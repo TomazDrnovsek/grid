@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'profile_block.dart';
 import 'photo_grid.dart';
@@ -18,12 +19,47 @@ class _GridHomePageState extends State<GridHomePage> {
   final Set<int> _selectedIndexes = {};
   final ImagePicker _picker = ImagePicker();
 
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedImages();
+  }
+
+  // Load saved file paths, rebuild File objects, ignore missing files
+  Future<void> _loadSavedImages() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final List<String>? paths = prefs.getStringList('grid_image_paths');
+      if (paths != null) {
+        final valid = paths.where((p) => File(p).existsSync()).toList();
+        setState(() {
+          _images.clear();
+          _images.addAll(valid.map((p) => File(p)));
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading saved images: $e');
+    }
+  }
+
+  // Persist current order of file paths
+  Future<void> _saveImageOrder() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final paths = _images.map((f) => f.path).toList();
+      await prefs.setStringList('grid_image_paths', paths);
+    } catch (e) {
+      debugPrint('Error saving image order: $e');
+    }
+  }
+
   Future<void> _addPhoto() async {
     final pickedList = await _picker.pickMultiImage();
     if (pickedList.isNotEmpty) {
       setState(() {
         _images.insertAll(0, pickedList.map((x) => File(x.path)));
       });
+      await _saveImageOrder();
     }
   }
 
@@ -42,7 +78,7 @@ class _GridHomePageState extends State<GridHomePage> {
     // Long press initiates drag & drop
   }
 
-  void _handleReorder(int oldIndex, int newIndex) {
+  void _handleReorder(int oldIndex, int newIndex) async {
     setState(() {
       // Clear selections during reorder to avoid confusion
       _selectedIndexes.clear();
@@ -56,6 +92,7 @@ class _GridHomePageState extends State<GridHomePage> {
       final File item = _images.removeAt(oldIndex);
       _images.insert(newIndex, item);
     });
+    await _saveImageOrder();
   }
 
   void _confirmDelete() {
@@ -70,7 +107,8 @@ class _GridHomePageState extends State<GridHomePage> {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
+              final navigator = Navigator.of(context);
               setState(() {
                 // Sort selected indexes in descending order to avoid index shifting issues
                 final sortedIndexes = _selectedIndexes.toList()..sort((a, b) => b.compareTo(a));
@@ -81,7 +119,8 @@ class _GridHomePageState extends State<GridHomePage> {
 
                 _selectedIndexes.clear();
               });
-              Navigator.pop(context);
+              await _saveImageOrder();
+              navigator.pop();
             },
             child: const Text('Delete'),
           ),
