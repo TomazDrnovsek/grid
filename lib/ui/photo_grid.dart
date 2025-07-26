@@ -86,9 +86,16 @@ class PhotoGrid extends StatelessWidget {
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        Image.file(
-                          images[index],
-                          fit: BoxFit.cover,
+                        Container(
+                          decoration: isSelected
+                              ? BoxDecoration(
+                            border: Border.all(color: Colors.black, width: 3.0),
+                          )
+                              : null,
+                          child: Image.file(
+                            images[index],
+                            fit: BoxFit.cover,
+                          ),
                         ),
                         if (isSelected)
                           Positioned(
