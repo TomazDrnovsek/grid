@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 
 class FileUtils {
@@ -26,9 +25,9 @@ class FileUtils {
     final result = await FlutterImageCompress.compressAndGetFile(
       source.path,
       targetPath,
-      minWidth: 1080,
+      minWidth: 1074,
       // Let plugin decide minHeight to preserve aspect ratio
-      quality: 80,
+      quality: 85,
       autoCorrectionAngle: true,
       keepExif: true,
     );

@@ -161,18 +161,24 @@ class _GridHomePageState extends State<GridHomePage> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      bottomNavigationBar: SizedBox(
+      bottomNavigationBar: Container(
         height: 48,
-        child: BottomAppBar(
+        decoration: const BoxDecoration(
           color: Colors.white,
-          child: Center(
-            child: GestureDetector(
-              onTap: _addPhoto,
-              child: SvgPicture.asset(
-                'assets/add_button.svg',
-                width: 24,
-                height: 24,
-              ),
+          border: Border(
+            top: BorderSide(
+              color: Color(0xFFF7F7F7), // Light gray color
+              width: 1.0,
+            ),
+          ),
+        ),
+        child: Center(
+          child: GestureDetector(
+            onTap: _addPhoto,
+            child: SvgPicture.asset(
+              'assets/add_button.svg',
+              width: 24,
+              height: 24,
             ),
           ),
         ),
@@ -184,7 +190,7 @@ class _GridHomePageState extends State<GridHomePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 24),
+                const SizedBox(height: 40),
                 const ProfileBlock(),
                 PhotoGrid(
                   images: _images,

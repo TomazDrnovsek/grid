@@ -43,7 +43,7 @@ class PhotoGrid extends StatelessWidget {
                 width: 118,
                 height: 157,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(0),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.3),
@@ -53,7 +53,7 @@ class PhotoGrid extends StatelessWidget {
                   ],
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(0),
                   child: Image.file(
                     images[index],
                     fit: BoxFit.cover,
