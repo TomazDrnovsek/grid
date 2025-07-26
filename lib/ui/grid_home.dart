@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../file_utils.dart';
 import 'profile_block.dart';
 import 'photo_grid.dart';
 
@@ -25,24 +26,50 @@ class _GridHomePageState extends State<GridHomePage> {
     _loadSavedImages();
   }
 
-  // Load saved file paths, rebuild File objects, ignore missing files
+  /// Load saved paths, migrate external files into app storage if needed.
   Future<void> _loadSavedImages() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final List<String>? paths = prefs.getStringList('grid_image_paths');
-      if (paths != null) {
-        final valid = paths.where((p) => File(p).existsSync()).toList();
-        setState(() {
-          _images.clear();
-          _images.addAll(valid.map((p) => File(p)));
-        });
+      final List<String>? stored = prefs.getStringList('grid_image_paths');
+      if (stored == null) return;
+
+      final appDir = await FileUtils.getAppImagesDir();
+      final List<String> migrated = [];
+
+      for (final path in stored) {
+        final file = File(path);
+        if (!file.existsSync()) continue;
+
+        if (path.startsWith(appDir.path)) {
+          // Already in app storage
+          migrated.add(path);
+        } else {
+          // Migrate external image into our storage
+          try {
+            final compressed = await FileUtils.copyAndCompress(XFile(path));
+            migrated.add(compressed.path);
+          } catch (e) {
+            // on failure, keep original so UI still works
+            debugPrint('Migration failed for $path: $e');
+            migrated.add(path);
+          }
+        }
       }
+
+      // Persist any new paths
+      await prefs.setStringList('grid_image_paths', migrated);
+
+      setState(() {
+        _images
+          ..clear()
+          ..addAll(migrated.map((p) => File(p)));
+      });
     } catch (e) {
-      debugPrint('Error loading saved images: $e');
+      debugPrint('Error loading/migrating images: $e');
     }
   }
 
-  // Persist current order of file paths
+  /// Save the current list of image file paths.
   Future<void> _saveImageOrder() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -53,14 +80,23 @@ class _GridHomePageState extends State<GridHomePage> {
     }
   }
 
+  /// Pick, copy to app storage, compress, and add to grid.
   Future<void> _addPhoto() async {
-    final pickedList = await _picker.pickMultiImage();
-    if (pickedList.isNotEmpty) {
-      setState(() {
-        _images.insertAll(0, pickedList.map((x) => File(x.path)));
-      });
-      await _saveImageOrder();
+    final picks = await _picker.pickMultiImage();
+    if (picks.isEmpty) return;
+
+    for (final xfile in picks) {
+      try {
+        // ▶️ Off the UI isolate; compression runs in background
+        final compressed = await FileUtils.copyAndCompress(xfile);
+        setState(() => _images.insert(0, compressed));
+      } catch (e) {
+        debugPrint('Error compressing ${xfile.path}: $e');
+        // Optionally: fall back to raw File(xfile.path)
+        // setState(() => _images.insert(0, File(xfile.path)));
+      }
     }
+    await _saveImageOrder();
   }
 
   void _handleTap(int index) {
@@ -73,54 +109,44 @@ class _GridHomePageState extends State<GridHomePage> {
     });
   }
 
-  void _handleLongPress(int index) {
-    // This is now handled by the ReorderableBuilder
-    // Long press initiates drag & drop
-  }
-
-  void _handleReorder(int oldIndex, int newIndex) async {
+  Future<void> _handleReorder(int oldIndex, int newIndex) async {
     setState(() {
-      // Clear selections during reorder to avoid confusion
       _selectedIndexes.clear();
-
-      // Adjust newIndex if necessary
-      if (oldIndex < newIndex) {
-        newIndex -= 1;
-      }
-
-      // Reorder the images list
-      final File item = _images.removeAt(oldIndex);
+      if (oldIndex < newIndex) newIndex -= 1;
+      final item = _images.removeAt(oldIndex);
       _images.insert(newIndex, item);
     });
     await _saveImageOrder();
   }
 
+  /// Confirm deletion, remove from both grid and disk.
   void _confirmDelete() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         title: const Text('Delete photos?'),
         content: const Text('This cannot be undone.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.of(dialogCtx).pop(),
             child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () async {
-              final navigator = Navigator.of(context);
-              setState(() {
-                // Sort selected indexes in descending order to avoid index shifting issues
-                final sortedIndexes = _selectedIndexes.toList()..sort((a, b) => b.compareTo(a));
-
-                for (final index in sortedIndexes) {
-                  _images.removeAt(index);
+              Navigator.of(dialogCtx).pop();
+              final sorted = _selectedIndexes.toList()
+                ..sort((a, b) => b.compareTo(a));
+              for (final i in sorted) {
+                final file = _images.removeAt(i);
+                try {
+                  await file.delete();
+                } catch (e) {
+                  debugPrint('Error deleting file ${file.path}: $e');
                 }
-
-                _selectedIndexes.clear();
-              });
+              }
+              _selectedIndexes.clear();
+              setState(() {});
               await _saveImageOrder();
-              navigator.pop();
             },
             child: const Text('Delete'),
           ),
@@ -133,60 +159,58 @@ class _GridHomePageState extends State<GridHomePage> {
   Widget build(BuildContext context) {
     final hasSelection = _selectedIndexes.isNotEmpty;
 
-    return Stack(
-      children: [
-        Scaffold(
-          backgroundColor: Colors.white,
-          body: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 24), // top margin for username
-                  const ProfileBlock(),
-                  PhotoGrid(
-                    images: _images,
-                    selectedIndexes: _selectedIndexes,
-                    onLongPress: _handleLongPress,
-                    onTap: _handleTap,
-                    onReorder: _handleReorder,
-                  ),
-                  const SizedBox(height: 90),
-                ],
-              ),
-            ),
-          ),
-          bottomNavigationBar: SizedBox(
-            height: 48,
-            child: BottomAppBar(
-              color: Colors.white,
-              child: Center(
-                child: GestureDetector(
-                  onTap: _addPhoto,
-                  child: SvgPicture.asset(
-                    'assets/add_button.svg',
-                    width: 24,
-                    height: 24,
-                  ),
-                ),
+    return Scaffold(
+      backgroundColor: Colors.white,
+      bottomNavigationBar: SizedBox(
+        height: 48,
+        child: BottomAppBar(
+          color: Colors.white,
+          child: Center(
+            child: GestureDetector(
+              onTap: _addPhoto,
+              child: SvgPicture.asset(
+                'assets/add_button.svg',
+                width: 24,
+                height: 24,
               ),
             ),
           ),
         ),
-        if (hasSelection)
-          Positioned(
-            bottom: 64, // adjusted to match bottom-left position above bottom bar
-            left: 16,
-            child: GestureDetector(
-              onTap: _confirmDelete,
-              child: SvgPicture.asset(
-                'assets/delete_button.svg',
-                width: 48,
-              ),
+      ),
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            // no horizontal padding; grid needs full-width
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 24),
+                const ProfileBlock(),
+                PhotoGrid(
+                  images: _images,
+                  selectedIndexes: _selectedIndexes,
+                  onTap: _handleTap,
+                  onReorder: _handleReorder,
+                  onLongPress: (_) {},
+                ),
+                const SizedBox(height: 90),
+              ],
             ),
           ),
-      ],
+        ],
+      ),
+      // Move delete button outside of body Stack to fix positioning
+      floatingActionButton: hasSelection
+          ? GestureDetector(
+        onTap: _confirmDelete,
+        child: SvgPicture.asset(
+          'assets/delete_button.svg',
+          width: 48,
+          height: 48, // Good practice to explicitly define height
+        ),
+      )
+          : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
     );
   }
 }
