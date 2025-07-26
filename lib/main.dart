@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:grid/app_theme.dart'; // Import your new theme file
 import 'ui/grid_home.dart';
 
 void main() {
@@ -13,11 +14,7 @@ class GridApp extends StatelessWidget {
     return MaterialApp(
       title: 'Grid',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        scaffoldBackgroundColor: Colors.white,
-        fontFamily: 'Roboto',
-        useMaterial3: true,
-      ),
+      theme: buildLightTheme(), // Use our custom light theme
       home: const GridHomePage(),
     );
   }
