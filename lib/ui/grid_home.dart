@@ -181,24 +181,29 @@ class _GridHomePageState extends State<GridHomePage> {
               ),
             ),
           ),
-          body: Stack(
-            children: [
-              SingleChildScrollView(
+          body: CustomScrollView(
+            slivers: [
+              // ProfileBlock as a sliver
+              SliverToBoxAdapter(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 40),
-                    const ProfileBlock(),
-                    PhotoGrid(
-                      images: _images,
-                      selectedIndexes: _selectedIndexes,
-                      onTap: _handleTap,
-                      onReorder: _handleReorder,
-                      onLongPress: (_) {},
-                    ),
-                    const SizedBox(height: 90),
+                  children: const [
+                    SizedBox(height: 40),
+                    ProfileBlock(),
                   ],
                 ),
+              ),
+              // Photo grid as a sliver
+              PhotoSliverGrid(
+                images: _images,
+                selectedIndexes: _selectedIndexes,
+                onTap: _handleTap,
+                onReorder: _handleReorder,
+                onLongPress: (_) {},
+              ),
+              // Bottom spacing for FAB
+              const SliverToBoxAdapter(
+                child: SizedBox(height: 90),
               ),
             ],
           ),

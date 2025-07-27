@@ -1,14 +1,14 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 
-class PhotoGrid extends StatelessWidget {
+class PhotoSliverGrid extends StatelessWidget {
   final List<File> images;
   final Set<int> selectedIndexes;
   final void Function(int) onTap;
   final void Function(int) onLongPress;
   final void Function(int oldIndex, int newIndex) onReorder;
 
-  const PhotoGrid({
+  const PhotoSliverGrid({
     super.key,
     required this.images,
     required this.selectedIndexes,
@@ -19,20 +19,15 @@ class PhotoGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 0),
-      child: GridView.builder(
-        padding: EdgeInsets.zero,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: images.length,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          mainAxisSpacing: 3,
-          crossAxisSpacing: 3,
-          childAspectRatio: 3 / 4,
-        ),
-        itemBuilder: (context, index) {
+    return SliverGrid(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        mainAxisSpacing: 3,
+        crossAxisSpacing: 3,
+        childAspectRatio: 3 / 4,
+      ),
+      delegate: SliverChildBuilderDelegate(
+            (context, index) {
           final isSelected = selectedIndexes.contains(index);
 
           return LongPressDraggable<int>(
@@ -123,6 +118,7 @@ class PhotoGrid extends StatelessWidget {
             ),
           );
         },
+        childCount: images.length,
       ),
     );
   }
