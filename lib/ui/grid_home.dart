@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../file_utils.dart';
 import 'profile_block.dart';
-import 'photo_grid.dart';
+import 'photo_sliver_grid.dart';
 import '../app_theme.dart';
 
 class GridHomePage extends StatefulWidget {
@@ -16,13 +16,17 @@ class GridHomePage extends StatefulWidget {
   State<GridHomePage> createState() => _GridHomePageState();
 }
 
-class _GridHomePageState extends State<GridHomePage> {
+class _GridHomePageState extends State<GridHomePage>
+    with AutomaticKeepAliveClientMixin {
   final List<File> _images = [];
   final Set<int> _selectedIndexes = {};
   final ImagePicker _picker = ImagePicker();
-
-  // ADDED: Modal visibility state for custom delete confirm
   bool _showDeleteConfirm = false;
+  bool _isLoading = false;
+
+  // Keep the state alive to prevent rebuilds
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -32,6 +36,9 @@ class _GridHomePageState extends State<GridHomePage> {
 
   /// Load saved paths, migrate external files into app storage if needed.
   Future<void> _loadSavedImages() async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final List<String>? stored = prefs.getStringList('grid_image_paths');
@@ -40,36 +47,48 @@ class _GridHomePageState extends State<GridHomePage> {
       final appDir = await FileUtils.getAppImagesDir();
       final List<String> migrated = [];
 
-      for (final path in stored) {
-        final file = File(path);
-        if (!file.existsSync()) continue;
+      // Process images in batches to avoid blocking UI
+      const batchSize = 10;
+      for (int i = 0; i < stored.length; i += batchSize) {
+        final batch = stored.skip(i).take(batchSize);
 
-        if (path.startsWith(appDir.path)) {
-          // Already in app storage
-          migrated.add(path);
-        } else {
-          // Migrate external image into our storage
-          try {
-            final compressed = await FileUtils.copyAndCompress(XFile(path));
-            migrated.add(compressed.path);
-          } catch (e) {
-            // on failure, keep original so UI still works
-            debugPrint('Migration failed for $path: $e');
+        for (final path in batch) {
+          final file = File(path);
+          if (!file.existsSync()) continue;
+
+          if (path.startsWith(appDir.path)) {
             migrated.add(path);
+          } else {
+            try {
+              final compressed = await FileUtils.copyAndCompress(XFile(path));
+              migrated.add(compressed.path);
+            } catch (e) {
+              debugPrint('Migration failed for $path: $e');
+              migrated.add(path);
+            }
           }
         }
+
+        // Update UI after each batch
+        if (mounted) {
+          setState(() {
+            _images
+              ..clear()
+              ..addAll(migrated.map((p) => File(p)));
+          });
+        }
+
+        // Allow other operations to run
+        await Future.delayed(const Duration(milliseconds: 1));
       }
 
-      // Persist any new paths
       await prefs.setStringList('grid_image_paths', migrated);
-
-      setState(() {
-        _images
-          ..clear()
-          ..addAll(migrated.map((p) => File(p)));
-      });
     } catch (e) {
       debugPrint('Error loading/migrating images: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -86,18 +105,34 @@ class _GridHomePageState extends State<GridHomePage> {
 
   /// Pick, copy to app storage, compress, and add to grid.
   Future<void> _addPhoto() async {
+    if (_isLoading) return;
+
     final picks = await _picker.pickMultiImage();
     if (picks.isEmpty) return;
 
-    for (final xfile in picks) {
-      try {
-        final compressed = await FileUtils.copyAndCompress(xfile);
-        setState(() => _images.insert(0, compressed));
-      } catch (e) {
-        debugPrint('Error compressing ${xfile.path}: $e');
+    setState(() => _isLoading = true);
+
+    try {
+      // Process images one by one to avoid memory spikes
+      for (final xfile in picks) {
+        try {
+          final compressed = await FileUtils.copyAndCompress(xfile);
+          if (mounted) {
+            setState(() => _images.insert(0, compressed));
+          }
+          // Small delay to prevent UI blocking
+          await Future.delayed(const Duration(milliseconds: 10));
+        } catch (e) {
+          debugPrint('Error compressing ${xfile.path}: $e');
+        }
+      }
+
+      await _saveImageOrder();
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
-    await _saveImageOrder();
   }
 
   void _handleTap(int index) {
@@ -120,7 +155,6 @@ class _GridHomePageState extends State<GridHomePage> {
     await _saveImageOrder();
   }
 
-  /// Show custom modal confirm, remove from both grid and disk on confirm.
   void _showDeleteModal() {
     setState(() {
       _showDeleteConfirm = true;
@@ -137,22 +171,40 @@ class _GridHomePageState extends State<GridHomePage> {
     setState(() {
       _showDeleteConfirm = false;
     });
+
     final sorted = _selectedIndexes.toList()..sort((a, b) => b.compareTo(a));
+
+    // Delete files in background to avoid blocking UI
+    final filesToDelete = <File>[];
     for (final i in sorted) {
-      final file = _images.removeAt(i);
+      filesToDelete.add(_images[i]);
+      _images.removeAt(i);
+    }
+
+    _selectedIndexes.clear();
+    setState(() {});
+
+    // Delete files asynchronously
+    _deleteFilesInBackground(filesToDelete);
+    await _saveImageOrder();
+  }
+
+  Future<void> _deleteFilesInBackground(List<File> files) async {
+    for (final file in files) {
       try {
         await file.delete();
       } catch (e) {
         debugPrint('Error deleting file ${file.path}: $e');
       }
+      // Small delay to prevent blocking
+      await Future.delayed(const Duration(milliseconds: 1));
     }
-    _selectedIndexes.clear();
-    setState(() {});
-    await _saveImageOrder();
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+
     final hasSelection = _selectedIndexes.isNotEmpty;
 
     return Stack(
@@ -165,49 +217,65 @@ class _GridHomePageState extends State<GridHomePage> {
               color: Colors.white,
               border: Border(
                 top: BorderSide(
-                  color: Color(0xFFF7F7F7), // Light gray color
+                  color: Color(0xFFF7F7F7),
                   width: 1.0,
                 ),
               ),
             ),
             child: Center(
               child: GestureDetector(
-                onTap: _addPhoto,
-                child: SvgPicture.asset(
-                  'assets/add_button.svg',
-                  width: 24,
-                  height: 24,
+                onTap: _isLoading ? null : _addPhoto,
+                child: Opacity(
+                  opacity: _isLoading ? 0.5 : 1.0,
+                  child: SvgPicture.asset(
+                    'assets/add_button.svg',
+                    width: 24,
+                    height: 24,
+                  ),
                 ),
               ),
             ),
           ),
           body: CustomScrollView(
+            // Add physics for better scrolling performance
+            physics: const BouncingScrollPhysics(),
+            cacheExtent: 1000, // Cache more items for smoother scrolling
             slivers: [
               // ProfileBlock as a sliver
-              SliverToBoxAdapter(
+              const SliverToBoxAdapter(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
+                  children: [
                     SizedBox(height: 40),
                     ProfileBlock(),
                   ],
                 ),
               ),
+              // Loading indicator
+              if (_isLoading && _images.isEmpty)
+                const SliverToBoxAdapter(
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(32.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  ),
+                ),
               // Photo grid as a sliver
-              PhotoSliverGrid(
-                images: _images,
-                selectedIndexes: _selectedIndexes,
-                onTap: _handleTap,
-                onReorder: _handleReorder,
-                onLongPress: (_) {},
-              ),
+              if (_images.isNotEmpty)
+                PhotoSliverGrid(
+                  images: _images,
+                  selectedIndexes: _selectedIndexes,
+                  onTap: _handleTap,
+                  onReorder: _handleReorder,
+                  onLongPress: (_) {},
+                ),
               // Bottom spacing for FAB
               const SliverToBoxAdapter(
                 child: SizedBox(height: 90),
               ),
             ],
           ),
-          // Delete button shows modal instead of system dialog
           floatingActionButton: hasSelection
               ? GestureDetector(
             onTap: _showDeleteModal,
@@ -236,8 +304,7 @@ class _GridHomePageState extends State<GridHomePage> {
   }
 }
 
-// --- ADDED: Custom Delete Confirm Modal ---
-
+// Delete confirm modal remains the same
 class _DeleteConfirmModal extends StatelessWidget {
   final VoidCallback onCancel;
   final VoidCallback onDelete;
@@ -251,7 +318,6 @@ class _DeleteConfirmModal extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // Dark overlay with tap-to-dismiss
         Positioned.fill(
           child: GestureDetector(
             onTap: onCancel,
@@ -260,7 +326,6 @@ class _DeleteConfirmModal extends StatelessWidget {
             ),
           ),
         ),
-        // Centered modal
         Center(
           child: Semantics(
             label: 'Delete confirmation dialog',
@@ -273,10 +338,10 @@ class _DeleteConfirmModal extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
+                  const Text(
                     'Are you sure?',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 20,
                       fontWeight: FontWeight.w500,
@@ -290,7 +355,6 @@ class _DeleteConfirmModal extends StatelessWidget {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Cancel button
                       SizedBox(
                         width: 80,
                         height: 44,
@@ -320,7 +384,6 @@ class _DeleteConfirmModal extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 16),
-                      // Delete button
                       SizedBox(
                         width: 80,
                         height: 44,
