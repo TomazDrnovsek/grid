@@ -6,7 +6,10 @@ class AppColors {
   static const Color textSecondary = Color(0xFF555555);
   static const Color backgroundDefault = Color(0xFFFFFFFF);
   static const Color brandPrimary = Color(0xFF7424FF);
-// Add other colors from your handoff here as needed.
+  // Add other colors from your handoff here as needed.
+
+  // ADDED: Modal overlay color (80% opacity black)
+  static const Color overlay80 = Color(0xCC111111);
 }
 
 // Central place for all our app's text styles.
