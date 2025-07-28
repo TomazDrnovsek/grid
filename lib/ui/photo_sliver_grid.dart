@@ -22,8 +22,8 @@ class PhotoSliverGrid extends StatelessWidget {
     return SliverGrid(
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
-        mainAxisSpacing: 3,
-        crossAxisSpacing: 3,
+        mainAxisSpacing: 2,
+        crossAxisSpacing: 2,
         childAspectRatio: 3 / 4,
       ),
       delegate: SliverChildBuilderDelegate(
@@ -158,8 +158,8 @@ class _PhotoGridItem extends StatelessWidget {
           child: Image.file(
             file,
             fit: BoxFit.cover,
-            cacheWidth: 150,
-            cacheHeight: 200,
+            cacheWidth: 300,
+            cacheHeight: 400,
           ),
         ),
       ),
