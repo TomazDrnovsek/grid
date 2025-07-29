@@ -14,12 +14,13 @@ class AppColors {
 
 // Central place for all our app's text styles.
 class AppTextStyles {
+  // CHANGED: 19px bold with 3% letter spacing
   static const TextStyle headlineSm = TextStyle(
-    fontFamily: 'Roboto', // Make sure to match your main.dart font
-    fontSize: 20,
-    fontWeight: FontWeight.normal, // Regular weight
+    fontFamily: 'Roboto',
+    fontSize: 19,
+    fontWeight: FontWeight.bold,
+    letterSpacing: 0.57,
     color: AppColors.textPrimary,
-    height: 28 / 20, // Line height calculation
   );
 
   static const TextStyle body = TextStyle(
@@ -56,4 +57,14 @@ ThemeData buildLightTheme() {
     ),
     useMaterial3: true,
   );
+}
+
+// ADDED: Expose styles and colors for widget use
+class AppTheme {
+  static const TextStyle headlineSm = AppTextStyles.headlineSm;
+  static const TextStyle body = AppTextStyles.body;
+  static const TextStyle bodyMedium = AppTextStyles.bodyMedium;
+
+  static const Color background = AppColors.backgroundDefault;
+  static const Color primary = AppColors.brandPrimary;
 }

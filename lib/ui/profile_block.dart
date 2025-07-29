@@ -13,43 +13,32 @@ class ProfileBlock extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Username text
-          const Text(
-            'tomazdrnovsek',
-            style: TextStyle(
-              fontFamily: 'Roboto',
-              fontSize: 20,
-              fontWeight: FontWeight.w500, // Medium weight
-              color: AppColors.textPrimary,
-            ),
-          ),
+          // CHANGED: use AppTheme style
+          const Text('tomazdrnovsek', style: AppTheme.headlineSm),
           const SizedBox(height: 16),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Circle avatar with your photo
               const CircleAvatar(
                 radius: 40,
                 backgroundImage: AssetImage('assets/images/profile.jpg'),
-                backgroundColor: Colors.grey, // Fallback color if image fails to load
+                backgroundColor: Colors.grey,
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // User's full name
                     const Text(
                       'Tomaž Drnovšek',
                       style: TextStyle(
                         fontFamily: 'Roboto',
                         fontSize: 14,
-                        fontWeight: FontWeight.w500, // Medium weight
+                        fontWeight: FontWeight.w500,
                         color: AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    // Row for stats
                     const Row(
                       children: [
                         Stat(label: 'posts', value: '327'),
@@ -65,7 +54,6 @@ class ProfileBlock extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          // User's location/bio text
           const Text(
             'From Ljubljana, Slovenia.',
             style: TextStyle(
@@ -94,23 +82,21 @@ class Stat extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // The stat value (e.g., "327") - medium 16px
         Text(
           value,
           style: const TextStyle(
             fontFamily: 'Roboto',
             fontSize: 16,
-            fontWeight: FontWeight.w500, // Medium weight
+            fontWeight: FontWeight.w500,
             color: AppColors.textPrimary,
           ),
         ),
-        // The stat label (e.g., "posts") - regular 14px
         Text(
           label,
           style: const TextStyle(
             fontFamily: 'Roboto',
             fontSize: 14,
-            fontWeight: FontWeight.normal, // Regular weight
+            fontWeight: FontWeight.normal,
             color: AppColors.textSecondary,
           ),
         ),
