@@ -1,8 +1,8 @@
+// File: lib/ui/profile_block.dart
 import 'package:flutter/material.dart';
-import 'package:grid/app_theme.dart'; // Import your custom theme file
+import 'package:grid/app_theme.dart'; // Provides AppColors & AppTheme styles
 
-/// ProfileBlock Widget: Displays the main user profile information.
-/// This widget now uses styles from the app's central theme for consistency.
+/// Displays the main user profile information.
 class ProfileBlock extends StatelessWidget {
   const ProfileBlock({super.key});
 
@@ -13,7 +13,7 @@ class ProfileBlock extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // CHANGED: use AppTheme style
+          // CHANGED: use centralized headline style
           const Text('tomazdrnovsek', style: AppTheme.headlineSm),
           const SizedBox(height: 16),
           Row(
@@ -47,10 +47,10 @@ class ProfileBlock extends StatelessWidget {
                         SizedBox(width: 24),
                         Stat(label: 'following', value: '813'),
                       ],
-                    )
+                    ),
                   ],
                 ),
-              )
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -70,7 +70,7 @@ class ProfileBlock extends StatelessWidget {
   }
 }
 
-/// Stat Widget: A reusable component for displaying a value and a label (e.g., "327 posts").
+/// Reusable value/label pair.
 class Stat extends StatelessWidget {
   final String label;
   final String value;
