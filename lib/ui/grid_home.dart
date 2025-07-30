@@ -338,18 +338,9 @@ class _DeleteConfirmModal extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
-                    'Are you sure?',
+                  const Text('Are you sure?',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: 'Roboto',
-                      fontSize: 20,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
-                      height: 1.4,
-                      decoration: TextDecoration.none,
-                      decorationColor: Colors.transparent,
-                    ),
+                    style: AppTextStyles.dialogTitle
                   ),
                   const SizedBox(height: 24),
                   Row(
@@ -373,13 +364,7 @@ class _DeleteConfirmModal extends StatelessWidget {
                           onPressed: onCancel,
                           child: const Text(
                             'Cancel',
-                            style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontFamily: 'Roboto',
-                              fontWeight: FontWeight.w400,
-                              fontSize: 14,
-                              height: 1.29,
-                            ),
+                            style: AppTextStyles.dialogActionPrimary
                           ),
                         ),
                       ),
@@ -402,13 +387,7 @@ class _DeleteConfirmModal extends StatelessWidget {
                           onPressed: onDelete,
                           child: const Text(
                             'Delete',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontFamily: 'Roboto',
-                              fontWeight: FontWeight.w400,
-                              fontSize: 14,
-                              height: 1.29,
-                            ),
+                            style: AppTextStyles.dialogActionDanger
                           ),
                         ),
                       ),

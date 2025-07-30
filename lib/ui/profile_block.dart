@@ -29,15 +29,7 @@ class ProfileBlock extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Tomaž Drnovšek',
-                      style: TextStyle(
-                        fontFamily: 'Roboto',
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
+                    const Text('Tomaž Drnovšek', style: AppTheme.bodyMedium),
                     const SizedBox(height: 8),
                     const Row(
                       children: [
@@ -54,15 +46,7 @@ class ProfileBlock extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          const Text(
-            'From Ljubljana, Slovenia.',
-            style: TextStyle(
-              fontFamily: 'Roboto',
-              fontSize: 14,
-              fontWeight: FontWeight.normal,
-              color: AppColors.textPrimary,
-            ),
-          ),
+          const Text('From Ljubljana, Slovenia.', style: AppTheme.body),
           const SizedBox(height: 24),
         ],
       ),
@@ -84,21 +68,11 @@ class Stat extends StatelessWidget {
       children: [
         Text(
           value,
-          style: const TextStyle(
-            fontFamily: 'Roboto',
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: AppColors.textPrimary,
-          ),
+          style: AppTextStyles.statValue
         ),
         Text(
           label,
-          style: const TextStyle(
-            fontFamily: 'Roboto',
-            fontSize: 14,
-            fontWeight: FontWeight.normal,
-            color: AppColors.textSecondary,
-          ),
+          style: AppTextStyles.statLabel
         ),
       ],
     );

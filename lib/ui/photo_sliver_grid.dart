@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:grid/app_theme.dart';
 
 class PhotoSliverGrid extends StatelessWidget {
   final List<File> images;
@@ -70,7 +71,7 @@ class _PhotoGridItem extends StatelessWidget {
       feedback: _buildDragFeedback(),
       childWhenDragging: Container(
         decoration: BoxDecoration(
-          color: Colors.grey.withValues(alpha: 0.3),
+          color: AppColors.gridDragPlaceholder,
           borderRadius: BorderRadius.circular(4),
         ),
       ),
@@ -87,9 +88,9 @@ class _PhotoGridItem extends StatelessWidget {
             child: Container(
               decoration: BoxDecoration(
                 border: isTarget
-                    ? Border.all(color: Colors.blue, width: 2)
+                    ? Border.all(color: AppColors.gridDragTargetBorder, width: 2)
                     : isSelected
-                    ? Border.all(color: Colors.black, width: 3.0)
+                    ? Border.all(color: AppColors.gridSelectionBorder, width: 3.0)
                     : null,
               ),
               child: Stack(
@@ -105,8 +106,8 @@ class _PhotoGridItem extends StatelessWidget {
                     // Add error handling
                     errorBuilder: (context, error, stackTrace) {
                       return Container(
-                        color: Colors.grey[300],
-                        child: const Icon(Icons.error, color: Colors.grey),
+                        color: AppColors.gridErrorBackground,
+                        child: const Icon(Icons.error, color: AppColors.gridErrorIcon),
                       );
                     },
                   ),
@@ -119,7 +120,7 @@ class _PhotoGridItem extends StatelessWidget {
                         height: 24,
                         decoration: const BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.black,
+                          color: AppColors.gridSelectionTickBg,
                         ),
                         child: const Icon(
                           Icons.check,
@@ -147,7 +148,7 @@ class _PhotoGridItem extends StatelessWidget {
           borderRadius: BorderRadius.circular(0),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.3),
+              color: AppColors.gridDragShadow,
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),
