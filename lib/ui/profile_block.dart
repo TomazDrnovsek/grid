@@ -22,7 +22,7 @@ class ProfileBlock extends StatelessWidget {
               const CircleAvatar(
                 radius: 40,
                 backgroundImage: AssetImage('assets/images/profile.jpg'),
-                backgroundColor: Colors.grey,
+                backgroundColor: AppColors.avatarPlaceholder,
               ),
               const SizedBox(width: 16),
               Expanded(

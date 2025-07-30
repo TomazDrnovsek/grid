@@ -55,7 +55,9 @@ class _PhotoGridItem extends StatelessWidget {
   final void Function(int) onTap;
   final void Function(int oldIndex, int newIndex) onReorder;
 
-  const _PhotoGridItem({
+  // Removed GlobalKey as LayoutBuilder will provide the size
+
+  const _PhotoGridItem({ // Added const keyword here
     super.key,
     required this.file,
     required this.index,
@@ -66,84 +68,96 @@ class _PhotoGridItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LongPressDraggable<int>(
-      data: index,
-      feedback: _buildDragFeedback(),
-      childWhenDragging: Container(
-        decoration: BoxDecoration(
-          color: AppColors.gridDragPlaceholder,
-          borderRadius: BorderRadius.circular(4),
+    // This is the actual content of the grid item, which will be reused for child, childWhenDragging, and feedback
+    final gridItemVisualContent = Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.file(
+          file,
+          fit: BoxFit.cover,
+          cacheWidth: 360, // Keep this for efficient loading in the grid
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              color: AppColors.gridErrorBackground,
+              child: const Icon(Icons.error, color: AppColors.gridErrorIcon),
+            );
+          },
         ),
-      ),
-      child: DragTarget<int>(
-        onWillAcceptWithDetails: (details) => details.data != index,
-        onAcceptWithDetails: (details) {
-          onReorder(details.data, index);
-        },
-        builder: (context, candidateData, rejectedData) {
-          final isTarget = candidateData.isNotEmpty;
-
-          return GestureDetector(
-            onTap: () => onTap(index),
+        if (isSelected)
+          Positioned(
+            bottom: 8,
+            right: 8,
             child: Container(
-              decoration: BoxDecoration(
-                border: isTarget
-                    ? Border.all(color: AppColors.gridDragTargetBorder, width: 2)
-                    : isSelected
-                    ? Border.all(color: AppColors.gridSelectionBorder, width: 3.0)
-                    : null,
+              width: 24,
+              height: 24,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.gridSelectionTickBg,
               ),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // Use memory-efficient image loading
-                  Image.file(
-                    file,
-                    fit: BoxFit.cover,
-                    // Reduce memory usage - these values are more reasonable
-                    cacheWidth: 360, // Reduced from 200
-                    // cacheHeight: 480, // Reduced from 267
-                    // Add error handling
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: AppColors.gridErrorBackground,
-                        child: const Icon(Icons.error, color: AppColors.gridErrorIcon),
-                      );
-                    },
-                  ),
-                  if (isSelected)
-                    Positioned(
-                      bottom: 8,
-                      right: 8,
-                      child: Container(
-                        width: 24,
-                        height: 24,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.gridSelectionTickBg,
-                        ),
-                        child: const Icon(
-                          Icons.check,
-                          size: 16,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                ],
+              child: const Icon(
+                Icons.check,
+                size: 16,
+                color: Colors.white,
               ),
             ),
-          );
-        },
-      ),
+          ),
+      ],
+    );
+
+    // Use LayoutBuilder to get the size of the _PhotoGridItem
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final itemSize = Size(constraints.maxWidth, constraints.maxHeight);
+
+        return LongPressDraggable<int>(
+          data: index,
+          // MODIFIED: Pass the calculated itemSize directly to _buildDragFeedback
+          feedback: _buildDragFeedback(itemSize, gridItemVisualContent),
+          // MODIFIED: childWhenDragging now mirrors the actual item's appearance
+          childWhenDragging: Container(
+            decoration: BoxDecoration(
+              color: AppColors.gridDragPlaceholder,
+              border: isSelected
+                  ? Border.all(color: AppColors.gridSelectionBorder, width: 3.0)
+                  : null,
+            ),
+            child: gridItemVisualContent, // Use the shared visual content
+          ),
+          child: DragTarget<int>(
+            onWillAcceptWithDetails: (details) => details.data != index,
+            onAcceptWithDetails: (details) {
+              onReorder(details.data, index);
+            },
+            builder: (context, candidateData, rejectedData) {
+              final isTarget = candidateData.isNotEmpty;
+
+              return GestureDetector(
+                onTap: () => onTap(index),
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: isTarget
+                        ? Border.all(color: AppColors.gridDragTargetBorder, width: 2)
+                        : isSelected
+                        ? Border.all(color: AppColors.gridSelectionBorder, width: 3.0)
+                        : null,
+                  ),
+                  child: gridItemVisualContent, // Use the shared visual content
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildDragFeedback() {
+  // MODIFIED: _buildDragFeedback now accepts the Size of the original widget and its content
+  Widget _buildDragFeedback(Size size, Widget content) {
     return Material(
       color: Colors.transparent,
       child: Container(
-        width: 118,
-        height: 157,
+        width: size.width, // Set width to match the original item
+        height: size.height, // Set height to match the original item
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(0),
           boxShadow: [
@@ -156,12 +170,7 @@ class _PhotoGridItem extends StatelessWidget {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(0),
-          child: Image.file(
-            file,
-            fit: BoxFit.cover,
-            cacheWidth: 300,
-            cacheHeight: 400,
-          ),
+          child: content, // Use the passed content
         ),
       ),
     );

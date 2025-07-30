@@ -17,6 +17,9 @@ class AppColors {
   static const Color gridErrorBackground = Color(0xFFE0E0E0);   // grey-300 container
   static const Color gridErrorIcon = Color(0xFF9E9E9E);         // grey icon tint
   static const Color gridDragShadow = Color(0x4D000000);        // 30 % black shadow
+  static const Color sheetDivider = Color(0xFFF7F7F7); // very-light grey
+  static const Color avatarPlaceholder = Color(0xFF9E9E9E); // medium grey
+
 
 }
 

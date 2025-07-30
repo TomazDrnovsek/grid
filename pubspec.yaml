@@ -98,5 +98,7 @@ flutter:
     - assets/delete_button.svg
     - assets/GRID_logo.svg
     - assets/selected_icon.svg
+    - assets/selected_icon.svg
+    - assets/menu_icon.svg
     - assets/images/sample1.jpg
     - assets/images/profile.jpg

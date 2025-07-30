@@ -148,7 +148,9 @@ class _GridHomePageState extends State<GridHomePage>
   Future<void> _handleReorder(int oldIndex, int newIndex) async {
     setState(() {
       _selectedIndexes.clear();
-      if (oldIndex < newIndex) newIndex -= 1;
+      // MODIFIED: Removed the conditional newIndex -= 1 adjustment
+      // This adjustment is often needed for ReorderableListView,
+      // but causes over-correction with LongPressDraggable/DragTarget in this setup.
       final item = _images.removeAt(oldIndex);
       _images.insert(newIndex, item);
     });
@@ -217,7 +219,7 @@ class _GridHomePageState extends State<GridHomePage>
               color: Colors.white,
               border: Border(
                 top: BorderSide(
-                  color: Color(0xFFF7F7F7),
+                  color: AppColors.sheetDivider,
                   width: 1.0,
                 ),
               ),
@@ -339,8 +341,8 @@ class _DeleteConfirmModal extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text('Are you sure?',
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.dialogTitle
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.dialogTitle
                   ),
                   const SizedBox(height: 24),
                   Row(
@@ -363,8 +365,8 @@ class _DeleteConfirmModal extends StatelessWidget {
                           ),
                           onPressed: onCancel,
                           child: const Text(
-                            'Cancel',
-                            style: AppTextStyles.dialogActionPrimary
+                              'Cancel',
+                              style: AppTextStyles.dialogActionPrimary
                           ),
                         ),
                       ),
@@ -386,8 +388,8 @@ class _DeleteConfirmModal extends StatelessWidget {
                           ),
                           onPressed: onDelete,
                           child: const Text(
-                            'Delete',
-                            style: AppTextStyles.dialogActionDanger
+                              'Delete',
+                              style: AppTextStyles.dialogActionDanger
                           ),
                         ),
                       ),
