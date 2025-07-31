@@ -253,7 +253,7 @@ class _GridHomePageState extends State<GridHomePage>
       children: [
         Scaffold(
           backgroundColor: AppColors.scaffoldBackground,
-          // CHANGED: bottom bar now includes the home button
+          // CHANGED: bottom bar now conditionally displays home or delete button
           bottomNavigationBar: Container(
             height: 48,
             decoration: const BoxDecoration(
@@ -267,19 +267,32 @@ class _GridHomePageState extends State<GridHomePage>
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.start, // Align to the start (left)
+              child: hasSelection // Conditional check for selected images
+                  ? Row( // View 2: Delete Mode (only delete button)
+                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
                   GestureDetector(
-                    onTap: _scrollToTop, // Call the scroll to top method
+                    onTap: _showDeleteModal, // Calls the delete confirmation modal
                     child: SvgPicture.asset(
-                      // Conditionally change icon based on scroll position
+                      'assets/delete_icon.svg', // New delete icon
+                      width: 24, // Consistent size
+                      height: 24, // Consistent size
+                    ),
+                  ),
+                ],
+              )
+                  : Row( // View 1: Normal Mode (home button and future normal buttons)
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  GestureDetector(
+                    onTap: _scrollToTop,
+                    child: SvgPicture.asset(
                       _isAtTop ? 'assets/home_icon-fill.svg' : 'assets/home_icon-outline.svg',
                       width: 24,
                       height: 24,
                     ),
                   ),
-                  // Other potential icons can go here, using Spacers if needed
+                  // Future normal-mode buttons would be added here
                 ],
               ),
             ),
@@ -351,17 +364,9 @@ class _GridHomePageState extends State<GridHomePage>
               const SliverToBoxAdapter(child: SizedBox(height: 90)),
             ],
           ),
-          floatingActionButton: hasSelection
-              ? GestureDetector(
-            onTap: _showDeleteModal,
-            child: SvgPicture.asset(
-              'assets/delete_button.svg',
-              width: 48,
-              height: 48,
-            ),
-          )
-              : null,
-          floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
+          // REMOVED: FloatingActionButton is no longer needed
+          floatingActionButton: null,
+          floatingActionButtonLocation: null,
         ),
 
         // Custom modal overlay with animation

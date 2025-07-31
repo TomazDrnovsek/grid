@@ -101,5 +101,6 @@ flutter:
     - assets/menu_icon.svg
     - assets/home_icon-fill.svg
     - assets/home_icon-outline.svg
+    - assets/delete_icon.svg
     - assets/images/sample1.jpg
     - assets/images/profile.jpg
