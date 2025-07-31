@@ -116,12 +116,12 @@ class _PhotoGridItem extends StatelessWidget {
           // MODIFIED: childWhenDragging now mirrors the actual item's appearance
           childWhenDragging: Container(
             decoration: BoxDecoration(
-              color: AppColors.gridDragPlaceholder,
+              color: AppColors.gridDragPlaceholder, // This color will now be visible
               border: isSelected
                   ? Border.all(color: AppColors.gridSelectionBorder, width: 4.0)
                   : null,
             ),
-            child: gridItemVisualContent, // Use the shared visual content
+            // The 'child' property showing the image has been removed.
           ),
           child: DragTarget<int>(
             onWillAcceptWithDetails: (details) => details.data != index,
