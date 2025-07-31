@@ -13,8 +13,7 @@ class ProfileBlock extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // CHANGED: use centralized headline style
-          const Text('tomazdrnovsek', style: AppTheme.headlineSm),
+          // REMOVED: The username 'tomazdrnovsek' is now in the top app bar
           const SizedBox(height: 16),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -67,12 +66,12 @@ class Stat extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          value,
-          style: AppTheme.statValue
+            value,
+            style: AppTheme.statValue
         ),
         Text(
-          label,
-          style: AppTheme.statLabel
+            label,
+            style: AppTheme.statLabel
         ),
       ],
     );

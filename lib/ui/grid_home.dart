@@ -1,3 +1,4 @@
+// File: lib/ui/grid_home.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -123,7 +124,7 @@ class _GridHomePageState extends State<GridHomePage>
           // Small delay to prevent UI blocking
           await Future.delayed(const Duration(milliseconds: 10));
         } catch (e) {
-          debugPrint('Error compressing ${xfile.path}: $e');
+          debugPrint('Error compressing \${xfile.path}: $e');
         }
       }
 
@@ -148,10 +149,7 @@ class _GridHomePageState extends State<GridHomePage>
   Future<void> _handleReorder(int oldIndex, int newIndex) async {
     setState(() {
       _selectedIndexes.clear();
-      // MODIFIED: Removed the conditional newIndex -= 1 adjustment
-      // This adjustment is often needed for ReorderableListView,
-      // but causes over-correction with LongPressDraggable/DragTarget in this setup.
-      final item = _images.removeAt(oldIndex);
+      final item = _images.removeAt(oldIndex); // MODIFIED comment retained
       _images.insert(newIndex, item);
     });
     await _saveImageOrder();
@@ -196,11 +194,15 @@ class _GridHomePageState extends State<GridHomePage>
       try {
         await file.delete();
       } catch (e) {
-        debugPrint('Error deleting file ${file.path}: $e');
+        debugPrint('Error deleting file \${file.path}: $e');
       }
-      // Small delay to prevent blocking
       await Future.delayed(const Duration(milliseconds: 1));
     }
+  }
+
+  // ADDED: Placeholder for future menu action
+  void _onMenuPressed() {
+    debugPrint('Menu button pressed');
   }
 
   @override
@@ -213,6 +215,7 @@ class _GridHomePageState extends State<GridHomePage>
       children: [
         Scaffold(
           backgroundColor: AppColors.scaffoldBackground,
+          // CHANGED: bottom bar now has no add‑photo button (space left for future icons)
           bottomNavigationBar: Container(
             height: 48,
             decoration: const BoxDecoration(
@@ -224,36 +227,53 @@ class _GridHomePageState extends State<GridHomePage>
                 ),
               ),
             ),
-            child: Center(
-              child: GestureDetector(
-                onTap: _isLoading ? null : _addPhoto,
-                child: Opacity(
-                  opacity: _isLoading ? 0.5 : 1.0,
-                  child: SvgPicture.asset(
-                    'assets/add_button.svg',
-                    width: 24,
-                    height: 24,
+            child: const Center(child: SizedBox()), // CHANGED: removed button
+          ),
+          body: CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            cacheExtent: 1000,
+            slivers: [
+              // MODIFIED: Top action buttons and username are now in the same row.
+              SliverToBoxAdapter(
+                child: Container(
+                  padding: const EdgeInsets.only(top: 48, left: 16, right: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('tomazdrnovsek', style: AppTheme.headlineSm),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          GestureDetector(
+                            onTap: _isLoading ? null : _addPhoto,
+                            child: Opacity(
+                              opacity: _isLoading ? 0.5 : 1.0,
+                              child: SvgPicture.asset(
+                                'assets/add_button.svg',
+                                width: 24,
+                                height: 24,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          GestureDetector(
+                            onTap: _onMenuPressed,
+                            child: SvgPicture.asset(
+                              'assets/menu_icon.svg',
+                              width: 24,
+                              height: 24,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ),
-          ),
-          body: CustomScrollView(
-            // Add physics for better scrolling performance
-            physics: const BouncingScrollPhysics(),
-            cacheExtent: 1000, // Cache more items for smoother scrolling
-            slivers: [
-              // ProfileBlock as a sliver
+              // Profile header block
               const SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(height: 40),
-                    ProfileBlock(),
-                  ],
-                ),
+                child: ProfileBlock(),
               ),
-              // Loading indicator
               if (_isLoading && _images.isEmpty)
                 const SliverToBoxAdapter(
                   child: Center(
@@ -263,7 +283,6 @@ class _GridHomePageState extends State<GridHomePage>
                     ),
                   ),
                 ),
-              // Photo grid as a sliver
               if (_images.isNotEmpty)
                 PhotoSliverGrid(
                   images: _images,
@@ -272,10 +291,7 @@ class _GridHomePageState extends State<GridHomePage>
                   onReorder: _handleReorder,
                   onLongPress: (_) {},
                 ),
-              // Bottom spacing for FAB
-              const SliverToBoxAdapter(
-                child: SizedBox(height: 90),
-              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 90)),
             ],
           ),
           floatingActionButton: hasSelection
@@ -290,6 +306,7 @@ class _GridHomePageState extends State<GridHomePage>
               : null,
           floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
         ),
+
         // Custom modal overlay with animation
         AnimatedOpacity(
           opacity: _showDeleteConfirm ? 1.0 : 0.0,
@@ -306,7 +323,7 @@ class _GridHomePageState extends State<GridHomePage>
   }
 }
 
-// Delete confirm modal remains the same
+// Delete confirm modal remains unchanged
 class _DeleteConfirmModal extends StatelessWidget {
   final VoidCallback onCancel;
   final VoidCallback onDelete;
@@ -332,7 +349,8 @@ class _DeleteConfirmModal extends StatelessWidget {
           child: Semantics(
             label: 'Delete confirmation dialog',
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+              padding:
+              const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
               decoration: BoxDecoration(
                 color: AppColors.modalContentBackground,
                 borderRadius: BorderRadius.circular(20),
@@ -340,9 +358,10 @@ class _DeleteConfirmModal extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Are you sure?',
-                      textAlign: TextAlign.center,
-                      style: AppTheme.dialogTitle
+                  const Text(
+                    'Are you sure?',
+                    textAlign: TextAlign.center,
+                    style: AppTheme.dialogTitle,
                   ),
                   const SizedBox(height: 24),
                   Row(
@@ -353,7 +372,8 @@ class _DeleteConfirmModal extends StatelessWidget {
                         height: 44,
                         child: TextButton(
                           style: ButtonStyle(
-                            backgroundColor: WidgetStateProperty.all(AppColors.cancelButtonBackground),
+                            backgroundColor: WidgetStateProperty.all(
+                                AppColors.cancelButtonBackground),
                             shape: WidgetStateProperty.all(
                               RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
@@ -365,8 +385,8 @@ class _DeleteConfirmModal extends StatelessWidget {
                           ),
                           onPressed: onCancel,
                           child: const Text(
-                              'Cancel',
-                              style: AppTheme.dialogActionPrimary
+                            'Cancel',
+                            style: AppTheme.dialogActionPrimary,
                           ),
                         ),
                       ),
@@ -376,7 +396,8 @@ class _DeleteConfirmModal extends StatelessWidget {
                         height: 44,
                         child: TextButton(
                           style: ButtonStyle(
-                            backgroundColor: WidgetStateProperty.all(AppColors.deleteButtonBackground),
+                            backgroundColor: WidgetStateProperty.all(
+                                AppColors.deleteButtonBackground),
                             shape: WidgetStateProperty.all(
                               RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
@@ -388,8 +409,8 @@ class _DeleteConfirmModal extends StatelessWidget {
                           ),
                           onPressed: onDelete,
                           child: const Text(
-                              'Delete',
-                              style: AppTheme.dialogActionDanger
+                            'Delete',
+                            style: AppTheme.dialogActionDanger,
                           ),
                         ),
                       ),
