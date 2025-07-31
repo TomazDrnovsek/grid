@@ -212,11 +212,11 @@ class _GridHomePageState extends State<GridHomePage>
     return Stack(
       children: [
         Scaffold(
-          backgroundColor: Colors.white,
+          backgroundColor: AppColors.scaffoldBackground,
           bottomNavigationBar: Container(
             height: 48,
             decoration: const BoxDecoration(
-              color: Colors.white,
+              color: AppColors.bottomBarBackground,
               border: Border(
                 top: BorderSide(
                   color: AppColors.sheetDivider,
@@ -324,7 +324,7 @@ class _DeleteConfirmModal extends StatelessWidget {
           child: GestureDetector(
             onTap: onCancel,
             child: Container(
-              color: AppColors.overlay80,
+              color: AppColors.modalOverlayBackground,
             ),
           ),
         ),
@@ -334,7 +334,7 @@ class _DeleteConfirmModal extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
               decoration: BoxDecoration(
-                color: AppColors.textPrimary,
+                color: AppColors.modalContentBackground,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Column(
@@ -353,7 +353,7 @@ class _DeleteConfirmModal extends StatelessWidget {
                         height: 44,
                         child: TextButton(
                           style: ButtonStyle(
-                            backgroundColor: WidgetStateProperty.all(Colors.white),
+                            backgroundColor: WidgetStateProperty.all(AppColors.cancelButtonBackground),
                             shape: WidgetStateProperty.all(
                               RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
@@ -376,14 +376,14 @@ class _DeleteConfirmModal extends StatelessWidget {
                         height: 44,
                         child: TextButton(
                           style: ButtonStyle(
-                            backgroundColor: WidgetStateProperty.all(AppColors.brandPrimary),
+                            backgroundColor: WidgetStateProperty.all(AppColors.deleteButtonBackground),
                             shape: WidgetStateProperty.all(
                               RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
                             ),
                             overlayColor: WidgetStateProperty.all(
-                              AppColors.brandPrimary.withAlpha(229),
+                              AppColors.deleteButtonOverlay,
                             ),
                           ),
                           onPressed: onDelete,

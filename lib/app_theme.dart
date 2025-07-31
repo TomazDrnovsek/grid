@@ -3,13 +3,15 @@ import 'package:flutter/material.dart';
 
 // Central place for all our app's colors, based on the hand-off document.
 class AppColors {
+  static const Color scaffoldBackground = Color(0xFFFFFFFF);
+  static const Color bottomBarBackground = Color(0xFFFFFFFF);
   static const Color textPrimary = Color(0xFF111111);
   static const Color textSecondary = Color(0xFF555555);
   static const Color backgroundDefault = Color(0xFFFFFFFF);
   static const Color brandPrimary = Color(0xFF7424FF);
   static const Color overlay80 = Color(0xCC111111);
 
-  // ADDED: grid-specific colours
+  // Grid-specific colours
   static const Color gridDragPlaceholder = Color(0x4D9E9E9E);   // 30 % grey
   static const Color gridDragTargetBorder = Color(0xFF1E88E5);  // vibrant blue hover outline
   static const Color gridSelectionBorder = textPrimary;         // reuse near-black
@@ -20,6 +22,13 @@ class AppColors {
   static const Color sheetDivider = Color(0xFFF7F7F7); // very-light grey
   static const Color avatarPlaceholder = Color(0xFF9E9E9E); // medium grey
 
+  // Delete modal specific colours
+  static const Color modalOverlayBackground = Color(0xCC111111); // 80% opaque black
+  static const Color modalContentBackground = Color(0xFFFFFFFF); // White background for the modal content
+  static const Color cancelButtonBackground = Color(0xFFE0E0E0); // Light gray for Cancel button background
+  static const Color deleteButtonBackground = Color(0xFF000000); // Black for Delete button background
+  static const Color deleteButtonText = Color(0xFFFFFFFF); // White text for Delete button
+  static const Color deleteButtonOverlay = Color(0x1AFFFFFF); // 10% opaque white
 
 }
 
@@ -70,7 +79,7 @@ class AppTheme {
     fontFamily: 'Roboto',
     fontSize: 20,
     fontWeight: FontWeight.w500,
-    color: Colors.white,
+    color: AppColors.textPrimary,
     height: 1.4,
     decoration: TextDecoration.none,
     decorationColor: Colors.transparent,

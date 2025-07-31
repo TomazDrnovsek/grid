@@ -118,7 +118,7 @@ class _PhotoGridItem extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.gridDragPlaceholder,
               border: isSelected
-                  ? Border.all(color: AppColors.gridSelectionBorder, width: 3.0)
+                  ? Border.all(color: AppColors.gridSelectionBorder, width: 4.0)
                   : null,
             ),
             child: gridItemVisualContent, // Use the shared visual content
@@ -138,7 +138,7 @@ class _PhotoGridItem extends StatelessWidget {
                     border: isTarget
                         ? Border.all(color: AppColors.gridDragTargetBorder, width: 2)
                         : isSelected
-                        ? Border.all(color: AppColors.gridSelectionBorder, width: 3.0)
+                        ? Border.all(color: AppColors.gridSelectionBorder, width: 4.0)
                         : null,
                   ),
                   child: gridItemVisualContent, // Use the shared visual content
