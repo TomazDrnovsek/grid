@@ -25,6 +25,11 @@ class _GridHomePageState extends State<GridHomePage>
   bool _showDeleteConfirm = false;
   bool _isLoading = false;
 
+  // Added: ScrollController to manage scrolling and detect position
+  final ScrollController _scrollController = ScrollController();
+  // Added: State to track if the scroll position is at the top
+  bool _isAtTop = true;
+
   // Keep the state alive to prevent rebuilds
   @override
   bool get wantKeepAlive => true;
@@ -33,6 +38,39 @@ class _GridHomePageState extends State<GridHomePage>
   void initState() {
     super.initState();
     _loadSavedImages();
+    // Added: Listen to scroll events
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    // Added: Dispose the scroll controller to prevent memory leaks
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  /// Method to handle scroll events and update _isAtTop state.
+  void _onScroll() {
+    // Update _isAtTop based on scroll offset. A small buffer (100) is used
+    // to account for slight bounces or overscrolling.
+    if (_scrollController.offset <= 100 && !_isAtTop) {
+      setState(() {
+        _isAtTop = true;
+      });
+    } else if (_scrollController.offset > 100 && _isAtTop) {
+      setState(() {
+        _isAtTop = false;
+      });
+    }
+  }
+
+  /// Method to scroll the CustomScrollView back to the top.
+  void _scrollToTop() {
+    _scrollController.animateTo(
+      0.0, // Scroll to the top
+      duration: const Duration(milliseconds: 300), // Animation duration
+      curve: Curves.easeOut, // Animation curve for smooth deceleration
+    );
   }
 
   /// Load saved paths, migrate external files into app storage if needed.
@@ -124,7 +162,7 @@ class _GridHomePageState extends State<GridHomePage>
           // Small delay to prevent UI blocking
           await Future.delayed(const Duration(milliseconds: 10));
         } catch (e) {
-          debugPrint('Error compressing \${xfile.path}: $e');
+          debugPrint('Error compressing ${xfile.path}: $e');
         }
       }
 
@@ -194,7 +232,7 @@ class _GridHomePageState extends State<GridHomePage>
       try {
         await file.delete();
       } catch (e) {
-        debugPrint('Error deleting file \${file.path}: $e');
+        debugPrint('Error deleting file ${file.path}: $e');
       }
       await Future.delayed(const Duration(milliseconds: 1));
     }
@@ -215,7 +253,7 @@ class _GridHomePageState extends State<GridHomePage>
       children: [
         Scaffold(
           backgroundColor: AppColors.scaffoldBackground,
-          // CHANGED: bottom bar now has no add‑photo button (space left for future icons)
+          // CHANGED: bottom bar now includes the home button
           bottomNavigationBar: Container(
             height: 48,
             decoration: const BoxDecoration(
@@ -227,16 +265,35 @@ class _GridHomePageState extends State<GridHomePage>
                 ),
               ),
             ),
-            child: const Center(child: SizedBox()), // CHANGED: removed button
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.start, // Align to the start (left)
+                children: [
+                  GestureDetector(
+                    onTap: _scrollToTop, // Call the scroll to top method
+                    child: SvgPicture.asset(
+                      // Conditionally change icon based on scroll position
+                      _isAtTop ? 'assets/home_icon-fill.svg' : 'assets/home_icon-outline.svg',
+                      width: 24,
+                      height: 24,
+                    ),
+                  ),
+                  // Other potential icons can go here, using Spacers if needed
+                ],
+              ),
+            ),
           ),
           body: CustomScrollView(
+            // Added: Attach the scroll controller to the CustomScrollView
+            controller: _scrollController,
             physics: const BouncingScrollPhysics(),
             cacheExtent: 1000,
             slivers: [
               // MODIFIED: Top action buttons and username are now in the same row.
               SliverToBoxAdapter(
                 child: Container(
-                  padding: const EdgeInsets.only(top: 48, left: 16, right: 16),
+                  padding: const EdgeInsets.only(top: 64, left: 16, right: 16),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [

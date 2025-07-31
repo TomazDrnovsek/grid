@@ -13,7 +13,6 @@ class ProfileBlock extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // REMOVED: The username 'tomazdrnovsek' is now in the top app bar
           const SizedBox(height: 16),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,

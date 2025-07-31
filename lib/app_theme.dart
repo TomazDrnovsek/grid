@@ -71,7 +71,7 @@ class AppTheme {
     fontFamily: 'Roboto',
     fontSize: 14,
     fontWeight: FontWeight.normal,
-    color: AppColors.textSecondary,
+    color: AppColors.textPrimary,
     height: 20 / 14,
   );
 
