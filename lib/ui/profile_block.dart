@@ -68,11 +68,11 @@ class Stat extends StatelessWidget {
       children: [
         Text(
           value,
-          style: AppTextStyles.statValue
+          style: AppTheme.statValue
         ),
         Text(
           label,
-          style: AppTextStyles.statLabel
+          style: AppTheme.statLabel
         ),
       ],
     );

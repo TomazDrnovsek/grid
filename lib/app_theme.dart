@@ -23,8 +23,8 @@ class AppColors {
 
 }
 
-// Central place for all our app's text styles.
-class AppTextStyles {
+// Central place for all our app's text styles and other theme properties.
+class AppTheme {
   static const TextStyle headlineSm = TextStyle(
     fontFamily: 'Roboto',
     fontSize: 19,
@@ -92,6 +92,9 @@ class AppTextStyles {
     height: 1.29,
   );
 
+  // Expose colors directly through AppTheme for consistency
+  static const Color background = AppColors.backgroundDefault;
+  static const Color primary = AppColors.brandPrimary;
 }
 
 // Light theme
@@ -102,19 +105,10 @@ ThemeData buildLightTheme() {
     primaryColor: AppColors.brandPrimary,
     fontFamily: 'Roboto',
     textTheme: const TextTheme(
-      titleLarge: AppTextStyles.headlineSm,
-      bodyMedium: AppTextStyles.body,
+      // Map your custom text styles to standard Material Design text theme properties
+      titleLarge: AppTheme.headlineSm, // Using AppTheme now
+      bodyMedium: AppTheme.body,       // Using AppTheme now
     ),
     useMaterial3: true,
   );
-}
-
-// ADDED: convenient re-exports
-class AppTheme {
-  static const TextStyle headlineSm = AppTextStyles.headlineSm;
-  static const TextStyle body = AppTextStyles.body;
-  static const TextStyle bodyMedium = AppTextStyles.bodyMedium;
-
-  static const Color background = AppColors.backgroundDefault;
-  static const Color primary = AppColors.brandPrimary;
 }

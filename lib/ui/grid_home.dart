@@ -342,7 +342,7 @@ class _DeleteConfirmModal extends StatelessWidget {
                 children: [
                   const Text('Are you sure?',
                       textAlign: TextAlign.center,
-                      style: AppTextStyles.dialogTitle
+                      style: AppTheme.dialogTitle
                   ),
                   const SizedBox(height: 24),
                   Row(
@@ -366,7 +366,7 @@ class _DeleteConfirmModal extends StatelessWidget {
                           onPressed: onCancel,
                           child: const Text(
                               'Cancel',
-                              style: AppTextStyles.dialogActionPrimary
+                              style: AppTheme.dialogActionPrimary
                           ),
                         ),
                       ),
@@ -389,7 +389,7 @@ class _DeleteConfirmModal extends StatelessWidget {
                           onPressed: onDelete,
                           child: const Text(
                               'Delete',
-                              style: AppTextStyles.dialogActionDanger
+                              style: AppTheme.dialogActionDanger
                           ),
                         ),
                       ),
