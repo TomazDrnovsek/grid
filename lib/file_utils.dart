@@ -24,7 +24,7 @@ class FileUtils {
   }
 
   /// Copies [source] into app storage and compresses it.
-  /// - maxWidth: 1074px, quality: 85
+  /// - maxWidth: 1080px, quality: 85
   /// - preserves EXIF orientation (autoCorrectionAngle)
   /// Throws on I/O errors.
   static Future<File> copyAndCompress(XFile source) async {
@@ -35,7 +35,7 @@ class FileUtils {
     final result = await FlutterImageCompress.compressAndGetFile(
       source.path,
       targetPath,
-      minWidth: 1074,
+      minWidth: 1080,
       // Let plugin decide minHeight to preserve aspect ratio
       quality: 85,
       autoCorrectionAngle: true,

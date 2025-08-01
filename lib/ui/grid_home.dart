@@ -308,7 +308,7 @@ class _GridHomePageState extends State<GridHomePage>
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
               child: hasSelection // Conditional check for selected images
-                  ? Row( // View 2: Delete Mode (only delete button)
+                  ? Row( // View 2: Delete Mode (delete button with counter)
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
                   GestureDetector(
@@ -317,6 +317,13 @@ class _GridHomePageState extends State<GridHomePage>
                       'assets/delete_icon.svg', // New delete icon
                       width: 24, // Consistent size
                       height: 24, // Consistent size
+                    ),
+                  ),
+                  const SizedBox(width: 16), // Space between delete icon and counter
+                  Text(
+                    '${_selectedIndexes.length}',
+                    style: AppTheme.bodyMedium.copyWith(
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ],
@@ -399,8 +406,8 @@ class _GridHomePageState extends State<GridHomePage>
                   thumbnails: _thumbnails,
                   selectedIndexes: _selectedIndexes,
                   onTap: _handleTap,
-                  onReorder: _handleReorder,
                   onLongPress: (_) {},
+                  onReorder: _handleReorder,
                 ),
               const SliverToBoxAdapter(child: SizedBox(height: 90)),
             ],
