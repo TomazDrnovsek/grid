@@ -7,6 +7,7 @@ class PhotoSliverGrid extends StatelessWidget {
   final List<File> thumbnails;
   final Set<int> selectedIndexes;
   final void Function(int) onTap;
+  final void Function(int) onDoubleTap;
   final void Function(int) onLongPress;
   final void Function(int oldIndex, int newIndex) onReorder;
 
@@ -16,6 +17,7 @@ class PhotoSliverGrid extends StatelessWidget {
     required this.thumbnails,
     required this.selectedIndexes,
     required this.onTap,
+    required this.onDoubleTap,
     required this.onLongPress,
     required this.onReorder,
   });
@@ -38,6 +40,7 @@ class PhotoSliverGrid extends StatelessWidget {
             index: index,
             isSelected: selectedIndexes.contains(index),
             onTap: onTap,
+            onDoubleTap: onDoubleTap,
             onReorder: onReorder,
           );
         },
@@ -57,6 +60,7 @@ class _PhotoGridItem extends StatelessWidget {
   final int index;
   final bool isSelected;
   final void Function(int) onTap;
+  final void Function(int) onDoubleTap;
   final void Function(int oldIndex, int newIndex) onReorder;
 
   const _PhotoGridItem({
@@ -66,6 +70,7 @@ class _PhotoGridItem extends StatelessWidget {
     required this.index,
     required this.isSelected,
     required this.onTap,
+    required this.onDoubleTap,
     required this.onReorder,
   });
 
@@ -75,16 +80,19 @@ class _PhotoGridItem extends StatelessWidget {
     final gridItemVisualContent = Stack(
       fit: StackFit.expand,
       children: [
-        Image.file(
-          thumbnail, // Use thumbnail for better performance and quality
-          fit: BoxFit.cover,
-          // Removed cacheWidth since thumbnails are already optimized size
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              color: AppColors.gridErrorBackground,
-              child: const Icon(Icons.error, color: AppColors.gridErrorIcon),
-            );
-          },
+        Hero(
+          tag: 'image_${file.path}',
+          child: Image.file(
+            thumbnail, // Use thumbnail for better performance and quality
+            fit: BoxFit.cover,
+            // Removed cacheWidth since thumbnails are already optimized size
+            errorBuilder: (context, error, stackTrace) {
+              return Container(
+                color: AppColors.gridErrorBackground,
+                child: const Icon(Icons.error, color: AppColors.gridErrorIcon),
+              );
+            },
+          ),
         ),
         if (isSelected)
           Positioned(
@@ -136,6 +144,7 @@ class _PhotoGridItem extends StatelessWidget {
 
               return GestureDetector(
                 onTap: () => onTap(index),
+                onDoubleTap: () => onDoubleTap(index),
                 child: Container(
                   decoration: BoxDecoration(
                     border: isTarget

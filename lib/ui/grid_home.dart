@@ -1,5 +1,6 @@
 // File: lib/ui/grid_home.dart
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
@@ -42,6 +43,10 @@ class _GridHomePageState extends State<GridHomePage>
   final ImagePicker _picker = ImagePicker();
   bool _showDeleteConfirm = false;
   bool _isLoading = false;
+
+  // Full-screen image preview state
+  bool _showImagePreview = false;
+  int _previewImageIndex = -1;
 
   // Added: ScrollController to manage scrolling and detect position
   final ScrollController _scrollController = ScrollController();
@@ -234,6 +239,20 @@ class _GridHomePageState extends State<GridHomePage>
     });
   }
 
+  void _handleDoubleTap(int index) {
+    setState(() {
+      _previewImageIndex = index;
+      _showImagePreview = true;
+    });
+  }
+
+  void _closeImagePreview() {
+    setState(() {
+      _showImagePreview = false;
+      _previewImageIndex = -1;
+    });
+  }
+
   Future<void> _handleReorder(int oldIndex, int newIndex) async {
     setState(() {
       _selectedIndexes.clear();
@@ -423,6 +442,7 @@ class _GridHomePageState extends State<GridHomePage>
                   thumbnails: _thumbnails,
                   selectedIndexes: _selectedIndexes,
                   onTap: _handleTap,
+                  onDoubleTap: _handleDoubleTap,
                   onLongPress: (_) {},
                   onReorder: _handleReorder,
                 ),
@@ -445,7 +465,71 @@ class _GridHomePageState extends State<GridHomePage>
           )
               : const SizedBox.shrink(),
         ),
+
+        // Full-screen image preview
+        if (_showImagePreview && _previewImageIndex >= 0)
+          _ImagePreviewModal(
+            image: _images[_previewImageIndex],
+            onClose: _closeImagePreview,
+          ),
       ],
+    );
+  }
+}
+
+// Full-screen image preview modal with blurred background
+class _ImagePreviewModal extends StatelessWidget {
+  final File image;
+  final VoidCallback onClose;
+
+  const _ImagePreviewModal({
+    required this.image,
+    required this.onClose,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onClose,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20), // Beautiful blur effect
+        child: Container(
+          color: Colors.black.withAlpha(200), // Much darker overlay (~78% opacity) with blur
+          padding: const EdgeInsets.all(24), // 24px padding on all sides
+          child: Center(
+            child: Hero(
+              tag: 'image_${image.path}',
+              child: Image.file(
+                image,
+                fit: BoxFit.contain, // Maintain aspect ratio within the padded area
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    padding: const EdgeInsets.all(32),
+                    child: const Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          color: Colors.white,
+                          size: 48,
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'Unable to load image',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
