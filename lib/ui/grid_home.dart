@@ -378,7 +378,7 @@ class _GridHomePageState extends State<GridHomePage>
                     ? MainAxisAlignment.spaceBetween // Space between for single image (delete left, share right)
                     : MainAxisAlignment.start, // Start for multiple images (delete + counter only)
                 children: [
-                  // Delete button and counter (always present when images selected)
+                  // Delete button and counter (counter only shown for 2+ selections)
                   Row(
                     children: [
                       GestureDetector(
@@ -389,13 +389,16 @@ class _GridHomePageState extends State<GridHomePage>
                           height: 24,
                         ),
                       ),
-                      const SizedBox(width: 16), // Space between delete icon and counter
-                      Text(
-                        '${_selectedIndexes.length}',
-                        style: AppTheme.bodyMedium.copyWith(
-                          color: AppColors.textPrimary,
+                      // MODIFIED: Only show counter for 2 or more selections
+                      if (_selectedIndexes.length >= 2) ...[
+                        const SizedBox(width: 16), // Space between delete icon and counter
+                        Text(
+                          '${_selectedIndexes.length}',
+                          style: AppTheme.bodyMedium.copyWith(
+                            color: AppColors.textPrimary,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                   // Share button (only for single image selection)
