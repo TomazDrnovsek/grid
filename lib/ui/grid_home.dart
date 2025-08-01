@@ -31,7 +31,9 @@ class SmoothEasingScrollPhysics extends BouncingScrollPhysics {
 }
 
 class GridHomePage extends StatefulWidget {
-  const GridHomePage({super.key});
+  final ThemeNotifier themeNotifier;
+
+  const GridHomePage({super.key, required this.themeNotifier});
 
   @override
   State<GridHomePage> createState() => _GridHomePageState();
@@ -348,7 +350,7 @@ class _GridHomePageState extends State<GridHomePage>
   void _onMenuPressed() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => const MenuScreen(),
+        builder: (context) => MenuScreen(themeNotifier: widget.themeNotifier),
       ),
     );
   }
@@ -357,176 +359,203 @@ class _GridHomePageState extends State<GridHomePage>
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final hasSelection = _selectedIndexes.isNotEmpty;
 
-    return Stack(
-      children: [
-        Scaffold(
-          backgroundColor: AppColors.scaffoldBackground,
-          // CHANGED: bottom bar now conditionally displays home or delete button
-          bottomNavigationBar: Container(
-            height: 48,
-            decoration: const BoxDecoration(
-              color: AppColors.bottomBarBackground,
-              border: Border(
-                top: BorderSide(
-                  color: AppColors.sheetDivider,
-                  width: 1.0,
+    return AnimatedBuilder(
+      animation: widget.themeNotifier,
+      builder: (context, child) {
+        return Stack(
+          children: [
+            Scaffold(
+              backgroundColor: AppColors.scaffoldBackground(isDark),
+              // CHANGED: bottom bar now conditionally displays home or delete button
+              bottomNavigationBar: Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.bottomBarBackground(isDark),
+                  border: Border(
+                    top: BorderSide(
+                      color: AppColors.sheetDivider(isDark),
+                      width: 1.0,
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: hasSelection // Conditional check for selected images
-                  ? Row( // View 2: Delete Mode with conditional share
-                mainAxisAlignment: _selectedIndexes.length == 1
-                    ? MainAxisAlignment.spaceBetween // Space between for single image (delete left, share right)
-                    : MainAxisAlignment.start, // Start for multiple images (delete + counter only)
-                children: [
-                  // Delete button and counter (counter only shown for 2+ selections)
-                  Row(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: hasSelection // Conditional check for selected images
+                      ? Row( // View 2: Delete Mode with conditional share
+                    mainAxisAlignment: _selectedIndexes.length == 1
+                        ? MainAxisAlignment.spaceBetween // Space between for single image (delete left, share right)
+                        : MainAxisAlignment.start, // Start for multiple images (delete + counter only)
                     children: [
-                      GestureDetector(
-                        onTap: _showDeleteModal, // Calls the delete confirmation modal
-                        child: SvgPicture.asset(
-                          'assets/delete_icon.svg',
-                          width: 24,
-                          height: 24,
-                        ),
-                      ),
-                      // MODIFIED: Only show counter for 2 or more selections
-                      if (_selectedIndexes.length >= 2) ...[
-                        const SizedBox(width: 16), // Space between delete icon and counter
-                        Text(
-                          '${_selectedIndexes.length}',
-                          style: AppTheme.bodyMedium.copyWith(
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  // Share button (only for single image selection)
-                  if (_selectedIndexes.length == 1)
-                    GestureDetector(
-                      onTap: _shareSelectedImage,
-                      child: SvgPicture.asset(
-                        'assets/share_icon.svg',
-                        width: 24,
-                        height: 24,
-                      ),
-                    ),
-                ],
-              )
-                  : Row( // View 1: Normal Mode (home button and future normal buttons)
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  GestureDetector(
-                    onTap: _scrollToTop,
-                    child: SvgPicture.asset(
-                      _isAtTop ? 'assets/home_icon-fill.svg' : 'assets/home_icon-outline.svg',
-                      width: 24,
-                      height: 24,
-                    ),
-                  ),
-                  // Future normal-mode buttons would be added here
-                ],
-              ),
-            ),
-          ),
-          body: CustomScrollView(
-            // Added: Attach the scroll controller to the CustomScrollView
-            controller: _scrollController,
-            physics: const SmoothEasingScrollPhysics(), // Premium controlled scrolling
-            cacheExtent: 1000,
-            slivers: [
-              // MODIFIED: Top action buttons and username are now in the same row.
-              SliverToBoxAdapter(
-                child: Container(
-                  padding: const EdgeInsets.only(top: 48, left: 16, right: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('tomazdrnovsek', style: AppTheme.headlineSm),
+                      // Delete button and counter (counter only shown for 2+ selections)
                       Row(
-                        mainAxisSize: MainAxisSize.min,
                         children: [
                           GestureDetector(
-                            onTap: _isLoading ? null : _addPhoto,
-                            child: Opacity(
-                              opacity: _isLoading ? 0.5 : 1.0,
-                              child: SvgPicture.asset(
-                                'assets/add_button.svg',
-                                width: 24,
-                                height: 24,
+                            onTap: _showDeleteModal, // Calls the delete confirmation modal
+                            child: SvgPicture.asset(
+                              'assets/delete_icon.svg',
+                              width: 24,
+                              height: 24,
+                              colorFilter: ColorFilter.mode(
+                                AppColors.textPrimary(isDark),
+                                BlendMode.srcIn,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 16),
-                          GestureDetector(
-                            onTap: _onMenuPressed,
-                            child: SvgPicture.asset(
-                              'assets/menu_icon.svg',
-                              width: 24,
-                              height: 24,
+                          // MODIFIED: Only show counter for 2 or more selections
+                          if (_selectedIndexes.length >= 2) ...[
+                            const SizedBox(width: 16), // Space between delete icon and counter
+                            Text(
+                              '${_selectedIndexes.length}',
+                              style: AppTheme.bodyMedium(isDark).copyWith(
+                                color: AppColors.textPrimary(isDark),
+                              ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
+                      // Share button (only for single image selection)
+                      if (_selectedIndexes.length == 1)
+                        GestureDetector(
+                          onTap: _shareSelectedImage,
+                          child: SvgPicture.asset(
+                            'assets/share_icon.svg',
+                            width: 24,
+                            height: 24,
+                            colorFilter: ColorFilter.mode(
+                              AppColors.textPrimary(isDark),
+                              BlendMode.srcIn,
+                            ),
+                          ),
+                        ),
+                    ],
+                  )
+                      : Row( // View 1: Normal Mode (home button and future normal buttons)
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      GestureDetector(
+                        onTap: _scrollToTop,
+                        child: SvgPicture.asset(
+                          _isAtTop ? 'assets/home_icon-fill.svg' : 'assets/home_icon-outline.svg',
+                          width: 24,
+                          height: 24,
+                          colorFilter: ColorFilter.mode(
+                            AppColors.textPrimary(isDark),
+                            BlendMode.srcIn,
+                          ),
+                        ),
+                      ),
+                      // Future normal-mode buttons would be added here
                     ],
                   ),
                 ),
               ),
-              // Profile header block
-              const SliverToBoxAdapter(
-                child: ProfileBlock(),
-              ),
-              if (_isLoading && _images.isEmpty)
-                const SliverToBoxAdapter(
-                  child: Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(32.0),
-                      child: CircularProgressIndicator(),
+              body: CustomScrollView(
+                // Added: Attach the scroll controller to the CustomScrollView
+                controller: _scrollController,
+                physics: const SmoothEasingScrollPhysics(), // Premium controlled scrolling
+                cacheExtent: 1000,
+                slivers: [
+                  // MODIFIED: Top action buttons and username are now in the same row.
+                  SliverToBoxAdapter(
+                    child: Container(
+                      padding: const EdgeInsets.only(top: 48, left: 16, right: 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('tomazdrnovsek', style: AppTheme.headlineSm(isDark)),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              GestureDetector(
+                                onTap: _isLoading ? null : _addPhoto,
+                                child: Opacity(
+                                  opacity: _isLoading ? 0.5 : 1.0,
+                                  child: SvgPicture.asset(
+                                    'assets/add_button.svg',
+                                    width: 24,
+                                    height: 24,
+                                    colorFilter: ColorFilter.mode(
+                                      AppColors.textPrimary(isDark),
+                                      BlendMode.srcIn,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              GestureDetector(
+                                onTap: _onMenuPressed,
+                                child: SvgPicture.asset(
+                                  'assets/menu_icon.svg',
+                                  width: 24,
+                                  height: 24,
+                                  colorFilter: ColorFilter.mode(
+                                    AppColors.textPrimary(isDark),
+                                    BlendMode.srcIn,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              if (_images.isNotEmpty)
-                PhotoSliverGrid(
-                  images: _images,
-                  thumbnails: _thumbnails,
-                  selectedIndexes: _selectedIndexes,
-                  onTap: _handleTap,
-                  onDoubleTap: _handleDoubleTap,
-                  onLongPress: (_) {},
-                  onReorder: _handleReorder,
-                ),
-              const SliverToBoxAdapter(child: SizedBox(height: 90)),
-            ],
-          ),
-          // REMOVED: FloatingActionButton is no longer needed
-          floatingActionButton: null,
-          floatingActionButtonLocation: null,
-        ),
+                  // Profile header block
+                  const SliverToBoxAdapter(
+                    child: ProfileBlock(),
+                  ),
+                  if (_isLoading && _images.isEmpty)
+                    const SliverToBoxAdapter(
+                      child: Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(32.0),
+                          child: CircularProgressIndicator(),
+                        ),
+                      ),
+                    ),
+                  if (_images.isNotEmpty)
+                    PhotoSliverGrid(
+                      images: _images,
+                      thumbnails: _thumbnails,
+                      selectedIndexes: _selectedIndexes,
+                      onTap: _handleTap,
+                      onDoubleTap: _handleDoubleTap,
+                      onLongPress: (_) {},
+                      onReorder: _handleReorder,
+                    ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 90)),
+                ],
+              ),
+              // REMOVED: FloatingActionButton is no longer needed
+              floatingActionButton: null,
+              floatingActionButtonLocation: null,
+            ),
 
-        // Custom modal overlay with animation
-        AnimatedOpacity(
-          opacity: _showDeleteConfirm ? 1.0 : 0.0,
-          duration: const Duration(milliseconds: 200),
-          child: _showDeleteConfirm
-              ? _DeleteConfirmModal(
-            onCancel: _onDeleteCancel,
-            onDelete: _onDeleteConfirm,
-          )
-              : const SizedBox.shrink(),
-        ),
+            // Custom modal overlay with animation
+            AnimatedOpacity(
+              opacity: _showDeleteConfirm ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 200),
+              child: _showDeleteConfirm
+                  ? _DeleteConfirmModal(
+                onCancel: _onDeleteCancel,
+                onDelete: _onDeleteConfirm,
+                isDark: isDark,
+              )
+                  : const SizedBox.shrink(),
+            ),
 
-        // Full-screen image preview
-        if (_showImagePreview && _previewImageIndex >= 0)
-          _ImagePreviewModal(
-            image: _images[_previewImageIndex],
-            onClose: _closeImagePreview,
-          ),
-      ],
+            // Full-screen image preview
+            if (_showImagePreview && _previewImageIndex >= 0)
+              _ImagePreviewModal(
+                image: _images[_previewImageIndex],
+                onClose: _closeImagePreview,
+              ),
+          ],
+        );
+      },
     );
   }
 }
@@ -559,7 +588,7 @@ class _ImagePreviewModal extends StatelessWidget {
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
                     padding: const EdgeInsets.all(32),
-                    child: Column(
+                    child: const Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
@@ -589,10 +618,12 @@ class _ImagePreviewModal extends StatelessWidget {
 class _DeleteConfirmModal extends StatelessWidget {
   final VoidCallback onCancel;
   final VoidCallback onDelete;
+  final bool isDark;
 
   const _DeleteConfirmModal({
     required this.onCancel,
     required this.onDelete,
+    required this.isDark,
   });
 
   @override
@@ -603,7 +634,7 @@ class _DeleteConfirmModal extends StatelessWidget {
           child: GestureDetector(
             onTap: onCancel,
             child: Container(
-              color: AppColors.modalOverlayBackground,
+              color: AppColors.modalOverlayBackground(isDark),
             ),
           ),
         ),
@@ -614,16 +645,16 @@ class _DeleteConfirmModal extends StatelessWidget {
               padding:
               const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
               decoration: BoxDecoration(
-                color: AppColors.modalContentBackground,
+                color: AppColors.modalContentBackground(isDark),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
+                  Text(
                     'Are you sure?',
                     textAlign: TextAlign.center,
-                    style: AppTheme.dialogTitle,
+                    style: AppTheme.dialogTitle(isDark),
                   ),
                   const SizedBox(height: 24),
                   Row(
@@ -635,20 +666,20 @@ class _DeleteConfirmModal extends StatelessWidget {
                         child: TextButton(
                           style: ButtonStyle(
                             backgroundColor: WidgetStateProperty.all(
-                                AppColors.cancelButtonBackground),
+                                AppColors.cancelButtonBackground(isDark)),
                             shape: WidgetStateProperty.all(
                               RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
                             ),
                             overlayColor: WidgetStateProperty.all(
-                              AppColors.textPrimary.withAlpha(18),
+                              AppColors.textPrimary(isDark).withAlpha(18),
                             ),
                           ),
                           onPressed: onCancel,
-                          child: const Text(
+                          child: Text(
                             'Cancel',
-                            style: AppTheme.dialogActionPrimary,
+                            style: AppTheme.dialogActionPrimary(isDark),
                           ),
                         ),
                       ),

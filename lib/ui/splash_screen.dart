@@ -5,7 +5,9 @@ import '../app_theme.dart';
 import 'grid_home.dart';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  final ThemeNotifier themeNotifier;
+
+  const SplashScreen({super.key, required this.themeNotifier});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -58,7 +60,7 @@ class _SplashScreenState extends State<SplashScreen>
     if (mounted) {
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) => const GridHomePage(),
+          pageBuilder: (context, animation, secondaryAnimation) => GridHomePage(themeNotifier: widget.themeNotifier),
           transitionDuration: const Duration(milliseconds: 300),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(
@@ -83,7 +85,7 @@ class _SplashScreenState extends State<SplashScreen>
     final logoSize = screenWidth / 3; // 1/3 of screen width
 
     return Scaffold(
-      backgroundColor: AppColors.splashBackground, // Using centralized color
+      backgroundColor: AppColors.splashBackground, // Using centralized color (unchanged - always dark)
       body: Center(
         child: AnimatedBuilder(
           animation: _animationController,

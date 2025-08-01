@@ -8,6 +8,8 @@ class ProfileBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -17,25 +19,25 @@ class ProfileBlock extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const CircleAvatar(
+              CircleAvatar(
                 radius: 40,
-                backgroundImage: AssetImage('assets/images/profile.jpg'),
-                backgroundColor: AppColors.avatarPlaceholder,
+                backgroundImage: const AssetImage('assets/images/profile.jpg'),
+                backgroundColor: AppColors.avatarPlaceholder(isDark),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Tomaž Drnovšek', style: AppTheme.bodyMedium),
+                    Text('Tomaž Drnovšek', style: AppTheme.bodyMedium(isDark)),
                     const SizedBox(height: 8),
-                    const Row(
+                    Row(
                       children: [
-                        Stat(label: 'posts', value: '327'),
-                        SizedBox(width: 24),
-                        Stat(label: 'followers', value: '3,333'),
-                        SizedBox(width: 24),
-                        Stat(label: 'following', value: '813'),
+                        Stat(label: 'posts', value: '327', isDark: isDark),
+                        const SizedBox(width: 24),
+                        Stat(label: 'followers', value: '3,333', isDark: isDark),
+                        const SizedBox(width: 24),
+                        Stat(label: 'following', value: '813', isDark: isDark),
                       ],
                     ),
                   ],
@@ -44,7 +46,7 @@ class ProfileBlock extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          const Text('From Ljubljana, Slovenia.', style: AppTheme.body),
+          Text('From Ljubljana, Slovenia.', style: AppTheme.body(isDark)),
           const SizedBox(height: 24),
         ],
       ),
@@ -56,8 +58,9 @@ class ProfileBlock extends StatelessWidget {
 class Stat extends StatelessWidget {
   final String label;
   final String value;
+  final bool isDark;
 
-  const Stat({super.key, required this.label, required this.value});
+  const Stat({super.key, required this.label, required this.value, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
@@ -66,11 +69,11 @@ class Stat extends StatelessWidget {
       children: [
         Text(
             value,
-            style: AppTheme.statValue
+            style: AppTheme.statValue(isDark)
         ),
         Text(
             label,
-            style: AppTheme.statLabel
+            style: AppTheme.statLabel(isDark)
         ),
       ],
     );

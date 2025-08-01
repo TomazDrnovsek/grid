@@ -76,6 +76,8 @@ class _PhotoGridItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     // This is the actual content of the grid item, which will be reused for child, childWhenDragging, and feedback
     final gridItemVisualContent = Stack(
       fit: StackFit.expand,
@@ -88,8 +90,8 @@ class _PhotoGridItem extends StatelessWidget {
             // Removed cacheWidth since thumbnails are already optimized size
             errorBuilder: (context, error, stackTrace) {
               return Container(
-                color: AppColors.gridErrorBackground,
-                child: const Icon(Icons.error, color: AppColors.gridErrorIcon),
+                color: AppColors.gridErrorBackground(isDark),
+                child: Icon(Icons.error, color: AppColors.gridErrorIcon(isDark)),
               );
             },
           ),
@@ -103,12 +105,12 @@ class _PhotoGridItem extends StatelessWidget {
               height: 24,
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.gridSelectionTickBg,
+                color: AppColors.textPrimaryLight, // Always black circle, regardless of theme
               ),
-              child: Icon(
+              child: const Icon(
                 Icons.check,
                 size: 16,
-                color: AppColors.pureWhite,
+                color: AppColors.pureWhite, // Always white checkmark
               ),
             ),
           ),
@@ -127,9 +129,9 @@ class _PhotoGridItem extends StatelessWidget {
           // MODIFIED: childWhenDragging now mirrors the actual item's appearance
           childWhenDragging: Container(
             decoration: BoxDecoration(
-              color: AppColors.gridDragPlaceholder, // This color will now be visible
+              color: AppColors.gridDragPlaceholder(isDark), // This color will now be visible
               border: isSelected
-                  ? Border.all(color: AppColors.gridSelectionBorder, width: 4.0)
+                  ? Border.all(color: isDark ? AppColors.textSecondaryDark : AppColors.textPrimaryLight, width: 4.0)
                   : null,
             ),
             // The 'child' property showing the image has been removed.
@@ -150,7 +152,7 @@ class _PhotoGridItem extends StatelessWidget {
                     border: isTarget
                         ? Border.all(color: AppColors.gridDragTargetBorder, width: 2)
                         : isSelected
-                        ? Border.all(color: AppColors.gridSelectionBorder, width: 4.0)
+                        ? Border.all(color: isDark ? AppColors.textSecondaryDark : AppColors.textPrimaryLight, width: 4.0)
                         : null,
                   ),
                   child: gridItemVisualContent, // Use the shared visual content
@@ -172,11 +174,11 @@ class _PhotoGridItem extends StatelessWidget {
         height: size.height, // Set height to match the original item
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(0),
-          boxShadow: [
+          boxShadow: const [
             BoxShadow(
               color: AppColors.gridDragShadow,
               blurRadius: 8,
-              offset: const Offset(0, 4),
+              offset: Offset(0, 4),
             ),
           ],
         ),
