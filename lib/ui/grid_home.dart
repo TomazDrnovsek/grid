@@ -52,10 +52,16 @@ class _GridHomePageState extends State<GridHomePage>
   bool _showImagePreview = false;
   int _previewImageIndex = -1;
 
-  // Added: ScrollController to manage scrolling and detect position
+  // ScrollController to manage scrolling and detect position
   final ScrollController _scrollController = ScrollController();
-  // Added: State to track if the scroll position is at the top
+  // State to track if the scroll position is at the top
   bool _isAtTop = true;
+
+  // Header username editing
+  bool _editingHeaderUsername = false;
+  String _headerUsername = 'tomazdrnovsek';
+  final TextEditingController _headerUsernameController = TextEditingController();
+  final FocusNode _headerUsernameFocus = FocusNode();
 
   // Keep the state alive to prevent rebuilds
   @override
@@ -65,15 +71,65 @@ class _GridHomePageState extends State<GridHomePage>
   void initState() {
     super.initState();
     _loadSavedImages();
-    // Added: Listen to scroll events
+    _loadHeaderUsername();
+    // Listen to scroll events
     _scrollController.addListener(_onScroll);
+    // Setup header username focus listener
+    _headerUsernameFocus.addListener(() {
+      if (!_headerUsernameFocus.hasFocus && _editingHeaderUsername) {
+        _saveHeaderUsername();
+        setState(() => _editingHeaderUsername = false);
+      }
+    });
   }
 
   @override
   void dispose() {
-    // Added: Dispose the scroll controller to prevent memory leaks
+    // Dispose the scroll controller to prevent memory leaks
     _scrollController.dispose();
+    _headerUsernameController.dispose();
+    _headerUsernameFocus.dispose();
     super.dispose();
+  }
+
+  /// Load saved header username from SharedPreferences
+  Future<void> _loadHeaderUsername() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedUsername = prefs.getString('header_username');
+      if (savedUsername != null) {
+        setState(() {
+          _headerUsername = savedUsername;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading header username: $e');
+    }
+  }
+
+  /// Save header username to SharedPreferences
+  Future<void> _saveHeaderUsername() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('header_username', _headerUsernameController.text);
+      setState(() {
+        _headerUsername = _headerUsernameController.text;
+      });
+    } catch (e) {
+      debugPrint('Error saving header username: $e');
+    }
+  }
+
+  /// Start editing header username
+  void _startEditingHeaderUsername() {
+    setState(() {
+      _editingHeaderUsername = true;
+      _headerUsernameController.text = _headerUsername;
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _headerUsernameFocus.requestFocus();
+    });
   }
 
   /// Method to handle scroll events and update _isAtTop state.
@@ -318,7 +374,7 @@ class _GridHomePageState extends State<GridHomePage>
     }
   }
 
-  // ADDED: Share single selected image
+  // Share single selected image
   Future<void> _shareSelectedImage() async {
     if (_selectedIndexes.length != 1) return; // Only works with exactly 1 image
 
@@ -365,37 +421,64 @@ class _GridHomePageState extends State<GridHomePage>
     return AnimatedBuilder(
       animation: widget.themeNotifier,
       builder: (context, child) {
-        return Stack(
-          children: [
-            Scaffold(
-              backgroundColor: AppColors.scaffoldBackground(isDark),
-              // CHANGED: bottom bar now conditionally displays home or delete button
-              bottomNavigationBar: Container(
-                height: 48,
-                decoration: BoxDecoration(
-                  color: AppColors.bottomBarBackground(isDark),
-                  border: Border(
-                    top: BorderSide(
-                      color: AppColors.sheetDivider(isDark),
-                      width: 1.0,
+        return GestureDetector(
+          onTap: () {
+            // Unfocus header username if editing
+            if (_editingHeaderUsername) _headerUsernameFocus.unfocus();
+          },
+          child: Stack(
+            children: [
+              Scaffold(
+                backgroundColor: AppColors.scaffoldBackground(isDark),
+                bottomNavigationBar: Container(
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppColors.bottomBarBackground(isDark),
+                    border: Border(
+                      top: BorderSide(
+                        color: AppColors.sheetDivider(isDark),
+                        width: 1.0,
+                      ),
                     ),
                   ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                  child: hasSelection // Conditional check for selected images
-                      ? Row( // View 2: Delete Mode with conditional share
-                    mainAxisAlignment: _selectedIndexes.length == 1
-                        ? MainAxisAlignment.spaceBetween // Space between for single image (delete left, share right)
-                        : MainAxisAlignment.start, // Start for multiple images (delete + counter only)
-                    children: [
-                      // Delete button and counter (counter only shown for 2+ selections)
-                      Row(
-                        children: [
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                    child: hasSelection
+                        ? Row(
+                      mainAxisAlignment: _selectedIndexes.length == 1
+                          ? MainAxisAlignment.spaceBetween
+                          : MainAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            GestureDetector(
+                              onTap: _showDeleteModal,
+                              child: SvgPicture.asset(
+                                'assets/delete_icon.svg',
+                                width: 24,
+                                height: 24,
+                                colorFilter: ColorFilter.mode(
+                                  AppColors.textPrimary(isDark),
+                                  BlendMode.srcIn,
+                                ),
+                              ),
+                            ),
+                            if (_selectedIndexes.length >= 2) ...[
+                              const SizedBox(width: 16),
+                              Text(
+                                '${_selectedIndexes.length}',
+                                style: AppTheme.bodyMedium(isDark).copyWith(
+                                  color: AppColors.textPrimary(isDark),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        if (_selectedIndexes.length == 1)
                           GestureDetector(
-                            onTap: _showDeleteModal, // Calls the delete confirmation modal
+                            onTap: _shareSelectedImage,
                             child: SvgPicture.asset(
-                              'assets/delete_icon.svg',
+                              'assets/share_icon.svg',
                               width: 24,
                               height: 24,
                               colorFilter: ColorFilter.mode(
@@ -404,24 +487,15 @@ class _GridHomePageState extends State<GridHomePage>
                               ),
                             ),
                           ),
-                          // MODIFIED: Only show counter for 2 or more selections
-                          if (_selectedIndexes.length >= 2) ...[
-                            const SizedBox(width: 16), // Space between delete icon and counter
-                            Text(
-                              '${_selectedIndexes.length}',
-                              style: AppTheme.bodyMedium(isDark).copyWith(
-                                color: AppColors.textPrimary(isDark),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      // Share button (only for single image selection)
-                      if (_selectedIndexes.length == 1)
+                      ],
+                    )
+                        : Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
                         GestureDetector(
-                          onTap: _shareSelectedImage,
+                          onTap: _scrollToTop,
                           child: SvgPicture.asset(
-                            'assets/share_icon.svg',
+                            _isAtTop ? 'assets/home_icon-fill.svg' : 'assets/home_icon-outline.svg',
                             width: 24,
                             height: 24,
                             colorFilter: ColorFilter.mode(
@@ -430,51 +504,68 @@ class _GridHomePageState extends State<GridHomePage>
                             ),
                           ),
                         ),
-                    ],
-                  )
-                      : Row( // View 1: Normal Mode (home button and future normal buttons)
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      GestureDetector(
-                        onTap: _scrollToTop,
-                        child: SvgPicture.asset(
-                          _isAtTop ? 'assets/home_icon-fill.svg' : 'assets/home_icon-outline.svg',
-                          width: 24,
-                          height: 24,
-                          colorFilter: ColorFilter.mode(
-                            AppColors.textPrimary(isDark),
-                            BlendMode.srcIn,
-                          ),
-                        ),
-                      ),
-                      // Future normal-mode buttons would be added here
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              body: CustomScrollView(
-                // Added: Attach the scroll controller to the CustomScrollView
-                controller: _scrollController,
-                physics: const SmoothEasingScrollPhysics(), // Premium controlled scrolling
-                cacheExtent: 1000,
-                slivers: [
-                  // MODIFIED: Top action buttons and username are now in the same row.
-                  SliverToBoxAdapter(
-                    child: Container(
-                      padding: const EdgeInsets.only(top: 48, left: 16, right: 16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('tomazdrnovsek', style: AppTheme.headlineSm(isDark)),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              GestureDetector(
-                                onTap: _isLoading ? null : _addPhoto,
-                                child: Opacity(
-                                  opacity: _isLoading ? 0.5 : 1.0,
+                body: CustomScrollView(
+                  controller: _scrollController,
+                  physics: const SmoothEasingScrollPhysics(),
+                  cacheExtent: 1000,
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: Container(
+                        padding: const EdgeInsets.only(top: 48, left: 16, right: 16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: _editingHeaderUsername
+                                  ? TextField(
+                                controller: _headerUsernameController,
+                                focusNode: _headerUsernameFocus,
+                                style: AppTheme.headlineSm(isDark),
+                                maxLines: 1,
+                                maxLength: 20,
+                                decoration: const InputDecoration(
+                                  border: InputBorder.none,
+                                  counterText: '',
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                              )
+                                  : GestureDetector(
+                                onTap: _startEditingHeaderUsername,
+                                child: Text(
+                                  _headerUsername,
+                                  style: AppTheme.headlineSm(isDark),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                GestureDetector(
+                                  onTap: _isLoading ? null : _addPhoto,
+                                  child: Opacity(
+                                    opacity: _isLoading ? 0.5 : 1.0,
+                                    child: SvgPicture.asset(
+                                      'assets/add_button.svg',
+                                      width: 24,
+                                      height: 24,
+                                      colorFilter: ColorFilter.mode(
+                                        AppColors.textPrimary(isDark),
+                                        BlendMode.srcIn,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                GestureDetector(
+                                  onTap: _onMenuPressed,
                                   child: SvgPicture.asset(
-                                    'assets/add_button.svg',
+                                    'assets/menu_icon.svg',
                                     width: 24,
                                     height: 24,
                                     colorFilter: ColorFilter.mode(
@@ -483,77 +574,60 @@ class _GridHomePageState extends State<GridHomePage>
                                     ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 16),
-                              GestureDetector(
-                                onTap: _onMenuPressed,
-                                child: SvgPicture.asset(
-                                  'assets/menu_icon.svg',
-                                  width: 24,
-                                  height: 24,
-                                  colorFilter: ColorFilter.mode(
-                                    AppColors.textPrimary(isDark),
-                                    BlendMode.srcIn,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // Profile header block
-                  const SliverToBoxAdapter(
-                    child: ProfileBlock(),
-                  ),
-                  if (_isLoading && _images.isEmpty)
-                    const SliverToBoxAdapter(
-                      child: Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(32.0),
-                          child: CircularProgressIndicator(),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                  if (_images.isNotEmpty)
-                    PhotoSliverGrid(
-                      images: _images,
-                      thumbnails: _thumbnails,
-                      selectedIndexes: _selectedIndexes,
-                      onTap: _handleTap,
-                      onDoubleTap: _handleDoubleTap,
-                      onLongPress: (_) {},
-                      onReorder: _handleReorder,
+                    const SliverToBoxAdapter(
+                      child: ProfileBlock(),
                     ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 90)),
-                ],
+                    if (_isLoading && _images.isEmpty)
+                      const SliverToBoxAdapter(
+                        child: Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(32.0),
+                            child: CircularProgressIndicator(),
+                          ),
+                        ),
+                      ),
+                    if (_images.isNotEmpty)
+                      PhotoSliverGrid(
+                        images: _images,
+                        thumbnails: _thumbnails,
+                        selectedIndexes: _selectedIndexes,
+                        onTap: _handleTap,
+                        onDoubleTap: _handleDoubleTap,
+                        onLongPress: (_) {},
+                        onReorder: _handleReorder,
+                      ),
+                    const SliverToBoxAdapter(child: SizedBox(height: 90)),
+                  ],
+                ),
               ),
-              // REMOVED: FloatingActionButton is no longer needed
-              floatingActionButton: null,
-              floatingActionButtonLocation: null,
-            ),
 
-            // Custom modal overlay with animation
-            AnimatedOpacity(
-              opacity: _showDeleteConfirm ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 200),
-              child: _showDeleteConfirm
-                  ? _DeleteConfirmModal(
-                onCancel: _onDeleteCancel,
-                onDelete: _onDeleteConfirm,
-                isDark: isDark,
-              )
-                  : const SizedBox.shrink(),
-            ),
-
-            // Full-screen image preview
-            if (_showImagePreview && _previewImageIndex >= 0)
-              _ImagePreviewModal(
-                image: _images[_previewImageIndex],
-                onClose: _closeImagePreview,
+              // Custom modal overlay with animation
+              AnimatedOpacity(
+                opacity: _showDeleteConfirm ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 200),
+                child: _showDeleteConfirm
+                    ? DeleteConfirmModal(
+                  onCancel: _onDeleteCancel,
+                  onDelete: _onDeleteConfirm,
+                  isDark: isDark,
+                )
+                    : const SizedBox.shrink(),
               ),
-          ],
+
+              // Full-screen image preview
+              if (_showImagePreview && _previewImageIndex >= 0)
+                ImagePreviewModal(
+                  image: _images[_previewImageIndex],
+                  onClose: _closeImagePreview,
+                ),
+            ],
+          ),
         );
       },
     );
@@ -561,11 +635,12 @@ class _GridHomePageState extends State<GridHomePage>
 }
 
 // Full-screen image preview modal with blurred background
-class _ImagePreviewModal extends StatelessWidget {
+class ImagePreviewModal extends StatelessWidget {
   final File image;
   final VoidCallback onClose;
 
-  const _ImagePreviewModal({
+  const ImagePreviewModal({
+    super.key,
     required this.image,
     required this.onClose,
   });
@@ -575,16 +650,16 @@ class _ImagePreviewModal extends StatelessWidget {
     return GestureDetector(
       onTap: onClose,
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20), // Beautiful blur effect
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: Container(
-          color: AppColors.imagePreviewOverlay, // Using centralized color
-          padding: const EdgeInsets.all(24), // 24px padding on all sides
+          color: AppColors.imagePreviewOverlay,
+          padding: const EdgeInsets.all(24),
           child: Center(
             child: Hero(
               tag: 'image_${image.path}',
               child: Image.file(
                 image,
-                fit: BoxFit.contain, // Maintain aspect ratio within the padded area
+                fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
                     padding: const EdgeInsets.all(32),
@@ -614,13 +689,14 @@ class _ImagePreviewModal extends StatelessWidget {
   }
 }
 
-// Delete confirm modal remains unchanged
-class _DeleteConfirmModal extends StatelessWidget {
+// Delete confirm modal
+class DeleteConfirmModal extends StatelessWidget {
   final VoidCallback onCancel;
   final VoidCallback onDelete;
   final bool isDark;
 
-  const _DeleteConfirmModal({
+  const DeleteConfirmModal({
+    super.key,
     required this.onCancel,
     required this.onDelete,
     required this.isDark,
@@ -642,8 +718,7 @@ class _DeleteConfirmModal extends StatelessWidget {
           child: Semantics(
             label: 'Delete confirmation dialog',
             child: Container(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
               decoration: BoxDecoration(
                 color: AppColors.modalContentBackground(isDark),
                 borderRadius: BorderRadius.circular(20),
