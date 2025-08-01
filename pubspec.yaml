@@ -36,6 +36,7 @@ dependencies:
   shared_preferences: ^2.0.15
   path_provider: ^2.0.14
   flutter_image_compress: ^2.3.0
+  share_plus: ^7.2.1
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -102,5 +103,6 @@ flutter:
     - assets/home_icon-fill.svg
     - assets/home_icon-outline.svg
     - assets/delete_icon.svg
+    - assets/share_icon.svg
     - assets/images/sample1.jpg
     - assets/images/profile.jpg

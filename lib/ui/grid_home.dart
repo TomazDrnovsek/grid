@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../file_utils.dart';
 import 'profile_block.dart';
@@ -314,6 +315,34 @@ class _GridHomePageState extends State<GridHomePage>
     }
   }
 
+  // ADDED: Share single selected image
+  Future<void> _shareSelectedImage() async {
+    if (_selectedIndexes.length != 1) return; // Only works with exactly 1 image
+
+    try {
+      final imageIndex = _selectedIndexes.first;
+      final imageFile = _images[imageIndex];
+
+      // Share the high-quality image using system share dialog
+      await Share.shareXFiles(
+        [XFile(imageFile.path)],
+        text: 'Shared from Grid',
+      );
+
+    } catch (e) {
+      debugPrint('Error sharing image: $e');
+      // Show error message to user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to share image'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
   // ADDED: Placeholder for future menu action
   void _onMenuPressed() {
     debugPrint('Menu button pressed');
@@ -344,24 +373,41 @@ class _GridHomePageState extends State<GridHomePage>
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
               child: hasSelection // Conditional check for selected images
-                  ? Row( // View 2: Delete Mode (delete button with counter)
-                mainAxisAlignment: MainAxisAlignment.start,
+                  ? Row( // View 2: Delete Mode with conditional share
+                mainAxisAlignment: _selectedIndexes.length == 1
+                    ? MainAxisAlignment.spaceBetween // Space between for single image (delete left, share right)
+                    : MainAxisAlignment.start, // Start for multiple images (delete + counter only)
                 children: [
-                  GestureDetector(
-                    onTap: _showDeleteModal, // Calls the delete confirmation modal
-                    child: SvgPicture.asset(
-                      'assets/delete_icon.svg', // New delete icon
-                      width: 24, // Consistent size
-                      height: 24, // Consistent size
-                    ),
+                  // Delete button and counter (always present when images selected)
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: _showDeleteModal, // Calls the delete confirmation modal
+                        child: SvgPicture.asset(
+                          'assets/delete_icon.svg',
+                          width: 24,
+                          height: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 16), // Space between delete icon and counter
+                      Text(
+                        '${_selectedIndexes.length}',
+                        style: AppTheme.bodyMedium.copyWith(
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 16), // Space between delete icon and counter
-                  Text(
-                    '${_selectedIndexes.length}',
-                    style: AppTheme.bodyMedium.copyWith(
-                      color: AppColors.textPrimary,
+                  // Share button (only for single image selection)
+                  if (_selectedIndexes.length == 1)
+                    GestureDetector(
+                      onTap: _shareSelectedImage,
+                      child: SvgPicture.asset(
+                        'assets/share_icon.svg',
+                        width: 24,
+                        height: 24,
+                      ),
                     ),
-                  ),
                 ],
               )
                   : Row( // View 1: Normal Mode (home button and future normal buttons)
