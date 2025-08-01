@@ -33,13 +33,33 @@ class MenuScreen extends StatelessWidget {
             ),
           ),
 
-          // Main content area (empty for now)
+          // Main content area
           Expanded(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: const Column(
+              child: Column(
                 children: [
-                  SizedBox(height: 32), // Space from top navigation
+                  const SizedBox(height: 32), // Space from top navigation
+
+                  // Appearance toggle
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Appearance',
+                        style: AppTheme.body,
+                      ),
+                      Switch(
+                        value: true, // For now, always on (we'll implement this next)
+                        onChanged: null, // Disabled for now
+                        activeColor: AppColors.textPrimary,
+                        inactiveThumbColor: AppColors.textSecondary,
+                        inactiveTrackColor: AppColors.textSecondary.withAlpha(76), // 30% opacity
+                        trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+                      ),
+                    ],
+                  ),
+
                   // Future menu items will go here
                 ],
               ),
