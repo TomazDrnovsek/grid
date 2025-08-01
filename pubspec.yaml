@@ -104,5 +104,6 @@ flutter:
     - assets/home_icon-outline.svg
     - assets/delete_icon.svg
     - assets/share_icon.svg
+    - assets/arrow_left.svg
     - assets/images/sample1.jpg
     - assets/images/profile.jpg

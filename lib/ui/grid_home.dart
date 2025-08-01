@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import '../file_utils.dart';
 import 'profile_block.dart';
 import 'photo_sliver_grid.dart';
+import 'menu_screen.dart';
 import '../app_theme.dart';
 
 /// Premium scroll physics with controlled spring parameters for Instagram-like feel
@@ -343,9 +344,13 @@ class _GridHomePageState extends State<GridHomePage>
     }
   }
 
-  // ADDED: Placeholder for future menu action
+  // Navigate to menu screen
   void _onMenuPressed() {
-    debugPrint('Menu button pressed');
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const MenuScreen(),
+      ),
+    );
   }
 
   @override
