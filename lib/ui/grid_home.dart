@@ -10,6 +10,23 @@ import 'profile_block.dart';
 import 'photo_sliver_grid.dart';
 import '../app_theme.dart';
 
+/// Simple scroll physics with better deceleration curve - extends BouncingScrollPhysics
+class SmoothEasingScrollPhysics extends BouncingScrollPhysics {
+  const SmoothEasingScrollPhysics({super.parent});
+
+  @override
+  SmoothEasingScrollPhysics applyTo(ScrollPhysics? ancestor) {
+    return SmoothEasingScrollPhysics(parent: buildParent(ancestor));
+  }
+
+  @override
+  SpringDescription get spring => SpringDescription.withDampingRatio(
+    mass: 0.5,       // Standard mass
+    stiffness: 120.0, // Slightly higher stiffness for better control
+    ratio: 1.2,      // Over-damped for quicker, smoother stopping
+  );
+}
+
 class GridHomePage extends StatefulWidget {
   const GridHomePage({super.key});
 
@@ -347,7 +364,7 @@ class _GridHomePageState extends State<GridHomePage>
           body: CustomScrollView(
             // Added: Attach the scroll controller to the CustomScrollView
             controller: _scrollController,
-            physics: const BouncingScrollPhysics(),
+            physics: const SmoothEasingScrollPhysics(), // Better easing while keeping bounce behavior
             cacheExtent: 1000,
             slivers: [
               // MODIFIED: Top action buttons and username are now in the same row.
