@@ -4,6 +4,7 @@ import 'package:grid/app_theme.dart';
 
 class PhotoSliverGrid extends StatelessWidget {
   final List<File> images;
+  final List<File> thumbnails;
   final Set<int> selectedIndexes;
   final void Function(int) onTap;
   final void Function(int) onLongPress;
@@ -12,6 +13,7 @@ class PhotoSliverGrid extends StatelessWidget {
   const PhotoSliverGrid({
     super.key,
     required this.images,
+    required this.thumbnails,
     required this.selectedIndexes,
     required this.onTap,
     required this.onLongPress,
@@ -32,6 +34,7 @@ class PhotoSliverGrid extends StatelessWidget {
           return _PhotoGridItem(
             key: ValueKey('photo_$index'),
             file: images[index],
+            thumbnail: thumbnails.length > index ? thumbnails[index] : images[index],
             index: index,
             isSelected: selectedIndexes.contains(index),
             onTap: onTap,
@@ -50,16 +53,16 @@ class PhotoSliverGrid extends StatelessWidget {
 
 class _PhotoGridItem extends StatelessWidget {
   final File file;
+  final File thumbnail;
   final int index;
   final bool isSelected;
   final void Function(int) onTap;
   final void Function(int oldIndex, int newIndex) onReorder;
 
-  // Removed GlobalKey as LayoutBuilder will provide the size
-
-  const _PhotoGridItem({ // Added const keyword here
+  const _PhotoGridItem({
     super.key,
     required this.file,
+    required this.thumbnail,
     required this.index,
     required this.isSelected,
     required this.onTap,
@@ -73,9 +76,9 @@ class _PhotoGridItem extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         Image.file(
-          file,
+          thumbnail, // Use thumbnail for better performance and quality
           fit: BoxFit.cover,
-          cacheWidth: 360, // Keep this for efficient loading in the grid
+          // Removed cacheWidth since thumbnails are already optimized size
           errorBuilder: (context, error, stackTrace) {
             return Container(
               color: AppColors.gridErrorBackground,

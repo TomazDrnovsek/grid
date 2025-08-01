@@ -20,6 +20,7 @@ class GridHomePage extends StatefulWidget {
 class _GridHomePageState extends State<GridHomePage>
     with AutomaticKeepAliveClientMixin {
   final List<File> _images = [];
+  final List<File> _thumbnails = [];
   final Set<int> _selectedIndexes = {};
   final ImagePicker _picker = ImagePicker();
   bool _showDeleteConfirm = false;
@@ -85,6 +86,8 @@ class _GridHomePageState extends State<GridHomePage>
 
       final appDir = await FileUtils.getAppImagesDir();
       final List<String> migrated = [];
+      final List<File> loadedImages = [];
+      final List<File> loadedThumbnails = [];
 
       // Process images in batches to avoid blocking UI
       const batchSize = 10;
@@ -95,15 +98,34 @@ class _GridHomePageState extends State<GridHomePage>
           final file = File(path);
           if (!file.existsSync()) continue;
 
-          if (path.startsWith(appDir.path)) {
-            migrated.add(path);
-          } else {
+          String finalPath = path;
+          if (!path.startsWith(appDir.path)) {
             try {
-              final compressed = await FileUtils.copyAndCompress(XFile(path));
-              migrated.add(compressed.path);
+              // Migrate old external files using new thumbnail system
+              final result = await FileUtils.processImageWithThumbnail(XFile(path));
+              finalPath = result['image']!.path;
             } catch (e) {
               debugPrint('Migration failed for $path: $e');
-              migrated.add(path);
+              finalPath = path;
+            }
+          }
+
+          migrated.add(finalPath);
+          loadedImages.add(File(finalPath));
+
+          // Try to load corresponding thumbnail
+          final thumbnail = await FileUtils.getThumbnailForImage(finalPath);
+          if (thumbnail != null) {
+            loadedThumbnails.add(thumbnail);
+          } else {
+            // Create thumbnail if missing (for old images)
+            try {
+              final newThumbnail = await FileUtils.generateThumbnail(XFile(finalPath));
+              loadedThumbnails.add(newThumbnail);
+            } catch (e) {
+              debugPrint('Failed to generate thumbnail for $finalPath: $e');
+              // Use the full image as fallback
+              loadedThumbnails.add(File(finalPath));
             }
           }
         }
@@ -113,7 +135,10 @@ class _GridHomePageState extends State<GridHomePage>
           setState(() {
             _images
               ..clear()
-              ..addAll(migrated.map((p) => File(p)));
+              ..addAll(loadedImages);
+            _thumbnails
+              ..clear()
+              ..addAll(loadedThumbnails);
           });
         }
 
@@ -142,7 +167,7 @@ class _GridHomePageState extends State<GridHomePage>
     }
   }
 
-  /// Pick, copy to app storage, compress, and add to grid.
+  /// Pick, copy to app storage, compress, create thumbnails, and add to grid.
   Future<void> _addPhoto() async {
     if (_isLoading) return;
 
@@ -155,15 +180,22 @@ class _GridHomePageState extends State<GridHomePage>
       // Process images one by one to avoid memory spikes
       for (final xfile in picks) {
         try {
-          final compressed = await FileUtils.copyAndCompress(xfile);
+          // Use the new thumbnail system for better performance
+          final result = await FileUtils.processImageWithThumbnail(xfile);
+          final compressed = result['image']!;
+          final thumbnail = result['thumbnail']!;
+
           if (mounted) {
-            setState(() => _images.insert(0, compressed));
+            setState(() {
+              _images.insert(0, compressed);
+              _thumbnails.insert(0, thumbnail);
+            });
           }
           // Small delay to prevent UI blocking
           await Future.delayed(const Duration(milliseconds: 10));
           await File(xfile.path).delete();
         } catch (e) {
-          debugPrint('Error compressing ${xfile.path}: $e');
+          debugPrint('Error processing ${xfile.path}: $e');
         }
       }
 
@@ -188,8 +220,10 @@ class _GridHomePageState extends State<GridHomePage>
   Future<void> _handleReorder(int oldIndex, int newIndex) async {
     setState(() {
       _selectedIndexes.clear();
-      final item = _images.removeAt(oldIndex); // MODIFIED comment retained
+      final item = _images.removeAt(oldIndex);
+      final thumbnail = _thumbnails.removeAt(oldIndex);
       _images.insert(newIndex, item);
+      _thumbnails.insert(newIndex, thumbnail);
     });
     await _saveImageOrder();
   }
@@ -213,18 +247,22 @@ class _GridHomePageState extends State<GridHomePage>
 
     final sorted = _selectedIndexes.toList()..sort((a, b) => b.compareTo(a));
 
-    // Delete files in background to avoid blocking UI
-    final filesToDelete = <File>[];
+    // Delete both image and thumbnail files in background to avoid blocking UI
+    final imagesToDelete = <File>[];
+    final thumbnailsToDelete = <File>[];
+
     for (final i in sorted) {
-      filesToDelete.add(_images[i]);
+      imagesToDelete.add(_images[i]);
+      thumbnailsToDelete.add(_thumbnails[i]);
       _images.removeAt(i);
+      _thumbnails.removeAt(i);
     }
 
     _selectedIndexes.clear();
     setState(() {});
 
     // Delete files asynchronously
-    _deleteFilesInBackground(filesToDelete);
+    _deleteFilesInBackground([...imagesToDelete, ...thumbnailsToDelete]);
     await _saveImageOrder();
     await FileUtils.cleanupOrphanedThumbnails(_images.map((f) => f.path).toList());
   }
@@ -358,6 +396,7 @@ class _GridHomePageState extends State<GridHomePage>
               if (_images.isNotEmpty)
                 PhotoSliverGrid(
                   images: _images,
+                  thumbnails: _thumbnails,
                   selectedIndexes: _selectedIndexes,
                   onTap: _handleTap,
                   onReorder: _handleReorder,

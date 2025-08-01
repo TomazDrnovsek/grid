@@ -24,7 +24,7 @@ class FileUtils {
   }
 
   /// Copies [source] into app storage and compresses it.
-  /// - maxWidth: 1080px, quality: 85
+  /// - maxWidth: 1074px, quality: 85
   /// - preserves EXIF orientation (autoCorrectionAngle)
   /// Throws on I/O errors.
   static Future<File> copyAndCompress(XFile source) async {
@@ -48,10 +48,10 @@ class FileUtils {
     return File(result.path);
   }
 
-  /// Generates a small thumbnail optimized for grid display.
-  /// - Width: 150px (perfect for 3-column grid)
-  /// - Quality: 70 (good balance of size vs quality for thumbnails)
-  /// - Preserves EXIF orientation
+  /// Generates a small thumbnail optimized for 3:4 grid display.
+  /// - Width: 360px (perfect for 3-column grid with 3x pixel density)
+  /// - Quality: 85 (high quality for sharp grid display)
+  /// - Preserves EXIF orientation and aspect ratio
   /// Returns the thumbnail file path.
   static Future<File> generateThumbnail(XFile source) async {
     final thumbDir = await getAppThumbnailsDir();
@@ -76,7 +76,7 @@ class FileUtils {
 
   /// Creates both a full-size compressed image and a thumbnail.
   /// Returns a map with 'image' and 'thumbnail' keys containing the File objects.
-  /// This is more efficient than calling copyAndCompress and generateThumbnail separately.
+  /// This is the primary method for processing new images.
   static Future<Map<String, File>> processImageWithThumbnail(XFile source) async {
     final appDir = await getAppImagesDir();
     final thumbDir = await getAppThumbnailsDir();
@@ -85,7 +85,7 @@ class FileUtils {
     final imagePath = '${appDir.path}/IMG_$timestamp.jpg';
     final thumbPath = '${thumbDir.path}/THUMB_$timestamp.jpg';
 
-    // Process full image
+    // Process full image - high quality for future full-screen viewing
     final imageResult = await FlutterImageCompress.compressAndGetFile(
       source.path,
       imagePath,
@@ -95,12 +95,12 @@ class FileUtils {
       keepExif: true,
     );
 
-    // Process thumbnail
+    // Process thumbnail - optimized for 3:4 grid display
     final thumbResult = await FlutterImageCompress.compressAndGetFile(
       source.path,
       thumbPath,
-      minWidth: 150,
-      quality: 70,
+      minWidth: 360, // Perfect for 3-column grid
+      quality: 85,   // High quality for sharp grid display
       autoCorrectionAngle: true,
       keepExif: false,
     );
