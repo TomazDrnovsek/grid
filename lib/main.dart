@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:grid/app_theme.dart'; // Import your new theme file
-import 'ui/grid_home.dart';
+import 'package:grid/app_theme.dart';
+import 'ui/splash_screen.dart';
 
 void main() {
   runApp(const GridApp());
@@ -14,8 +14,8 @@ class GridApp extends StatelessWidget {
     return MaterialApp(
       title: 'Grid',
       debugShowCheckedModeBanner: false,
-      theme: buildLightTheme(), // Use our custom light theme
-      home: const GridHomePage(),
+      theme: buildLightTheme(),
+      home: const SplashScreen(), // Start with splash screen
     );
   }
 }
