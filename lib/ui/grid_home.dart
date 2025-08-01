@@ -161,6 +161,7 @@ class _GridHomePageState extends State<GridHomePage>
           }
           // Small delay to prevent UI blocking
           await Future.delayed(const Duration(milliseconds: 10));
+          await File(xfile.path).delete();
         } catch (e) {
           debugPrint('Error compressing ${xfile.path}: $e');
         }
@@ -225,6 +226,7 @@ class _GridHomePageState extends State<GridHomePage>
     // Delete files asynchronously
     _deleteFilesInBackground(filesToDelete);
     await _saveImageOrder();
+    await FileUtils.cleanupOrphanedThumbnails(_images.map((f) => f.path).toList());
   }
 
   Future<void> _deleteFilesInBackground(List<File> files) async {
