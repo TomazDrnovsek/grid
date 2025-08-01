@@ -548,7 +548,7 @@ class _ImagePreviewModal extends StatelessWidget {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20), // Beautiful blur effect
         child: Container(
-          color: Colors.black.withAlpha(200), // Much darker overlay (~78% opacity) with blur
+          color: AppColors.imagePreviewOverlay, // Using centralized color
           padding: const EdgeInsets.all(24), // 24px padding on all sides
           child: Center(
             child: Hero(
@@ -559,21 +559,18 @@ class _ImagePreviewModal extends StatelessWidget {
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
                     padding: const EdgeInsets.all(32),
-                    child: const Column(
+                    child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
                           Icons.error_outline,
-                          color: Colors.white,
+                          color: AppColors.imagePreviewErrorIcon,
                           size: 48,
                         ),
                         SizedBox(height: 16),
                         Text(
                           'Unable to load image',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                          ),
+                          style: AppTheme.imagePreviewError,
                         ),
                       ],
                     ),

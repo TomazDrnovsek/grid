@@ -83,7 +83,7 @@ class _SplashScreenState extends State<SplashScreen>
     final logoSize = screenWidth / 3; // 1/3 of screen width
 
     return Scaffold(
-      backgroundColor: const Color(0xFF1A1A1A), // Dark background like your design
+      backgroundColor: AppColors.splashBackground, // Using centralized color
       body: Center(
         child: AnimatedBuilder(
           animation: _animationController,

@@ -105,10 +105,10 @@ class _PhotoGridItem extends StatelessWidget {
                 shape: BoxShape.circle,
                 color: AppColors.gridSelectionTickBg,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.check,
                 size: 16,
-                color: Colors.white,
+                color: AppColors.pureWhite,
               ),
             ),
           ),
@@ -166,7 +166,7 @@ class _PhotoGridItem extends StatelessWidget {
   // MODIFIED: _buildDragFeedback now accepts the Size of the original widget and its content
   Widget _buildDragFeedback(Size size, Widget content) {
     return Material(
-      color: Colors.transparent,
+      color: AppColors.pureTransparent,
       child: Container(
         width: size.width, // Set width to match the original item
         height: size.height, // Set height to match the original item

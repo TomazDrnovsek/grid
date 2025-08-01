@@ -54,8 +54,8 @@ class MenuScreen extends StatelessWidget {
                         onChanged: null, // Disabled for now
                         activeColor: AppColors.textPrimary,
                         inactiveThumbColor: AppColors.textSecondary,
-                        inactiveTrackColor: AppColors.textSecondary.withAlpha(76), // 30% opacity
-                        trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+                        inactiveTrackColor: AppColors.switchInactiveTrack,
+                        trackOutlineColor: AppTheme.switchTrackOutlineColor,
                       ),
                     ],
                   ),
