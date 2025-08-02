@@ -82,7 +82,8 @@ class ProfileBlock extends StatefulWidget {
   State<ProfileBlock> createState() => _ProfileBlockState();
 }
 
-class _ProfileBlockState extends State<ProfileBlock> {
+class _ProfileBlockState extends State<ProfileBlock>
+    with AutomaticKeepAliveClientMixin {
   late ProfileData _profileData;
   bool _isLoading = true;
 
@@ -108,6 +109,10 @@ class _ProfileBlockState extends State<ProfileBlock> {
   final FocusNode _bioFocus = FocusNode();
 
   final ImagePicker _picker = ImagePicker();
+
+  // Keep the state alive to prevent rebuilds that cause image blinking
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -293,6 +298,8 @@ class _ProfileBlockState extends State<ProfileBlock> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (_isLoading) {
@@ -315,12 +322,56 @@ class _ProfileBlockState extends State<ProfileBlock> {
                 children: [
                   GestureDetector(
                     onTap: _changeProfileImage,
-                    child: CircleAvatar(
-                      radius: 40,
-                      backgroundImage: _profileData.profileImagePath != null
-                          ? FileImage(File(_profileData.profileImagePath!))
-                          : const AssetImage('assets/images/profile.jpg') as ImageProvider,
-                      backgroundColor: AppColors.avatarPlaceholder(isDark),
+                    child: Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.avatarPlaceholder(isDark),
+                      ),
+                      child: ClipOval(
+                        child: _profileData.profileImagePath != null
+                            ? Image.file(
+                          File(_profileData.profileImagePath!),
+                          fit: BoxFit.cover,
+                          width: 80,
+                          height: 80,
+                          // Add gaplessPlayback to prevent blinking
+                          gaplessPlayback: true,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: 80,
+                              height: 80,
+                              color: AppColors.avatarPlaceholder(isDark),
+                              child: Icon(
+                                Icons.person,
+                                size: 40,
+                                color: AppColors.textSecondary(isDark),
+                              ),
+                            );
+                          },
+                        )
+                            : Image.asset(
+                          'assets/images/profile.jpg',
+                          fit: BoxFit.cover,
+                          width: 80,
+                          height: 80,
+                          // Add gaplessPlayback to prevent blinking
+                          gaplessPlayback: true,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: 80,
+                              height: 80,
+                              color: AppColors.avatarPlaceholder(isDark),
+                              child: Icon(
+                                Icons.person,
+                                size: 40,
+                                color: AppColors.textSecondary(isDark),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 16),

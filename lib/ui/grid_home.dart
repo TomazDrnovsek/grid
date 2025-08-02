@@ -284,7 +284,7 @@ class _GridHomePageState extends State<GridHomePage>
       await _saveImageOrder();
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() => _isLoading = true);
       }
     }
   }
@@ -405,8 +405,21 @@ class _GridHomePageState extends State<GridHomePage>
   // Navigate to menu screen
   void _onMenuPressed() {
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => MenuScreen(themeNotifier: widget.themeNotifier),
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            MenuScreen(themeNotifier: widget.themeNotifier),
+        transitionDuration: const Duration(milliseconds: 250),
+        reverseTransitionDuration: const Duration(milliseconds: 250),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          // Use a fade transition instead of the default slide
+          return FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeInOut,
+            ),
+            child: child,
+          );
+        },
       ),
     );
   }
