@@ -294,6 +294,20 @@ class _GridHomePageState extends State<GridHomePage>
         debugPrint('Updated stored paths: ${validPaths.length} valid out of ${stored.length}');
       }
 
+      // Repair any missing thumbnails
+      debugPrint('Checking for missing thumbnails...');
+      final repairedCount = await FileUtils.repairMissingThumbnails(validPaths);
+      if (repairedCount > 0) {
+        debugPrint('Repaired $repairedCount missing thumbnails');
+
+        // Reload thumbnails after repair
+        _thumbnails.clear();
+        for (final imagePath in validPaths) {
+          final thumbnail = await FileUtils.getThumbnailForImage(imagePath);
+          _thumbnails.add(thumbnail ?? File(imagePath));
+        }
+      }
+
       // Final validation
       _validateSelectedIndexes();
 
@@ -347,9 +361,10 @@ class _GridHomePageState extends State<GridHomePage>
 
     try {
       // Process all images first, then update UI once
-      for (final xfile in picks) {
+      for (int i = 0; i < picks.length; i++) {
+        final xfile = picks[i];
         try {
-          debugPrint('Processing image: ${xfile.path}');
+          debugPrint('Processing image ${i + 1}/${picks.length}: ${xfile.path}');
 
           final result = await FileUtils.processImageWithThumbnail(xfile);
           final compressed = result['image']!;
@@ -363,11 +378,24 @@ class _GridHomePageState extends State<GridHomePage>
             throw Exception('Thumbnail was not created');
           }
 
+          // Verify files are valid
+          if (!await FileUtils.verifyImageFile(compressed)) {
+            throw Exception('Compressed image is corrupted');
+          }
+          if (!await FileUtils.verifyImageFile(thumbnail)) {
+            throw Exception('Thumbnail is corrupted');
+          }
+
           newImages.add(compressed);
           newThumbnails.add(thumbnail);
           successCount++;
 
           debugPrint('Successfully processed: ${compressed.path}');
+
+          // Add small delay between operations to prevent file system overload
+          if (i < picks.length - 1) {
+            await Future.delayed(const Duration(milliseconds: 50));
+          }
 
           // Try to delete original file
           try {
@@ -383,13 +411,44 @@ class _GridHomePageState extends State<GridHomePage>
 
       // Update UI with all new images at once
       if (newImages.isNotEmpty && mounted) {
+        // First, add the images to the lists
         setState(() {
           // Insert all new images at the beginning
           _images.insertAll(0, newImages.reversed);
           _thumbnails.insertAll(0, newThumbnails.reversed);
         });
 
+        // Save the new image order
         await _saveImageOrder();
+
+        // Force a complete widget tree rebuild for large batches
+        if (newImages.length > 10) {
+          debugPrint('Large batch detected, forcing complete UI refresh...');
+
+          // Small delay to ensure setState completes
+          await Future.delayed(const Duration(milliseconds: 100));
+
+          // Force the grid to rebuild by temporarily clearing and restoring
+          if (mounted) {
+            final tempImages = List<File>.from(_images);
+            final tempThumbnails = List<File>.from(_thumbnails);
+
+            setState(() {
+              _images.clear();
+              _thumbnails.clear();
+            });
+
+            // Wait for the clear to process
+            await Future.delayed(const Duration(milliseconds: 50));
+
+            if (mounted) {
+              setState(() {
+                _images.addAll(tempImages);
+                _thumbnails.addAll(tempThumbnails);
+              });
+            }
+          }
+        }
       }
 
       // Show feedback if some images failed

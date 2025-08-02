@@ -44,7 +44,7 @@ class PhotoSliverGrid extends StatelessWidget {
           final thumbnail = index < thumbnails.length ? thumbnails[index] : images[index];
 
           return _PhotoGridItem(
-            key: ValueKey('photo_${images[index].path}_$index'),
+            key: ValueKey('photo_${images[index].path}'), // Simplified key that doesn't change
             file: images[index],
             thumbnail: thumbnail,
             index: index,
@@ -55,10 +55,26 @@ class PhotoSliverGrid extends StatelessWidget {
           );
         },
         childCount: images.length,
-        // Better memory management without sacrificing quality
-        addAutomaticKeepAlives: true,   // Keep visible items alive for better UX
+        // Optimized for smooth scrolling
+        addAutomaticKeepAlives: true,   // Keep visible items alive for smooth scrolling
         addRepaintBoundaries: true,     // Isolate repaints for better performance
         addSemanticIndexes: false,      // Skip semantic indexing for performance
+        findChildIndexCallback: (Key key) {
+          // Help Flutter find widgets more efficiently
+          if (key is ValueKey<String>) {
+            final value = key.value;
+            if (value.startsWith('photo_')) {
+              final parts = value.split('_');
+              if (parts.length >= 3) {
+                final index = int.tryParse(parts[parts.length - 2]);
+                if (index != null && index < images.length) {
+                  return index;
+                }
+              }
+            }
+          }
+          return null;
+        },
       ),
     );
   }
@@ -91,9 +107,9 @@ class _PhotoGridItem extends StatefulWidget {
 class _PhotoGridItemState extends State<_PhotoGridItem>
     with AutomaticKeepAliveClientMixin {
 
-  // Keep grid items alive for better UX while managing memory properly
+  // Keep grid items alive for better scrolling performance
   @override
-  bool get wantKeepAlive => true; // Back to true for smooth scrolling
+  bool get wantKeepAlive => true;
 
   @override
   Widget build(BuildContext context) {
@@ -248,7 +264,7 @@ class _MemoryOptimizedImageState extends State<_MemoryOptimizedImage>
   void didUpdateWidget(_MemoryOptimizedImage oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // Reset state if the image files change
+    // Only reset if the actual file paths changed
     if (oldWidget.thumbnailFile.path != widget.thumbnailFile.path ||
         oldWidget.fullImageFile.path != widget.fullImageFile.path) {
 
@@ -347,11 +363,15 @@ class _MemoryOptimizedImageState extends State<_MemoryOptimizedImage>
       });
     }
 
+    // Calculate optimal cache width based on device
+    final devicePixelRatio = View.of(context).devicePixelRatio;
+    final cacheWidth = (360 * devicePixelRatio).round(); // 360 logical pixels * device pixel ratio for sharp grid display
+
     return Image.file(
       imageFile,
       fit: BoxFit.cover,
       gaplessPlayback: true,
-      cacheWidth: 480, // Fixed cache width for consistency
+      cacheWidth: cacheWidth,
       frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
         if (_isDisposed || !_isMounted) {
           return const SizedBox.shrink();

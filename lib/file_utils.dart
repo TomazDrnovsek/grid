@@ -366,4 +366,81 @@ class FileUtils {
     }
     return successCount;
   }
+
+  /// Verifies that an image file is valid and can be loaded.
+  /// Returns true if the image is valid, false otherwise.
+  static Future<bool> verifyImageFile(File imageFile) async {
+    try {
+      if (!await imageFile.exists()) {
+        return false;
+      }
+
+      // Check file size - if it's 0, the file is corrupted
+      final stat = await imageFile.stat();
+      if (stat.size == 0) {
+        debugPrint('Image file is empty: ${imageFile.path}');
+        return false;
+      }
+
+      // Try to read the first few bytes to ensure file is accessible
+      final bytes = await imageFile.openRead(0, 100).first;
+      if (bytes.isEmpty) {
+        debugPrint('Unable to read image file: ${imageFile.path}');
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('Error verifying image file ${imageFile.path}: $e');
+      return false;
+    }
+  }
+
+  /// Repairs missing or corrupted thumbnails for existing images.
+  /// Returns the number of thumbnails repaired.
+  static Future<int> repairMissingThumbnails(List<String> imagePaths) async {
+    int repairedCount = 0;
+
+    for (final imagePath in imagePaths) {
+      try {
+        // Skip if not a valid image path
+        if (!imagePath.contains('/IMG_') || !imagePath.endsWith('.jpg')) {
+          continue;
+        }
+
+        // Check if image exists
+        final imageFile = File(imagePath);
+        if (!await verifyImageFile(imageFile)) {
+          debugPrint('Skipping invalid image: $imagePath');
+          continue;
+        }
+
+        // Check if thumbnail exists and is valid
+        final thumbnail = await getThumbnailForImage(imagePath);
+        bool needsRepair = false;
+
+        if (thumbnail == null) {
+          needsRepair = true;
+          debugPrint('Missing thumbnail for: $imagePath');
+        } else if (!await verifyImageFile(thumbnail)) {
+          needsRepair = true;
+          debugPrint('Corrupted thumbnail for: $imagePath');
+        }
+
+        if (needsRepair) {
+          try {
+            debugPrint('Generating new thumbnail for: $imagePath');
+            await generateThumbnail(XFile(imagePath));
+            repairedCount++;
+          } catch (e) {
+            debugPrint('Failed to repair thumbnail for $imagePath: $e');
+          }
+        }
+      } catch (e) {
+        debugPrint('Error checking thumbnail for $imagePath: $e');
+      }
+    }
+
+    return repairedCount;
+  }
 }
