@@ -52,8 +52,9 @@ class AppColors {
 
   static const Color gridDragTargetBorder = Color(0xFF1E88E5);  // Same in both themes - brand color
 
-  static Color gridSelectionBorder(bool isDark) => textPrimary(isDark);         // Reuse text primary
-  static Color gridSelectionTickBg(bool isDark) => textPrimary(isDark);         // Same as selection border
+  // UPDATED: Selected image border - white in dark mode, black in light mode
+  static Color gridSelectionBorder(bool isDark) => isDark ? pureWhite : textPrimaryLight;
+  static Color gridSelectionTickBg(bool isDark) => textPrimaryLight; // Always black circle
 
   static const Color gridErrorBackgroundLight = Color(0xFFE0E0E0);
   static const Color gridErrorBackgroundDark = Color(0xFF2C2C2C);
@@ -73,22 +74,30 @@ class AppColors {
   static const Color avatarPlaceholderDark = Color(0xFF666666);
   static Color avatarPlaceholder(bool isDark) => isDark ? avatarPlaceholderDark : avatarPlaceholderLight;
 
-  // Delete modal specific colours
+  // UPDATED: Delete modal specific colours - new dark mode styling
   static const Color modalOverlayBackgroundLight = Color(0xCC111111);
   static const Color modalOverlayBackgroundDark = Color(0xCC000000);
   static Color modalOverlayBackground(bool isDark) => isDark ? modalOverlayBackgroundDark : modalOverlayBackgroundLight;
 
   static const Color modalContentBackgroundLight = Color(0xFFFFFFFF);
-  static const Color modalContentBackgroundDark = Color(0xFF2C2C2C);
+  static const Color modalContentBackgroundDark = Color(0xFF000000);  // UPDATED: Pure black
   static Color modalContentBackground(bool isDark) => isDark ? modalContentBackgroundDark : modalContentBackgroundLight;
 
   static const Color cancelButtonBackgroundLight = Color(0xFFE0E0E0);
-  static const Color cancelButtonBackgroundDark = Color(0xFF404040);
+  static const Color cancelButtonBackgroundDark = Color(0xFF222222);  // UPDATED: Dark gray
   static Color cancelButtonBackground(bool isDark) => isDark ? cancelButtonBackgroundDark : cancelButtonBackgroundLight;
 
-  static const Color deleteButtonBackground = Color(0xFF000000); // Same in both themes
-  static const Color deleteButtonText = Color(0xFFFFFFFF);       // Same in both themes
-  static const Color deleteButtonOverlay = Color(0x1AFFFFFF);    // Same in both themes
+  static const Color deleteButtonBackgroundLight = Color(0xFF000000); // Black in light mode
+  static const Color deleteButtonBackgroundDark = Color(0xFFFFFFFF);  // UPDATED: White in dark mode
+  static Color deleteButtonBackground(bool isDark) => isDark ? deleteButtonBackgroundDark : deleteButtonBackgroundLight;
+
+  static const Color deleteButtonTextLight = Color(0xFFFFFFFF);       // White text in light mode
+  static const Color deleteButtonTextDark = Color(0xFF000000);        // UPDATED: Black text in dark mode
+  static Color deleteButtonText(bool isDark) => isDark ? deleteButtonTextDark : deleteButtonTextLight;
+
+  static const Color deleteButtonOverlayLight = Color(0x1AFFFFFF);    // Light overlay in light mode
+  static const Color deleteButtonOverlayDark = Color(0x1A000000);     // UPDATED: Dark overlay in dark mode
+  static Color deleteButtonOverlay(bool isDark) => isDark ? deleteButtonOverlayDark : deleteButtonOverlayLight;
 
   // Image preview modal colors (same in both themes - always dark overlay)
   static const Color imagePreviewOverlay = Color(0xC8000000);    // ~78% black opacity
@@ -98,11 +107,15 @@ class AppColors {
   // Splash screen colors (unchanged - always dark)
   static const Color splashBackground = Color(0xFF1A1A1A);       // Dark background
 
-  // Switch/Toggle colors
+  // UPDATED: Switch/Toggle colors - new styling
   static const Color switchTrackOutline = Colors.transparent;    // No outline
-  static const Color switchInactiveTrackLight = Color(0x4D555555);
-  static const Color switchInactiveTrackDark = Color(0x4D888888);
+  static const Color switchInactiveTrackLight = Color(0xFFF0F0F0);  // UPDATED: Light gray
+  static const Color switchInactiveTrackDark = Color(0xFF222222);   // UPDATED: Dark gray
   static Color switchInactiveTrack(bool isDark) => isDark ? switchInactiveTrackDark : switchInactiveTrackLight;
+
+  static const Color switchInactiveThumbLight = Color(0xFF000000);  // UPDATED: Black circle
+  static const Color switchInactiveThumbDark = Color(0xFFFFFFFF);   // UPDATED: White circle
+  static Color switchInactiveThumb(bool isDark) => isDark ? switchInactiveThumbDark : switchInactiveThumbLight;
 
   // Pure colors for situations requiring absolute values
   static const Color pureWhite = Color(0xFFFFFFFF);
@@ -172,11 +185,12 @@ class AppTheme {
     height: 1.29,
   );
 
-  static const TextStyle dialogActionDanger = TextStyle(
+  // UPDATED: Delete button text style - adapts to theme
+  static TextStyle dialogActionDanger(bool isDark) => TextStyle(
     fontFamily: 'Roboto',
     fontSize: 14,
     fontWeight: FontWeight.w400,
-    color: AppColors.pureWhite,
+    color: AppColors.deleteButtonText(isDark),
     height: 1.29,
   );
 
@@ -189,9 +203,22 @@ class AppTheme {
     height: 1.4,
   );
 
-  // Switch styling properties
+  // UPDATED: Switch styling properties - new custom styling
   static WidgetStateProperty<Color> get switchTrackOutlineColor =>
       WidgetStateProperty.all(AppColors.switchTrackOutline);
+
+  static WidgetStateProperty<Color> switchThumbColor(bool isDark) =>
+      WidgetStateProperty.resolveWith<Color>((Set<WidgetState> states) {
+        if (states.contains(WidgetState.selected)) {
+          return AppColors.textPrimary(isDark);  // Active thumb color
+        }
+        return AppColors.switchInactiveThumb(isDark);  // Inactive thumb color
+      });
+
+  static WidgetStateProperty<Color> switchTrackColor(bool isDark) =>
+      WidgetStateProperty.resolveWith<Color>((Set<WidgetState> states) {
+        return AppColors.switchInactiveTrack(isDark);  // Same track color always
+      });
 }
 
 // Light theme

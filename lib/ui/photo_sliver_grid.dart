@@ -46,10 +46,10 @@ class PhotoSliverGrid extends StatelessWidget {
           );
         },
         childCount: images.length,
-        // Optimizations for high refresh rate scrolling
-        addAutomaticKeepAlives: true,  // Keep images alive for smoother scrolling
-        addRepaintBoundaries: true,    // Isolate repaints for better performance
-        addSemanticIndexes: false,     // Skip semantic indexing for performance
+        // Better memory management without sacrificing quality
+        addAutomaticKeepAlives: true,   // Keep visible items alive for better UX
+        addRepaintBoundaries: true,     // Isolate repaints for better performance
+        addSemanticIndexes: false,      // Skip semantic indexing for performance
       ),
     );
   }
@@ -82,9 +82,9 @@ class _PhotoGridItem extends StatefulWidget {
 class _PhotoGridItemState extends State<_PhotoGridItem>
     with AutomaticKeepAliveClientMixin {
 
-  // Keep grid items alive for smoother high refresh rate scrolling
+  // Keep grid items alive for better UX while managing memory properly
   @override
-  bool get wantKeepAlive => true;
+  bool get wantKeepAlive => true; // Back to true for smooth scrolling
 
   @override
   Widget build(BuildContext context) {
@@ -92,9 +92,10 @@ class _PhotoGridItemState extends State<_PhotoGridItem>
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Optimized image widget with high refresh rate support
-    final optimizedImage = _HighRefreshImage(
-      file: widget.thumbnail,
+    // Memory-optimized image widget
+    final optimizedImage = _MemoryOptimizedImage(
+      thumbnailFile: widget.thumbnail,
+      fullImageFile: widget.file,
       isSelected: widget.isSelected,
       isDark: isDark,
     );
@@ -111,7 +112,7 @@ class _PhotoGridItemState extends State<_PhotoGridItem>
               color: AppColors.gridDragPlaceholder(isDark),
               border: widget.isSelected
                   ? Border.all(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textPrimaryLight,
+                  color: AppColors.gridSelectionBorder(isDark),
                   width: 4.0
               )
                   : null,
@@ -134,7 +135,7 @@ class _PhotoGridItemState extends State<_PhotoGridItem>
                         ? Border.all(color: AppColors.gridDragTargetBorder, width: 2)
                         : widget.isSelected
                         ? Border.all(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textPrimaryLight,
+                        color: AppColors.gridSelectionBorder(isDark),
                         width: 4.0
                     )
                         : null,
@@ -175,28 +176,33 @@ class _PhotoGridItemState extends State<_PhotoGridItem>
   }
 }
 
-/// High refresh rate optimized image widget with frame-perfect loading
-class _HighRefreshImage extends StatefulWidget {
-  final File file;
+/// Memory-optimized image widget that handles loading issues better
+class _MemoryOptimizedImage extends StatefulWidget {
+  final File thumbnailFile;
+  final File fullImageFile;
   final bool isSelected;
   final bool isDark;
 
-  const _HighRefreshImage({
-    required this.file,
+  const _MemoryOptimizedImage({
+    required this.thumbnailFile,
+    required this.fullImageFile,
     required this.isSelected,
     required this.isDark,
   });
 
   @override
-  State<_HighRefreshImage> createState() => _HighRefreshImageState();
+  State<_MemoryOptimizedImage> createState() => _MemoryOptimizedImageState();
 }
 
-class _HighRefreshImageState extends State<_HighRefreshImage>
+class _MemoryOptimizedImageState extends State<_MemoryOptimizedImage>
     with SingleTickerProviderStateMixin {
 
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
   bool _imageLoaded = false;
+  bool _useFallback = false;
+  bool _isDisposed = false;
+  String? _currentImagePath;
 
   @override
   void initState() {
@@ -223,62 +229,139 @@ class _HighRefreshImageState extends State<_HighRefreshImage>
   }
 
   @override
+  void didUpdateWidget(_MemoryOptimizedImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // Reset state if the image files change
+    if (oldWidget.thumbnailFile.path != widget.thumbnailFile.path ||
+        oldWidget.fullImageFile.path != widget.fullImageFile.path) {
+      setState(() {
+        _imageLoaded = false;
+        _useFallback = false;
+        _currentImagePath = null;
+        _fadeController.reset();
+      });
+    }
+  }
+
+  @override
   void dispose() {
+    _isDisposed = true;
     _fadeController.dispose();
     super.dispose();
   }
 
+  Widget _buildImageWidget(File imageFile) {
+    // Track current image path to detect changes
+    final imagePath = imageFile.path;
+
+    // Reset loaded state if image changed
+    if (_currentImagePath != imagePath) {
+      _currentImagePath = imagePath;
+      _imageLoaded = false;
+      _fadeController.reset();
+    }
+
+    return Image.file(
+      imageFile,
+      fit: BoxFit.cover,
+      gaplessPlayback: true,
+      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+        if (_isDisposed) return const SizedBox.shrink();
+
+        if (wasSynchronouslyLoaded) {
+          _imageLoaded = true;
+          return child;
+        }
+
+        if (frame != null && !_imageLoaded) {
+          _imageLoaded = true;
+          if (!_isDisposed && mounted) {
+            SchedulerBinding.instance.addPostFrameCallback((_) {
+              if (!_isDisposed && mounted) {
+                _fadeController.forward();
+              }
+            });
+          }
+        }
+
+        return AnimatedBuilder(
+          animation: _fadeAnimation,
+          builder: (context, child) {
+            return Opacity(
+              opacity: frame == null ? 0.0 : _fadeAnimation.value,
+              child: child,
+            );
+          },
+          child: child,
+        );
+      },
+      errorBuilder: (context, error, stackTrace) {
+        if (_isDisposed) return const SizedBox.shrink();
+
+        debugPrint('Image failed to load: ${imageFile.path}, error: $error');
+
+        // Try fallback to full image if thumbnail fails and we haven't tried it yet
+        if (!_useFallback && imageFile.path == widget.thumbnailFile.path) {
+          debugPrint('Thumbnail failed, trying full image: ${widget.fullImageFile.path}');
+
+          // Schedule state update after current build
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!_isDisposed && mounted) {
+              setState(() {
+                _useFallback = true;
+                _imageLoaded = false;
+                _currentImagePath = null;
+              });
+            }
+          });
+
+          // Show loading state while switching
+          return Container(
+            color: AppColors.gridErrorBackground(widget.isDark),
+            child: Center(
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    AppColors.gridErrorIcon(widget.isDark),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        // Show error if both thumbnail and full image fail
+        return Container(
+          color: AppColors.gridErrorBackground(widget.isDark),
+          child: Icon(
+            Icons.error_outline,
+            color: AppColors.gridErrorIcon(widget.isDark),
+            size: 24,
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isDisposed) return const SizedBox.shrink();
+
+    final imageFile = _useFallback ? widget.fullImageFile : widget.thumbnailFile;
+
     return Stack(
       fit: StackFit.expand,
       children: [
         Hero(
-          tag: 'image_${widget.file.path}',
-          child: Image.file(
-            widget.file,
-            fit: BoxFit.cover,
-            gaplessPlayback: true, // Critical for high refresh rate stability
-            frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-              // Handle frame-perfect loading for high refresh rate displays
-              if (wasSynchronouslyLoaded) {
-                _imageLoaded = true;
-                return child;
-              }
-
-              if (frame != null && !_imageLoaded) {
-                _imageLoaded = true;
-                SchedulerBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) {
-                    _fadeController.forward();
-                  }
-                });
-              }
-
-              return AnimatedBuilder(
-                animation: _fadeAnimation,
-                builder: (context, child) {
-                  return Opacity(
-                    opacity: frame == null ? 0.0 : _fadeAnimation.value,
-                    child: child,
-                  );
-                },
-                child: child,
-              );
-            },
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                color: AppColors.gridErrorBackground(widget.isDark),
-                child: Icon(
-                    Icons.error,
-                    color: AppColors.gridErrorIcon(widget.isDark)
-                ),
-              );
-            },
-          ),
+          tag: 'image_${widget.fullImageFile.path}',
+          child: _buildImageWidget(imageFile),
         ),
 
-        // Selection indicator with optimized rendering
+        // Selection indicator
         if (widget.isSelected)
           Positioned(
             bottom: 8,
@@ -288,12 +371,12 @@ class _HighRefreshImageState extends State<_HighRefreshImage>
               height: 24,
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.textPrimaryLight, // Always black circle
+                color: AppColors.textPrimaryLight,
               ),
               child: const Icon(
                 Icons.check,
                 size: 16,
-                color: AppColors.pureWhite, // Always white checkmark
+                color: AppColors.pureWhite,
               ),
             ),
           ),

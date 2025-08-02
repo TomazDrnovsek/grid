@@ -841,20 +841,20 @@ class DeleteConfirmModal extends StatelessWidget {
                         child: TextButton(
                           style: ButtonStyle(
                             backgroundColor: WidgetStateProperty.all(
-                                AppColors.deleteButtonBackground),
+                                AppColors.deleteButtonBackground(isDark)),
                             shape: WidgetStateProperty.all(
                               RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
                             ),
                             overlayColor: WidgetStateProperty.all(
-                              AppColors.deleteButtonOverlay,
+                              AppColors.deleteButtonOverlay(isDark),
                             ),
                           ),
                           onPressed: onDelete,
-                          child: const Text(
+                          child: Text(
                             'Delete',
-                            style: AppTheme.dialogActionDanger,
+                            style: AppTheme.dialogActionDanger(isDark),
                           ),
                         ),
                       ),
