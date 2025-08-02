@@ -1,4 +1,6 @@
+// File: lib/ui/photo_sliver_grid.dart
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:grid/app_theme.dart';
@@ -34,10 +36,17 @@ class PhotoSliverGrid extends StatelessWidget {
       ),
       delegate: SliverChildBuilderDelegate(
             (context, index) {
+          // Bounds checking
+          if (index >= images.length) {
+            return const SizedBox.shrink();
+          }
+
+          final thumbnail = index < thumbnails.length ? thumbnails[index] : images[index];
+
           return _PhotoGridItem(
-            key: ValueKey('photo_$index'),
+            key: ValueKey('photo_${images[index].path}_$index'),
             file: images[index],
-            thumbnail: thumbnails.length > index ? thumbnails[index] : images[index],
+            thumbnail: thumbnail,
             index: index,
             isSelected: selectedIndexes.contains(index),
             onTap: onTap,
@@ -199,10 +208,17 @@ class _MemoryOptimizedImageState extends State<_MemoryOptimizedImage>
 
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
-  bool _imageLoaded = false;
-  bool _useFallback = false;
+
+  // Track widget state to prevent race conditions
   bool _isDisposed = false;
+  bool _isMounted = true;
+
+  // Track current loading state
   String? _currentImagePath;
+  bool _isLoadingImage = false;
+  bool _hasError = false;
+  bool _useFallback = false;
+  Timer? _loadingTimeout;
 
   @override
   void initState() {
@@ -235,152 +251,244 @@ class _MemoryOptimizedImageState extends State<_MemoryOptimizedImage>
     // Reset state if the image files change
     if (oldWidget.thumbnailFile.path != widget.thumbnailFile.path ||
         oldWidget.fullImageFile.path != widget.fullImageFile.path) {
-      setState(() {
-        _imageLoaded = false;
-        _useFallback = false;
-        _currentImagePath = null;
-        _fadeController.reset();
-      });
+
+      // Cancel any pending operations
+      _currentImagePath = null;
+      _isLoadingImage = false;
+      _loadingTimeout?.cancel();
+
+      if (_isMounted && !_isDisposed) {
+        setState(() {
+          _hasError = false;
+          _useFallback = false;
+          _fadeController.reset();
+        });
+      }
     }
   }
 
   @override
   void dispose() {
     _isDisposed = true;
+    _isMounted = false;
+    _loadingTimeout?.cancel();
     _fadeController.dispose();
     super.dispose();
   }
 
+  void _safeSetState(VoidCallback fn) {
+    if (_isMounted && mounted && !_isDisposed) {
+      setState(fn);
+    }
+  }
+
+  Widget _buildErrorWidget() {
+    return Container(
+      color: AppColors.gridErrorBackground(widget.isDark),
+      child: Icon(
+        Icons.error_outline,
+        color: AppColors.gridErrorIcon(widget.isDark),
+        size: 24,
+      ),
+    );
+  }
+
+  Widget _buildLoadingWidget() {
+    return Container(
+      color: AppColors.gridErrorBackground(widget.isDark),
+      child: Center(
+        child: SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(
+              AppColors.gridErrorIcon(widget.isDark),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildImageWidget(File imageFile) {
-    // Track current image path to detect changes
     final imagePath = imageFile.path;
 
-    // Reset loaded state if image changed
+    // Prevent multiple simultaneous loads of the same image
+    if (_currentImagePath == imagePath && _isLoadingImage) {
+      return _buildLoadingWidget();
+    }
+
+    // Reset state for new image
     if (_currentImagePath != imagePath) {
       _currentImagePath = imagePath;
-      _imageLoaded = false;
-      _fadeController.reset();
+      _isLoadingImage = true;
+      _hasError = false;
+
+      // Cancel any existing timeout
+      _loadingTimeout?.cancel();
+
+      // Set a timeout for image loading
+      _loadingTimeout = Timer(const Duration(seconds: 10), () {
+        if (_isLoadingImage && _isMounted && mounted && !_isDisposed) {
+          debugPrint('Image loading timeout for: $imagePath');
+          _safeSetState(() {
+            _isLoadingImage = false;
+            _hasError = true;
+          });
+        }
+      });
+
+      // Reset animation safely
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (_isMounted && mounted && !_isDisposed) {
+          _fadeController.reset();
+        }
+      });
     }
 
     return Image.file(
       imageFile,
       fit: BoxFit.cover,
       gaplessPlayback: true,
+      cacheWidth: 480, // Fixed cache width for consistency
       frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-        if (_isDisposed) return const SizedBox.shrink();
+        if (_isDisposed || !_isMounted) {
+          return const SizedBox.shrink();
+        }
 
         if (wasSynchronouslyLoaded) {
-          _imageLoaded = true;
+          _isLoadingImage = false;
+          _loadingTimeout?.cancel();
           return child;
         }
 
-        if (frame != null && !_imageLoaded) {
-          _imageLoaded = true;
-          if (!_isDisposed && mounted) {
-            SchedulerBinding.instance.addPostFrameCallback((_) {
-              if (!_isDisposed && mounted) {
-                _fadeController.forward();
-              }
-            });
-          }
-        }
+        if (frame != null) {
+          // Image loaded successfully
+          _isLoadingImage = false;
+          _loadingTimeout?.cancel();
 
-        return AnimatedBuilder(
-          animation: _fadeAnimation,
-          builder: (context, child) {
-            return Opacity(
-              opacity: frame == null ? 0.0 : _fadeAnimation.value,
-              child: child,
-            );
-          },
-          child: child,
-        );
-      },
-      errorBuilder: (context, error, stackTrace) {
-        if (_isDisposed) return const SizedBox.shrink();
-
-        debugPrint('Image failed to load: ${imageFile.path}, error: $error');
-
-        // Try fallback to full image if thumbnail fails and we haven't tried it yet
-        if (!_useFallback && imageFile.path == widget.thumbnailFile.path) {
-          debugPrint('Thumbnail failed, trying full image: ${widget.fullImageFile.path}');
-
-          // Schedule state update after current build
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!_isDisposed && mounted) {
-              setState(() {
-                _useFallback = true;
-                _imageLoaded = false;
-                _currentImagePath = null;
-              });
+          // Safely trigger fade animation
+          SchedulerBinding.instance.addPostFrameCallback((_) {
+            if (_isMounted && mounted && !_isDisposed && !_hasError) {
+              _fadeController.forward();
             }
           });
 
-          // Show loading state while switching
-          return Container(
-            color: AppColors.gridErrorBackground(widget.isDark),
-            child: Center(
-              child: SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    AppColors.gridErrorIcon(widget.isDark),
-                  ),
-                ),
-              ),
-            ),
+          return AnimatedBuilder(
+            animation: _fadeAnimation,
+            builder: (context, animChild) {
+              return Opacity(
+                opacity: _fadeAnimation.value,
+                child: animChild,
+              );
+            },
+            child: child,
           );
         }
 
+        // Still loading
+        return _buildLoadingWidget();
+      },
+      errorBuilder: (context, error, stackTrace) {
+        if (_isDisposed || !_isMounted) {
+          return const SizedBox.shrink();
+        }
+
+        debugPrint('Image failed to load: ${imageFile.path}, error: $error');
+        _isLoadingImage = false;
+        _hasError = true;
+        _loadingTimeout?.cancel();
+
+        // Try fallback to full image if thumbnail fails and we haven't tried it yet
+        if (!_useFallback && imageFile.path == widget.thumbnailFile.path) {
+          debugPrint('Thumbnail failed, scheduling fallback to full image');
+
+          // Use post frame callback to avoid setState during build
+          SchedulerBinding.instance.addPostFrameCallback((_) {
+            _safeSetState(() {
+              _useFallback = true;
+              _currentImagePath = null;
+              _isLoadingImage = false;
+            });
+          });
+
+          // Show loading state while switching
+          return _buildLoadingWidget();
+        }
+
         // Show error if both thumbnail and full image fail
-        return Container(
-          color: AppColors.gridErrorBackground(widget.isDark),
-          child: Icon(
-            Icons.error_outline,
-            color: AppColors.gridErrorIcon(widget.isDark),
-            size: 24,
-          ),
-        );
+        return _buildErrorWidget();
       },
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isDisposed) return const SizedBox.shrink();
+    if (_isDisposed || !_isMounted) {
+      return const SizedBox.shrink();
+    }
 
-    final imageFile = _useFallback ? widget.fullImageFile : widget.thumbnailFile;
+    try {
+      final imageFile = _useFallback ? widget.fullImageFile : widget.thumbnailFile;
 
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        Hero(
-          tag: 'image_${widget.fullImageFile.path}',
-          child: _buildImageWidget(imageFile),
-        ),
+      // Quick existence check to fail fast
+      if (!imageFile.existsSync()) {
+        return _buildErrorWidget();
+      }
 
-        // Selection indicator
-        if (widget.isSelected)
-          Positioned(
-            bottom: 8,
-            right: 8,
-            child: Container(
-              width: 24,
-              height: 24,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.textPrimaryLight,
-              ),
-              child: const Icon(
-                Icons.check,
-                size: 16,
-                color: AppColors.pureWhite,
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          Hero(
+            tag: 'image_${widget.fullImageFile.path}',
+            flightShuttleBuilder: (
+                BuildContext flightContext,
+                Animation<double> animation,
+                HeroFlightDirection flightDirection,
+                BuildContext fromHeroContext,
+                BuildContext toHeroContext,
+                ) {
+              // Custom flight animation to prevent glitches
+              return AnimatedBuilder(
+                animation: animation,
+                builder: (context, child) {
+                  return FadeTransition(
+                    opacity: animation.drive(
+                      Tween<double>(begin: 1.0, end: 1.0),
+                    ),
+                    child: _buildImageWidget(widget.fullImageFile),
+                  );
+                },
+              );
+            },
+            child: _buildImageWidget(imageFile),
+          ),
+
+          // Selection indicator
+          if (widget.isSelected)
+            Positioned(
+              bottom: 8,
+              right: 8,
+              child: Container(
+                width: 24,
+                height: 24,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.textPrimaryLight,
+                ),
+                child: const Icon(
+                  Icons.check,
+                  size: 16,
+                  color: AppColors.pureWhite,
+                ),
               ),
             ),
-          ),
-      ],
-    );
+        ],
+      );
+    } catch (e) {
+      debugPrint('Error building image widget: $e');
+      return _buildErrorWidget();
+    }
   }
 }

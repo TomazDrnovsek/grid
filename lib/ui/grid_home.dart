@@ -95,9 +95,6 @@ class _GridHomePageState extends State<GridHomePage>
   final TextEditingController _headerUsernameController = TextEditingController();
   final FocusNode _headerUsernameFocus = FocusNode();
 
-  // Performance monitoring for high refresh rate optimization
-  late AnimationController _performanceController;
-
   // Keep the state alive to prevent rebuilds
   @override
   bool get wantKeepAlive => true;
@@ -105,13 +102,6 @@ class _GridHomePageState extends State<GridHomePage>
   @override
   void initState() {
     super.initState();
-
-    // Initialize performance monitoring
-    _performanceController = AnimationController(
-      duration: const Duration(milliseconds: 16), // 60fps baseline
-      vsync: this,
-    );
-
     _loadSavedImages();
     _loadHeaderUsername();
     _setupScrollOptimizations();
@@ -123,7 +113,6 @@ class _GridHomePageState extends State<GridHomePage>
     _scrollController.dispose();
     _headerUsernameController.dispose();
     _headerUsernameFocus.dispose();
-    _performanceController.dispose();
     super.dispose();
   }
 
@@ -194,6 +183,21 @@ class _GridHomePageState extends State<GridHomePage>
     });
   }
 
+  /// Validates and cleans up selected indexes to ensure they're within bounds
+  void _validateSelectedIndexes() {
+    if (_selectedIndexes.isEmpty) return;
+
+    final maxIndex = _images.length - 1;
+    final invalidIndexes = _selectedIndexes.where((index) => index < 0 || index > maxIndex).toList();
+
+    if (invalidIndexes.isNotEmpty) {
+      debugPrint('Removing invalid selected indexes: $invalidIndexes');
+      setState(() {
+        _selectedIndexes.removeAll(invalidIndexes);
+      });
+    }
+  }
+
   /// Optimized scroll to top for high refresh rate displays
   void _scrollToTop() {
     final refreshRate = SchedulerBinding.instance.platformDispatcher.displays.first.refreshRate;
@@ -216,72 +220,85 @@ class _GridHomePageState extends State<GridHomePage>
     try {
       final prefs = await SharedPreferences.getInstance();
       final List<String>? stored = prefs.getStringList('grid_image_paths');
-      if (stored == null) return;
+      if (stored == null || stored.isEmpty) {
+        return;
+      }
 
       final appDir = await FileUtils.getAppImagesDir();
-      final List<String> migrated = [];
-      final List<File> loadedImages = [];
-      final List<File> loadedThumbnails = [];
+      final List<String> validPaths = [];
 
-      // Process images in smaller batches for high refresh rate responsiveness
-      final refreshRate = SchedulerBinding.instance.platformDispatcher.displays.first.refreshRate;
-      final batchSize = refreshRate > 90 ? 5 : 10; // Smaller batches for 120Hz to maintain frame rate
+      // Clear existing arrays
+      _images.clear();
+      _thumbnails.clear();
 
-      for (int i = 0; i < stored.length; i += batchSize) {
-        final batch = stored.skip(i).take(batchSize);
-
-        for (final path in batch) {
+      // Process all images without batching to avoid state issues
+      for (final path in stored) {
+        try {
           final file = File(path);
-          if (!file.existsSync()) continue;
+          if (!file.existsSync()) {
+            debugPrint('Skipping non-existent file: $path');
+            continue;
+          }
 
           String finalPath = path;
+
+          // Migrate if needed
           if (!path.startsWith(appDir.path)) {
             try {
               final result = await FileUtils.processImageWithThumbnail(XFile(path));
               finalPath = result['image']!.path;
+              debugPrint('Migrated image to: $finalPath');
             } catch (e) {
               debugPrint('Migration failed for $path: $e');
-              finalPath = path;
+              continue;
             }
           }
 
-          migrated.add(finalPath);
-          loadedImages.add(File(finalPath));
-
-          final thumbnail = await FileUtils.getThumbnailForImage(finalPath);
-          if (thumbnail != null) {
-            loadedThumbnails.add(thumbnail);
-          } else {
-            try {
-              final newThumbnail = await FileUtils.generateThumbnail(XFile(finalPath));
-              loadedThumbnails.add(newThumbnail);
-            } catch (e) {
-              debugPrint('Failed to generate thumbnail for $finalPath: $e');
-              loadedThumbnails.add(File(finalPath));
-            }
+          // Verify the image file still exists
+          final imageFile = File(finalPath);
+          if (!await imageFile.exists()) {
+            debugPrint('Image file not found after migration: $finalPath');
+            continue;
           }
-        }
 
-        // Update UI after each batch with high refresh rate optimization
-        if (mounted) {
-          setState(() {
-            _images
-              ..clear()
-              ..addAll(loadedImages);
-            _thumbnails
-              ..clear()
-              ..addAll(loadedThumbnails);
-          });
-        }
+          // Try to get or generate thumbnail
+          File thumbnailFile;
+          try {
+            final existingThumbnail = await FileUtils.getThumbnailForImage(finalPath);
+            if (existingThumbnail != null && await existingThumbnail.exists()) {
+              thumbnailFile = existingThumbnail;
+            } else {
+              debugPrint('Generating missing thumbnail for: $finalPath');
+              thumbnailFile = await FileUtils.generateThumbnail(XFile(finalPath));
+            }
+          } catch (e) {
+            debugPrint('Thumbnail handling failed for $finalPath: $e');
+            // Use original image as fallback
+            thumbnailFile = imageFile;
+          }
 
-        // Shorter delay for high refresh rate displays
-        final delay = refreshRate > 90 ? 0 : 1; // No delay for 120Hz, 1ms for 60Hz
-        await Future.delayed(Duration(milliseconds: delay));
+          // Add to arrays
+          _images.add(imageFile);
+          _thumbnails.add(thumbnailFile);
+          validPaths.add(finalPath);
+
+        } catch (e) {
+          debugPrint('Error processing image at $path: $e');
+          continue;
+        }
       }
 
-      await prefs.setStringList('grid_image_paths', migrated);
+      // Save only valid paths
+      if (validPaths.length != stored.length) {
+        await prefs.setStringList('grid_image_paths', validPaths);
+        debugPrint('Updated stored paths: ${validPaths.length} valid out of ${stored.length}');
+      }
+
+      // Final validation
+      _validateSelectedIndexes();
+
     } catch (e) {
-      debugPrint('Error loading/migrating images: $e');
+      debugPrint('Error loading images: $e');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -304,41 +321,102 @@ class _GridHomePageState extends State<GridHomePage>
   Future<void> _addPhoto() async {
     if (_isLoading) return;
 
-    final picks = await _picker.pickMultiImage();
-    if (picks.isEmpty) return;
+    List<XFile> picks = [];
+    try {
+      picks = await _picker.pickMultiImage();
+      if (picks.isEmpty) return;
+    } catch (e) {
+      debugPrint('Error picking images: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to pick images'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
 
     setState(() => _isLoading = true);
 
-    try {
-      // Process images with optimized timing for high refresh rate
-      final refreshRate = SchedulerBinding.instance.platformDispatcher.displays.first.refreshRate;
-      final delay = refreshRate > 90 ? 5 : 10; // Faster processing for 120Hz
+    int successCount = 0;
+    int failureCount = 0;
+    final List<File> newImages = [];
+    final List<File> newThumbnails = [];
 
+    try {
+      // Process all images first, then update UI once
       for (final xfile in picks) {
         try {
+          debugPrint('Processing image: ${xfile.path}');
+
           final result = await FileUtils.processImageWithThumbnail(xfile);
           final compressed = result['image']!;
           final thumbnail = result['thumbnail']!;
 
-          if (mounted) {
-            setState(() {
-              _images.insert(0, compressed);
-              _thumbnails.insert(0, thumbnail);
-            });
+          // Verify files were created successfully
+          if (!await compressed.exists()) {
+            throw Exception('Compressed image was not created');
+          }
+          if (!await thumbnail.exists()) {
+            throw Exception('Thumbnail was not created');
           }
 
-          await Future.delayed(Duration(milliseconds: delay));
-          await File(xfile.path).delete();
+          newImages.add(compressed);
+          newThumbnails.add(thumbnail);
+          successCount++;
+
+          debugPrint('Successfully processed: ${compressed.path}');
+
+          // Try to delete original file
+          try {
+            await File(xfile.path).delete();
+          } catch (e) {
+            debugPrint('Failed to delete original file ${xfile.path}: $e');
+          }
         } catch (e) {
           debugPrint('Error processing ${xfile.path}: $e');
+          failureCount++;
         }
       }
 
-      await _saveImageOrder();
+      // Update UI with all new images at once
+      if (newImages.isNotEmpty && mounted) {
+        setState(() {
+          // Insert all new images at the beginning
+          _images.insertAll(0, newImages.reversed);
+          _thumbnails.insertAll(0, newThumbnails.reversed);
+        });
+
+        await _saveImageOrder();
+      }
+
+      // Show feedback if some images failed
+      if (mounted && failureCount > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              successCount > 0
+                  ? 'Added $successCount images. $failureCount failed.'
+                  : 'Failed to add images',
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     } catch (e) {
       debugPrint('Error in _addPhoto: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('An error occurred while adding photos'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     } finally {
-      // Always reset loading state, regardless of success or failure
+      // Always reset loading state
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -348,6 +426,11 @@ class _GridHomePageState extends State<GridHomePage>
   }
 
   void _handleTap(int index) {
+    if (index < 0 || index >= _images.length) {
+      debugPrint('Invalid tap index: $index');
+      return;
+    }
+
     setState(() {
       if (_selectedIndexes.contains(index)) {
         _selectedIndexes.remove(index);
@@ -358,10 +441,12 @@ class _GridHomePageState extends State<GridHomePage>
   }
 
   void _handleDoubleTap(int index) {
-    setState(() {
-      _previewImageIndex = index;
-      _showImagePreview = true;
-    });
+    if (index >= 0 && index < _images.length) {
+      setState(() {
+        _previewImageIndex = index;
+        _showImagePreview = true;
+      });
+    }
   }
 
   void _closeImagePreview() {
@@ -372,6 +457,20 @@ class _GridHomePageState extends State<GridHomePage>
   }
 
   Future<void> _handleReorder(int oldIndex, int newIndex) async {
+    // Validate indices
+    if (oldIndex < 0 || oldIndex >= _images.length ||
+        newIndex < 0 || newIndex >= _images.length ||
+        oldIndex == newIndex) {
+      debugPrint('Invalid reorder indices: old=$oldIndex, new=$newIndex');
+      return;
+    }
+
+    // Also check thumbnails array
+    if (oldIndex >= _thumbnails.length || newIndex >= _thumbnails.length) {
+      debugPrint('Thumbnail array out of sync with images array');
+      return;
+    }
+
     setState(() {
       _selectedIndexes.clear();
       final item = _images.removeAt(oldIndex);
@@ -399,37 +498,69 @@ class _GridHomePageState extends State<GridHomePage>
       _showDeleteConfirm = false;
     });
 
-    final sorted = _selectedIndexes.toList()..sort((a, b) => b.compareTo(a));
+    try {
+      final sorted = _selectedIndexes.toList()..sort((a, b) => b.compareTo(a));
 
-    final imagesToDelete = <File>[];
-    final thumbnailsToDelete = <File>[];
+      final imagesToDelete = <File>[];
+      final thumbnailsToDelete = <File>[];
 
-    for (final i in sorted) {
-      imagesToDelete.add(_images[i]);
-      thumbnailsToDelete.add(_thumbnails[i]);
-      _images.removeAt(i);
-      _thumbnails.removeAt(i);
+      for (final i in sorted) {
+        if (i >= 0 && i < _images.length && i < _thumbnails.length) {
+          imagesToDelete.add(_images[i]);
+          thumbnailsToDelete.add(_thumbnails[i]);
+          _images.removeAt(i);
+          _thumbnails.removeAt(i);
+        } else {
+          debugPrint('Warning: Invalid index $i for deletion');
+        }
+      }
+
+      _selectedIndexes.clear();
+      setState(() {});
+
+      // Ensure arrays are still in sync after deletion
+      if (_thumbnails.length != _images.length) {
+        debugPrint('Arrays out of sync after deletion, resyncing...');
+        while (_thumbnails.length > _images.length) {
+          _thumbnails.removeLast();
+        }
+        while (_thumbnails.length < _images.length) {
+          _thumbnails.add(_images[_thumbnails.length]);
+        }
+      }
+
+      if (imagesToDelete.isNotEmpty) {
+        _deleteFilesInBackground([...imagesToDelete, ...thumbnailsToDelete]);
+        await _saveImageOrder();
+        await FileUtils.cleanupOrphanedThumbnails(_images.map((f) => f.path).toList());
+      }
+    } catch (e) {
+      debugPrint('Error in _onDeleteConfirm: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('An error occurred while deleting images'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     }
-
-    _selectedIndexes.clear();
-    setState(() {});
-
-    _deleteFilesInBackground([...imagesToDelete, ...thumbnailsToDelete]);
-    await _saveImageOrder();
-    await FileUtils.cleanupOrphanedThumbnails(_images.map((f) => f.path).toList());
   }
 
   Future<void> _deleteFilesInBackground(List<File> files) async {
-    final refreshRate = SchedulerBinding.instance.platformDispatcher.displays.first.refreshRate;
-    final delay = refreshRate > 90 ? 0 : 1; // Faster cleanup for high refresh rate
+    try {
+      final refreshRate = SchedulerBinding.instance.platformDispatcher.displays.first.refreshRate;
+      final delay = refreshRate > 90 ? 0 : 1; // Faster cleanup for high refresh rate
 
-    for (final file in files) {
-      try {
-        await file.delete();
-      } catch (e) {
-        debugPrint('Error deleting file ${file.path}: $e');
+      final deletedCount = await FileUtils.deleteFilesSafely(files);
+      debugPrint('Deleted $deletedCount of ${files.length} files');
+
+      // Small delay to ensure UI remains responsive
+      if (delay > 0) {
+        await Future.delayed(Duration(milliseconds: delay));
       }
-      await Future.delayed(Duration(milliseconds: delay));
+    } catch (e) {
+      debugPrint('Error in background file deletion: $e');
     }
   }
 
@@ -438,7 +569,16 @@ class _GridHomePageState extends State<GridHomePage>
 
     try {
       final imageIndex = _selectedIndexes.first;
+      if (imageIndex >= _images.length) {
+        throw Exception('Invalid image index');
+      }
+
       final imageFile = _images[imageIndex];
+
+      // Verify file exists before sharing
+      if (!await imageFile.exists()) {
+        throw Exception('Image file no longer exists');
+      }
 
       await Share.shareXFiles(
         [XFile(imageFile.path)],
@@ -670,7 +810,9 @@ class _GridHomePageState extends State<GridHomePage>
                     if (_images.isNotEmpty)
                       PhotoSliverGrid(
                         images: _images,
-                        thumbnails: _thumbnails,
+                        thumbnails: _thumbnails.length == _images.length
+                            ? _thumbnails
+                            : List<File>.from(_images), // Fallback if thumbnails out of sync
                         selectedIndexes: _selectedIndexes,
                         onTap: _handleTap,
                         onDoubleTap: _handleDoubleTap,
@@ -696,7 +838,7 @@ class _GridHomePageState extends State<GridHomePage>
                     : const SizedBox.shrink(),
               ),
 
-              if (_showImagePreview && _previewImageIndex >= 0)
+              if (_showImagePreview && _previewImageIndex >= 0 && _previewImageIndex < _images.length)
                 ImagePreviewModal(
                   image: _images[_previewImageIndex],
                   onClose: _closeImagePreview,

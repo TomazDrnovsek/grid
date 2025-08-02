@@ -36,14 +36,21 @@ class ProfileData {
     'profileImagePath': profileImagePath,
   };
 
-  static ProfileData fromJson(Map<String, dynamic> json) => ProfileData(
-    username: json['username'] ?? 'tomazdrnovsek',
-    posts: json['posts'] ?? '327',
-    followers: json['followers'] ?? '3,333',
-    following: json['following'] ?? '813',
-    bio: json['bio'] ?? 'From Ljubljana, Slovenia.',
-    profileImagePath: json['profileImagePath'],
-  );
+  static ProfileData fromJson(Map<String, dynamic> json) {
+    try {
+      return ProfileData(
+        username: json['username']?.toString() ?? 'tomazdrnovsek',
+        posts: json['posts']?.toString() ?? '327',
+        followers: json['followers']?.toString() ?? '3,333',
+        following: json['following']?.toString() ?? '813',
+        bio: json['bio']?.toString() ?? 'From Ljubljana, Slovenia.',
+        profileImagePath: json['profileImagePath']?.toString(),
+      );
+    } catch (e) {
+      debugPrint('Error parsing ProfileData from JSON: $e');
+      return ProfileData(); // Return default profile
+    }
+  }
 }
 
 // Profile data manager
@@ -54,23 +61,39 @@ class ProfileDataManager {
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonString = prefs.getString(_key);
-      if (jsonString != null) {
-        final Map<String, dynamic> json = jsonDecode(jsonString);
-        return ProfileData.fromJson(json);
+      if (jsonString != null && jsonString.isNotEmpty) {
+        try {
+          final Map<String, dynamic> json = jsonDecode(jsonString);
+          final profile = ProfileData.fromJson(json);
+
+          // Validate profile image exists
+          if (profile.profileImagePath != null) {
+            final imageFile = File(profile.profileImagePath!);
+            if (!await imageFile.exists()) {
+              debugPrint('Profile image no longer exists, clearing path');
+              profile.profileImagePath = null;
+            }
+          }
+
+          return profile;
+        } catch (e) {
+          debugPrint('Error decoding profile JSON: $e');
+        }
       }
     } catch (e) {
-      debugPrint('Error loading profile: $e');
+      debugPrint('Error loading profile from SharedPreferences: $e');
     }
     return ProfileData();
   }
 
-  static Future<void> saveProfile(ProfileData profile) async {
+  static Future<bool> saveProfile(ProfileData profile) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonString = jsonEncode(profile.toJson());
-      await prefs.setString(_key, jsonString);
+      return await prefs.setString(_key, jsonString);
     } catch (e) {
       debugPrint('Error saving profile: $e');
+      return false;
     }
   }
 }
@@ -87,6 +110,7 @@ class _ProfileBlockState extends State<ProfileBlock>
     with AutomaticKeepAliveClientMixin {
   late ProfileData _profileData;
   bool _isLoading = true;
+  bool _isSaving = false;
 
   // Editing state tracking
   bool _editingUsername = false;
@@ -175,22 +199,41 @@ class _ProfileBlockState extends State<ProfileBlock>
   }
 
   Future<void> _loadProfile() async {
-    final profile = await ProfileDataManager.loadProfile();
-    setState(() {
-      _profileData = profile;
-      _isLoading = false;
-    });
+    try {
+      final profile = await ProfileDataManager.loadProfile();
+      if (mounted) {
+        setState(() {
+          _profileData = profile;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading profile: $e');
+      if (mounted) {
+        setState(() {
+          _profileData = ProfileData(); // Use default profile on error
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   String _formatNumber(String input) {
-    final cleaned = input.replaceAll(',', '').replaceAll(' ', '');
-    final number = int.tryParse(cleaned);
-    if (number == null) return input;
+    try {
+      final cleaned = input.replaceAll(',', '').replaceAll(' ', '').trim();
+      if (cleaned.isEmpty) return '0';
 
-    return number.toString().replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-          (Match m) => '${m[1]},',
-    );
+      final number = int.tryParse(cleaned);
+      if (number == null) return input;
+
+      return number.toString().replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+            (Match m) => '${m[1]},',
+      );
+    } catch (e) {
+      debugPrint('Error formatting number: $e');
+      return input;
+    }
   }
 
   String _unformatNumber(String formatted) {
@@ -198,24 +241,71 @@ class _ProfileBlockState extends State<ProfileBlock>
   }
 
   Future<void> _saveField(String field, String value) async {
-    switch (field) {
-      case 'username':
-        _profileData.username = value;
-        break;
-      case 'posts':
-        _profileData.posts = value;
-        break;
-      case 'followers':
-        _profileData.followers = value;
-        break;
-      case 'following':
-        _profileData.following = value;
-        break;
-      case 'bio':
-        _profileData.bio = value;
-        break;
+    if (_isSaving) return;
+
+    setState(() => _isSaving = true);
+
+    try {
+      // Validate input
+      final trimmedValue = value.trim();
+      if (trimmedValue.isEmpty && field != 'bio') {
+        // Don't allow empty values for username, posts, followers, following
+        debugPrint('Rejecting empty value for field: $field');
+        return;
+      }
+
+      switch (field) {
+        case 'username':
+          if (trimmedValue.length > 30) {
+            debugPrint('Username too long, truncating');
+            _profileData.username = trimmedValue.substring(0, 30);
+          } else {
+            _profileData.username = trimmedValue;
+          }
+          break;
+        case 'posts':
+          _profileData.posts = trimmedValue;
+          break;
+        case 'followers':
+          _profileData.followers = trimmedValue;
+          break;
+        case 'following':
+          _profileData.following = trimmedValue;
+          break;
+        case 'bio':
+          if (trimmedValue.length > 100) {
+            debugPrint('Bio too long, truncating');
+            _profileData.bio = trimmedValue.substring(0, 100);
+          } else {
+            _profileData.bio = trimmedValue;
+          }
+          break;
+      }
+
+      final saved = await ProfileDataManager.saveProfile(_profileData);
+      if (!saved && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to save profile changes'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error saving field $field: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('An error occurred while saving'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
-    await ProfileDataManager.saveProfile(_profileData);
   }
 
   Future<void> _changeProfileImage() async {
@@ -228,21 +318,51 @@ class _ProfileBlockState extends State<ProfileBlock>
       );
 
       if (image != null) {
-        final result = await FileUtils.processImageWithThumbnail(image);
-        final profileImage = result['image']!;
+        try {
+          final result = await FileUtils.processImageWithThumbnail(image);
+          final profileImage = result['image']!;
 
-        setState(() {
-          _profileData.profileImagePath = profileImage.path;
-        });
+          // Delete old profile image if it exists
+          if (_profileData.profileImagePath != null) {
+            try {
+              final oldImage = File(_profileData.profileImagePath!);
+              await FileUtils.deleteFileSafely(oldImage);
+            } catch (e) {
+              debugPrint('Failed to delete old profile image: $e');
+            }
+          }
 
-        await ProfileDataManager.saveProfile(_profileData);
+          setState(() {
+            _profileData.profileImagePath = profileImage.path;
+          });
+
+          final saved = await ProfileDataManager.saveProfile(_profileData);
+          if (!saved && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Failed to save profile image'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        } catch (e) {
+          debugPrint('Error processing profile image: $e');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Failed to process profile image'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        }
       }
     } catch (e) {
-      debugPrint('Error changing profile image: $e');
+      debugPrint('Error picking profile image: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Failed to update profile image'),
+            content: Text('Failed to select profile image'),
             duration: Duration(seconds: 2),
           ),
         );
@@ -251,6 +371,8 @@ class _ProfileBlockState extends State<ProfileBlock>
   }
 
   void _startEditing(String field) {
+    if (_isSaving) return;
+
     setState(() {
       switch (field) {
         case 'username':
@@ -277,6 +399,8 @@ class _ProfileBlockState extends State<ProfileBlock>
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
       switch (field) {
         case 'username':
           _usernameFocus.requestFocus();
@@ -322,18 +446,21 @@ class _ProfileBlockState extends State<ProfileBlock>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   GestureDetector(
-                    onTap: _changeProfileImage,
-                    child: Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppColors.avatarPlaceholder(isDark),
-                      ),
-                      child: ClipOval(
-                        child: _HighRefreshProfileImage(
-                          profileImagePath: _profileData.profileImagePath,
-                          isDark: isDark,
+                    onTap: _isSaving ? null : _changeProfileImage,
+                    child: Opacity(
+                      opacity: _isSaving ? 0.5 : 1.0,
+                      child: Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.avatarPlaceholder(isDark),
+                        ),
+                        child: ClipOval(
+                          child: _HighRefreshProfileImage(
+                            profileImagePath: _profileData.profileImagePath,
+                            isDark: isDark,
+                          ),
                         ),
                       ),
                     ),
@@ -350,6 +477,7 @@ class _ProfileBlockState extends State<ProfileBlock>
                           style: AppTheme.bodyMedium(isDark),
                           maxLines: 1,
                           maxLength: 30,
+                          enabled: !_isSaving,
                           decoration: const InputDecoration(
                             border: InputBorder.none,
                             counterText: '',
@@ -358,7 +486,7 @@ class _ProfileBlockState extends State<ProfileBlock>
                           ),
                         )
                             : GestureDetector(
-                          onTap: () => _startEditing('username'),
+                          onTap: _isSaving ? null : () => _startEditing('username'),
                           child: Text(_profileData.username, style: AppTheme.bodyMedium(isDark)),
                         ),
                         const SizedBox(height: 8),
@@ -370,8 +498,9 @@ class _ProfileBlockState extends State<ProfileBlock>
                               isEditing: _editingPosts,
                               controller: _postsController,
                               focusNode: _postsFocus,
-                              onTap: () => _startEditing('posts'),
+                              onTap: _isSaving ? () {} : () => _startEditing('posts'),
                               isDark: isDark,
+                              isEnabled: !_isSaving,
                             ),
                             const SizedBox(width: 24),
                             EditableStat(
@@ -380,8 +509,9 @@ class _ProfileBlockState extends State<ProfileBlock>
                               isEditing: _editingFollowers,
                               controller: _followersController,
                               focusNode: _followersFocus,
-                              onTap: () => _startEditing('followers'),
+                              onTap: _isSaving ? () {} : () => _startEditing('followers'),
                               isDark: isDark,
+                              isEnabled: !_isSaving,
                             ),
                             const SizedBox(width: 24),
                             EditableStat(
@@ -390,8 +520,9 @@ class _ProfileBlockState extends State<ProfileBlock>
                               isEditing: _editingFollowing,
                               controller: _followingController,
                               focusNode: _followingFocus,
-                              onTap: () => _startEditing('following'),
+                              onTap: _isSaving ? () {} : () => _startEditing('following'),
                               isDark: isDark,
+                              isEnabled: !_isSaving,
                             ),
                           ],
                         ),
@@ -404,7 +535,7 @@ class _ProfileBlockState extends State<ProfileBlock>
               // Bio container - now dynamically sizes to content
               GestureDetector(
                 onTap: () {
-                  if (!_editingBio) {
+                  if (!_editingBio && !_isSaving) {
                     _startEditing('bio');
                   }
                 },
@@ -417,6 +548,7 @@ class _ProfileBlockState extends State<ProfileBlock>
                     style: AppTheme.body(isDark),
                     maxLines: null, // Allow multiple lines as needed
                     maxLength: 100,
+                    enabled: !_isSaving,
                     decoration: const InputDecoration(
                       border: InputBorder.none,
                       counterText: '',
@@ -463,6 +595,7 @@ class EditableStat extends StatelessWidget {
   final FocusNode focusNode;
   final VoidCallback onTap;
   final bool isDark;
+  final bool isEnabled;
 
   const EditableStat({
     super.key,
@@ -473,6 +606,7 @@ class EditableStat extends StatelessWidget {
     required this.focusNode,
     required this.onTap,
     required this.isDark,
+    this.isEnabled = true,
   });
 
   @override
@@ -489,6 +623,7 @@ class EditableStat extends StatelessWidget {
             style: AppTheme.statValue(isDark),
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            enabled: isEnabled,
             decoration: const InputDecoration(
               border: InputBorder.none,
               isDense: true,
@@ -526,6 +661,7 @@ class _HighRefreshProfileImageState extends State<_HighRefreshProfileImage>
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
   bool _imageLoaded = false;
+  bool _hasError = false;
 
   @override
   void initState() {
@@ -590,7 +726,7 @@ class _HighRefreshProfileImageState extends State<_HighRefreshProfileImage>
         if (frame != null && !_imageLoaded) {
           _imageLoaded = true;
           SchedulerBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
+            if (mounted && !_hasError) {
               _fadeController.forward();
             }
           });
@@ -607,7 +743,13 @@ class _HighRefreshProfileImageState extends State<_HighRefreshProfileImage>
           child: child,
         );
       },
-      errorBuilder: (context, error, stackTrace) => errorWidget,
+      errorBuilder: (context, error, stackTrace) {
+        debugPrint('Profile image error: $error');
+        if (!_hasError) {
+          _hasError = true;
+        }
+        return errorWidget;
+      },
     );
   }
 
@@ -615,16 +757,27 @@ class _HighRefreshProfileImageState extends State<_HighRefreshProfileImage>
   Widget build(BuildContext context) {
     final errorWidget = _buildErrorWidget();
 
-    if (widget.profileImagePath != null) {
-      return _buildImageWithOptimizedLoading(
-        imageProvider: FileImage(File(widget.profileImagePath!)),
-        errorWidget: errorWidget,
-      );
-    } else {
-      return _buildImageWithOptimizedLoading(
-        imageProvider: const AssetImage('assets/images/profile.jpg'),
-        errorWidget: errorWidget,
-      );
+    try {
+      if (widget.profileImagePath != null) {
+        final imageFile = File(widget.profileImagePath!);
+        // Quick sync check to avoid async overhead for error state
+        if (!imageFile.existsSync()) {
+          return errorWidget;
+        }
+
+        return _buildImageWithOptimizedLoading(
+          imageProvider: FileImage(imageFile),
+          errorWidget: errorWidget,
+        );
+      } else {
+        return _buildImageWithOptimizedLoading(
+          imageProvider: const AssetImage('assets/images/profile.jpg'),
+          errorWidget: errorWidget,
+        );
+      }
+    } catch (e) {
+      debugPrint('Error building profile image: $e');
+      return errorWidget;
     }
   }
 }
