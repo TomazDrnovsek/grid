@@ -520,26 +520,29 @@ class _GridHomePageState extends State<GridHomePage>
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Expanded(
-                              child: _editingHeaderUsername
-                                  ? TextField(
-                                controller: _headerUsernameController,
-                                focusNode: _headerUsernameFocus,
-                                style: AppTheme.headlineSm(isDark),
-                                maxLines: 1,
-                                maxLength: 20,
-                                decoration: const InputDecoration(
-                                  border: InputBorder.none,
-                                  counterText: '',
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.zero,
-                                ),
-                              )
-                                  : GestureDetector(
-                                onTap: _startEditingHeaderUsername,
-                                child: Text(
-                                  _headerUsername,
+                              child: Padding(
+                                padding: const EdgeInsets.only(right: 24), // Add 24px margin
+                                child: _editingHeaderUsername
+                                    ? TextField(
+                                  controller: _headerUsernameController,
+                                  focusNode: _headerUsernameFocus,
                                   style: AppTheme.headlineSm(isDark),
-                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                  maxLength: 20,
+                                  decoration: const InputDecoration(
+                                    border: InputBorder.none,
+                                    counterText: '',
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                )
+                                    : GestureDetector(
+                                  onTap: _startEditingHeaderUsername,
+                                  child: Text(
+                                    _headerUsername,
+                                    style: AppTheme.headlineSm(isDark),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               ),
                             ),
