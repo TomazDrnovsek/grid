@@ -386,21 +386,21 @@ class _ProfileBlockState extends State<ProfileBlock> {
                 ],
               ),
               const SizedBox(height: 16),
+              // Bio container - now dynamically sizes to content
               GestureDetector(
                 onTap: () {
                   if (!_editingBio) {
                     _startEditing('bio');
                   }
                 },
-                child: Container(
+                child: SizedBox(
                   width: double.infinity,
-                  constraints: const BoxConstraints(minHeight: 40),
                   child: _editingBio
                       ? TextField(
                     controller: _bioController,
                     focusNode: _bioFocus,
                     style: AppTheme.body(isDark),
-                    maxLines: 2,
+                    maxLines: null, // Allow multiple lines as needed
                     maxLength: 100,
                     decoration: const InputDecoration(
                       border: InputBorder.none,
