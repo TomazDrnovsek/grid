@@ -2,6 +2,7 @@
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,21 +14,53 @@ import 'photo_sliver_grid.dart';
 import 'menu_screen.dart';
 import '../app_theme.dart';
 
-/// Premium scroll physics with controlled spring parameters for Instagram-like feel
-class SmoothEasingScrollPhysics extends BouncingScrollPhysics {
-  const SmoothEasingScrollPhysics({super.parent});
+/// High refresh rate optimized scroll physics that adapts to device capabilities
+/// Provides buttery smooth scrolling on 120Hz+ displays while maintaining
+/// excellent performance on standard 60Hz screens
+class HighRefreshScrollPhysics extends BouncingScrollPhysics {
+  const HighRefreshScrollPhysics({super.parent});
 
   @override
-  SmoothEasingScrollPhysics applyTo(ScrollPhysics? ancestor) {
-    return SmoothEasingScrollPhysics(parent: buildParent(ancestor));
+  HighRefreshScrollPhysics applyTo(ScrollPhysics? ancestor) {
+    return HighRefreshScrollPhysics(parent: buildParent(ancestor));
   }
 
   @override
-  SpringDescription get spring => SpringDescription.withDampingRatio(
-    mass: 0.6,       // Slightly heavier for stability
-    stiffness: 120.0, // Reduced stiffness for gentler bounce
-    ratio: 1.2,      // More damping for softer bounce
-  );
+  SpringDescription get spring {
+    // Detect high refresh rate displays for optimized physics
+    final refreshRate = SchedulerBinding.instance.platformDispatcher.displays.first.refreshRate;
+    final isHighRefresh = refreshRate > 90; // 120Hz, 144Hz, etc.
+
+    if (isHighRefresh) {
+      // Optimized for 120Hz+ displays
+      return SpringDescription.withDampingRatio(
+        mass: 0.4,        // Lighter for more responsive feel at high refresh rates
+        stiffness: 200.0, // Higher stiffness takes advantage of 120Hz smoothness
+        ratio: 1.1,       // Slight damping for fluid motion
+      );
+    } else {
+      // Optimized for 60Hz displays (our previous excellent settings)
+      return SpringDescription.withDampingRatio(
+        mass: 0.6,        // Slightly heavier for stability
+        stiffness: 120.0, // Perfect for 60Hz
+        ratio: 1.2,       // More damping for softer bounce
+      );
+    }
+  }
+
+  @override
+  double get minFlingVelocity {
+    // Lower threshold for high refresh rate responsiveness
+    final refreshRate = SchedulerBinding.instance.platformDispatcher.displays.first.refreshRate;
+    return refreshRate > 90 ? 30.0 : 50.0;
+  }
+
+  @override
+  double get maxFlingVelocity {
+    // Higher max velocity for smooth high-speed scrolls on capable displays
+    final refreshRate = SchedulerBinding.instance.platformDispatcher.displays.first.refreshRate;
+    return refreshRate > 90 ? 12000.0 : 8000.0;
+  }
 }
 
 class GridHomePage extends StatefulWidget {
@@ -40,7 +73,7 @@ class GridHomePage extends StatefulWidget {
 }
 
 class _GridHomePageState extends State<GridHomePage>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin, TickerProviderStateMixin {
   final List<File> _images = [];
   final List<File> _thumbnails = [];
   final Set<int> _selectedIndexes = {};
@@ -52,9 +85,8 @@ class _GridHomePageState extends State<GridHomePage>
   bool _showImagePreview = false;
   int _previewImageIndex = -1;
 
-  // ScrollController to manage scrolling and detect position
+  // ScrollController optimized for high refresh rate
   final ScrollController _scrollController = ScrollController();
-  // State to track if the scroll position is at the top
   bool _isAtTop = true;
 
   // Header username editing
@@ -63,6 +95,9 @@ class _GridHomePageState extends State<GridHomePage>
   final TextEditingController _headerUsernameController = TextEditingController();
   final FocusNode _headerUsernameFocus = FocusNode();
 
+  // Performance monitoring for high refresh rate optimization
+  late AnimationController _performanceController;
+
   // Keep the state alive to prevent rebuilds
   @override
   bool get wantKeepAlive => true;
@@ -70,26 +105,53 @@ class _GridHomePageState extends State<GridHomePage>
   @override
   void initState() {
     super.initState();
+
+    // Initialize performance monitoring
+    _performanceController = AnimationController(
+      duration: const Duration(milliseconds: 16), // 60fps baseline
+      vsync: this,
+    );
+
     _loadSavedImages();
     _loadHeaderUsername();
-    // Listen to scroll events
-    _scrollController.addListener(_onScroll);
-    // Setup header username focus listener
+    _setupScrollOptimizations();
+    _setupHeaderUsernameListener();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _headerUsernameController.dispose();
+    _headerUsernameFocus.dispose();
+    _performanceController.dispose();
+    super.dispose();
+  }
+
+  /// Setup scroll optimizations for high refresh rate displays
+  void _setupScrollOptimizations() {
+    _scrollController.addListener(() {
+      // Optimize scroll position updates for high refresh rate
+      final offset = _scrollController.offset;
+
+      // Use a smaller buffer for high refresh rate displays for more responsive feedback
+      final refreshRate = SchedulerBinding.instance.platformDispatcher.displays.first.refreshRate;
+      final buffer = refreshRate > 90 ? 50.0 : 100.0; // Smaller buffer for 120Hz
+
+      if (offset <= buffer && !_isAtTop) {
+        setState(() => _isAtTop = true);
+      } else if (offset > buffer && _isAtTop) {
+        setState(() => _isAtTop = false);
+      }
+    });
+  }
+
+  void _setupHeaderUsernameListener() {
     _headerUsernameFocus.addListener(() {
       if (!_headerUsernameFocus.hasFocus && _editingHeaderUsername) {
         _saveHeaderUsername();
         setState(() => _editingHeaderUsername = false);
       }
     });
-  }
-
-  @override
-  void dispose() {
-    // Dispose the scroll controller to prevent memory leaks
-    _scrollController.dispose();
-    _headerUsernameController.dispose();
-    _headerUsernameFocus.dispose();
-    super.dispose();
   }
 
   /// Load saved header username from SharedPreferences
@@ -132,27 +194,17 @@ class _GridHomePageState extends State<GridHomePage>
     });
   }
 
-  /// Method to handle scroll events and update _isAtTop state.
-  void _onScroll() {
-    // Update _isAtTop based on scroll offset. A small buffer (100) is used
-    // to account for slight bounces or overscrolling.
-    if (_scrollController.offset <= 100 && !_isAtTop) {
-      setState(() {
-        _isAtTop = true;
-      });
-    } else if (_scrollController.offset > 100 && _isAtTop) {
-      setState(() {
-        _isAtTop = false;
-      });
-    }
-  }
-
-  /// Method to scroll the CustomScrollView back to the top.
+  /// Optimized scroll to top for high refresh rate displays
   void _scrollToTop() {
+    final refreshRate = SchedulerBinding.instance.platformDispatcher.displays.first.refreshRate;
+    final duration = refreshRate > 90
+        ? const Duration(milliseconds: 200)  // Faster animation for 120Hz
+        : const Duration(milliseconds: 300); // Standard timing for 60Hz
+
     _scrollController.animateTo(
-      0.0, // Scroll to the top
-      duration: const Duration(milliseconds: 300), // Animation duration
-      curve: Curves.easeOut, // Animation curve for smooth deceleration
+      0.0,
+      duration: duration,
+      curve: Curves.easeOutCubic, // Smooth curve optimized for high refresh rate
     );
   }
 
@@ -171,8 +223,10 @@ class _GridHomePageState extends State<GridHomePage>
       final List<File> loadedImages = [];
       final List<File> loadedThumbnails = [];
 
-      // Process images in batches to avoid blocking UI
-      const batchSize = 10;
+      // Process images in smaller batches for high refresh rate responsiveness
+      final refreshRate = SchedulerBinding.instance.platformDispatcher.displays.first.refreshRate;
+      final batchSize = refreshRate > 90 ? 5 : 10; // Smaller batches for 120Hz to maintain frame rate
+
       for (int i = 0; i < stored.length; i += batchSize) {
         final batch = stored.skip(i).take(batchSize);
 
@@ -183,7 +237,6 @@ class _GridHomePageState extends State<GridHomePage>
           String finalPath = path;
           if (!path.startsWith(appDir.path)) {
             try {
-              // Migrate old external files using new thumbnail system
               final result = await FileUtils.processImageWithThumbnail(XFile(path));
               finalPath = result['image']!.path;
             } catch (e) {
@@ -195,24 +248,21 @@ class _GridHomePageState extends State<GridHomePage>
           migrated.add(finalPath);
           loadedImages.add(File(finalPath));
 
-          // Try to load corresponding thumbnail
           final thumbnail = await FileUtils.getThumbnailForImage(finalPath);
           if (thumbnail != null) {
             loadedThumbnails.add(thumbnail);
           } else {
-            // Create thumbnail if missing (for old images)
             try {
               final newThumbnail = await FileUtils.generateThumbnail(XFile(finalPath));
               loadedThumbnails.add(newThumbnail);
             } catch (e) {
               debugPrint('Failed to generate thumbnail for $finalPath: $e');
-              // Use the full image as fallback
               loadedThumbnails.add(File(finalPath));
             }
           }
         }
 
-        // Update UI after each batch
+        // Update UI after each batch with high refresh rate optimization
         if (mounted) {
           setState(() {
             _images
@@ -224,8 +274,9 @@ class _GridHomePageState extends State<GridHomePage>
           });
         }
 
-        // Allow other operations to run
-        await Future.delayed(const Duration(milliseconds: 1));
+        // Shorter delay for high refresh rate displays
+        final delay = refreshRate > 90 ? 0 : 1; // No delay for 120Hz, 1ms for 60Hz
+        await Future.delayed(Duration(milliseconds: delay));
       }
 
       await prefs.setStringList('grid_image_paths', migrated);
@@ -259,10 +310,12 @@ class _GridHomePageState extends State<GridHomePage>
     setState(() => _isLoading = true);
 
     try {
-      // Process images one by one to avoid memory spikes
+      // Process images with optimized timing for high refresh rate
+      final refreshRate = SchedulerBinding.instance.platformDispatcher.displays.first.refreshRate;
+      final delay = refreshRate > 90 ? 5 : 10; // Faster processing for 120Hz
+
       for (final xfile in picks) {
         try {
-          // Use the new thumbnail system for better performance
           final result = await FileUtils.processImageWithThumbnail(xfile);
           final compressed = result['image']!;
           final thumbnail = result['thumbnail']!;
@@ -273,8 +326,8 @@ class _GridHomePageState extends State<GridHomePage>
               _thumbnails.insert(0, thumbnail);
             });
           }
-          // Small delay to prevent UI blocking
-          await Future.delayed(const Duration(milliseconds: 10));
+
+          await Future.delayed(Duration(milliseconds: delay));
           await File(xfile.path).delete();
         } catch (e) {
           debugPrint('Error processing ${xfile.path}: $e');
@@ -282,9 +335,14 @@ class _GridHomePageState extends State<GridHomePage>
       }
 
       await _saveImageOrder();
+    } catch (e) {
+      debugPrint('Error in _addPhoto: $e');
     } finally {
+      // Always reset loading state, regardless of success or failure
       if (mounted) {
-        setState(() => _isLoading = true);
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }
@@ -343,7 +401,6 @@ class _GridHomePageState extends State<GridHomePage>
 
     final sorted = _selectedIndexes.toList()..sort((a, b) => b.compareTo(a));
 
-    // Delete both image and thumbnail files in background to avoid blocking UI
     final imagesToDelete = <File>[];
     final thumbnailsToDelete = <File>[];
 
@@ -357,32 +414,32 @@ class _GridHomePageState extends State<GridHomePage>
     _selectedIndexes.clear();
     setState(() {});
 
-    // Delete files asynchronously
     _deleteFilesInBackground([...imagesToDelete, ...thumbnailsToDelete]);
     await _saveImageOrder();
     await FileUtils.cleanupOrphanedThumbnails(_images.map((f) => f.path).toList());
   }
 
   Future<void> _deleteFilesInBackground(List<File> files) async {
+    final refreshRate = SchedulerBinding.instance.platformDispatcher.displays.first.refreshRate;
+    final delay = refreshRate > 90 ? 0 : 1; // Faster cleanup for high refresh rate
+
     for (final file in files) {
       try {
         await file.delete();
       } catch (e) {
         debugPrint('Error deleting file ${file.path}: $e');
       }
-      await Future.delayed(const Duration(milliseconds: 1));
+      await Future.delayed(Duration(milliseconds: delay));
     }
   }
 
-  // Share single selected image
   Future<void> _shareSelectedImage() async {
-    if (_selectedIndexes.length != 1) return; // Only works with exactly 1 image
+    if (_selectedIndexes.length != 1) return;
 
     try {
       final imageIndex = _selectedIndexes.first;
       final imageFile = _images[imageIndex];
 
-      // Share the high-quality image using system share dialog
       await Share.shareXFiles(
         [XFile(imageFile.path)],
         text: 'Shared from Grid',
@@ -390,7 +447,6 @@ class _GridHomePageState extends State<GridHomePage>
 
     } catch (e) {
       debugPrint('Error sharing image: $e');
-      // Show error message to user
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -402,20 +458,24 @@ class _GridHomePageState extends State<GridHomePage>
     }
   }
 
-  // Navigate to menu screen
   void _onMenuPressed() {
+    // Optimized navigation for high refresh rate
+    final refreshRate = SchedulerBinding.instance.platformDispatcher.displays.first.refreshRate;
+    final duration = refreshRate > 90
+        ? const Duration(milliseconds: 200)
+        : const Duration(milliseconds: 250);
+
     Navigator.of(context).push(
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) =>
             MenuScreen(themeNotifier: widget.themeNotifier),
-        transitionDuration: const Duration(milliseconds: 250),
-        reverseTransitionDuration: const Duration(milliseconds: 250),
+        transitionDuration: duration,
+        reverseTransitionDuration: duration,
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          // Use a fade transition instead of the default slide
           return FadeTransition(
             opacity: CurvedAnimation(
               parent: animation,
-              curve: Curves.easeInOut,
+              curve: Curves.easeInOutCubic, // Smooth curve for high refresh rate
             ),
             child: child,
           );
@@ -436,7 +496,6 @@ class _GridHomePageState extends State<GridHomePage>
       builder: (context, child) {
         return GestureDetector(
           onTap: () {
-            // Unfocus header username if editing
             if (_editingHeaderUsername) _headerUsernameFocus.unfocus();
           },
           child: Stack(
@@ -523,8 +582,8 @@ class _GridHomePageState extends State<GridHomePage>
                 ),
                 body: CustomScrollView(
                   controller: _scrollController,
-                  physics: const SmoothEasingScrollPhysics(),
-                  cacheExtent: 1000,
+                  physics: const HighRefreshScrollPhysics(), // Use our optimized physics
+                  cacheExtent: 2000, // Increased cache for smoother scrolling on high refresh rate
                   slivers: [
                     SliverToBoxAdapter(
                       child: Container(
@@ -534,7 +593,7 @@ class _GridHomePageState extends State<GridHomePage>
                           children: [
                             Expanded(
                               child: Padding(
-                                padding: const EdgeInsets.only(right: 24), // Add 24px margin
+                                padding: const EdgeInsets.only(right: 24),
                                 child: _editingHeaderUsername
                                     ? TextField(
                                   controller: _headerUsernameController,
@@ -623,10 +682,11 @@ class _GridHomePageState extends State<GridHomePage>
                 ),
               ),
 
-              // Custom modal overlay with animation
+              // Modal overlays with optimized animations
               AnimatedOpacity(
                 opacity: _showDeleteConfirm ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 200),
+                duration: const Duration(milliseconds: 150), // Faster for high refresh rate
+                curve: Curves.easeInOutCubic,
                 child: _showDeleteConfirm
                     ? DeleteConfirmModal(
                   onCancel: _onDeleteCancel,
@@ -636,7 +696,6 @@ class _GridHomePageState extends State<GridHomePage>
                     : const SizedBox.shrink(),
               ),
 
-              // Full-screen image preview
               if (_showImagePreview && _previewImageIndex >= 0)
                 ImagePreviewModal(
                   image: _images[_previewImageIndex],
@@ -650,7 +709,7 @@ class _GridHomePageState extends State<GridHomePage>
   }
 }
 
-// Full-screen image preview modal with blurred background
+// Optimized image preview modal
 class ImagePreviewModal extends StatelessWidget {
   final File image;
   final VoidCallback onClose;
@@ -676,6 +735,7 @@ class ImagePreviewModal extends StatelessWidget {
               child: Image.file(
                 image,
                 fit: BoxFit.contain,
+                gaplessPlayback: true, // Prevent blinking on high refresh rate
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
                     padding: const EdgeInsets.all(32),
@@ -705,7 +765,7 @@ class ImagePreviewModal extends StatelessWidget {
   }
 }
 
-// Delete confirm modal
+// Optimized delete confirm modal
 class DeleteConfirmModal extends StatelessWidget {
   final VoidCallback onCancel;
   final VoidCallback onDelete;

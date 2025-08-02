@@ -1,6 +1,7 @@
 // File: lib/ui/profile_block.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
@@ -330,46 +331,9 @@ class _ProfileBlockState extends State<ProfileBlock>
                         color: AppColors.avatarPlaceholder(isDark),
                       ),
                       child: ClipOval(
-                        child: _profileData.profileImagePath != null
-                            ? Image.file(
-                          File(_profileData.profileImagePath!),
-                          fit: BoxFit.cover,
-                          width: 80,
-                          height: 80,
-                          // Add gaplessPlayback to prevent blinking
-                          gaplessPlayback: true,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              width: 80,
-                              height: 80,
-                              color: AppColors.avatarPlaceholder(isDark),
-                              child: Icon(
-                                Icons.person,
-                                size: 40,
-                                color: AppColors.textSecondary(isDark),
-                              ),
-                            );
-                          },
-                        )
-                            : Image.asset(
-                          'assets/images/profile.jpg',
-                          fit: BoxFit.cover,
-                          width: 80,
-                          height: 80,
-                          // Add gaplessPlayback to prevent blinking
-                          gaplessPlayback: true,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              width: 80,
-                              height: 80,
-                              color: AppColors.avatarPlaceholder(isDark),
-                              child: Icon(
-                                Icons.person,
-                                size: 40,
-                                color: AppColors.textSecondary(isDark),
-                              ),
-                            );
-                          },
+                        child: _HighRefreshProfileImage(
+                          profileImagePath: _profileData.profileImagePath,
+                          isDark: isDark,
                         ),
                       ),
                     ),
@@ -539,5 +503,128 @@ class EditableStat extends StatelessWidget {
         Text(label, style: AppTheme.statLabel(isDark)),
       ],
     );
+  }
+}
+
+/// High refresh rate optimized profile image widget
+class _HighRefreshProfileImage extends StatefulWidget {
+  final String? profileImagePath;
+  final bool isDark;
+
+  const _HighRefreshProfileImage({
+    required this.profileImagePath,
+    required this.isDark,
+  });
+
+  @override
+  State<_HighRefreshProfileImage> createState() => _HighRefreshProfileImageState();
+}
+
+class _HighRefreshProfileImageState extends State<_HighRefreshProfileImage>
+    with SingleTickerProviderStateMixin {
+
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
+  bool _imageLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Detect refresh rate for optimized animation timing
+    final refreshRate = SchedulerBinding.instance.platformDispatcher.displays.first.refreshRate;
+    final frameDuration = refreshRate > 90
+        ? const Duration(milliseconds: 8)  // ~1 frame at 120Hz
+        : const Duration(milliseconds: 16); // ~1 frame at 60Hz
+
+    _fadeController = AnimationController(
+      duration: frameDuration,
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeOut,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    super.dispose();
+  }
+
+  Widget _buildErrorWidget() {
+    return Container(
+      width: 80,
+      height: 80,
+      color: AppColors.avatarPlaceholder(widget.isDark),
+      child: Icon(
+        Icons.person,
+        size: 40,
+        color: AppColors.textSecondary(widget.isDark),
+      ),
+    );
+  }
+
+  Widget _buildImageWithOptimizedLoading({
+    required ImageProvider imageProvider,
+    required Widget errorWidget,
+  }) {
+    return Image(
+      image: imageProvider,
+      fit: BoxFit.cover,
+      width: 80,
+      height: 80,
+      gaplessPlayback: true, // Critical for high refresh rate stability
+      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+        // Handle frame-perfect loading for high refresh rate displays
+        if (wasSynchronouslyLoaded) {
+          _imageLoaded = true;
+          return child;
+        }
+
+        if (frame != null && !_imageLoaded) {
+          _imageLoaded = true;
+          SchedulerBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _fadeController.forward();
+            }
+          });
+        }
+
+        return AnimatedBuilder(
+          animation: _fadeAnimation,
+          builder: (context, child) {
+            return Opacity(
+              opacity: frame == null ? 0.0 : _fadeAnimation.value,
+              child: child,
+            );
+          },
+          child: child,
+        );
+      },
+      errorBuilder: (context, error, stackTrace) => errorWidget,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final errorWidget = _buildErrorWidget();
+
+    if (widget.profileImagePath != null) {
+      return _buildImageWithOptimizedLoading(
+        imageProvider: FileImage(File(widget.profileImagePath!)),
+        errorWidget: errorWidget,
+      );
+    } else {
+      return _buildImageWithOptimizedLoading(
+        imageProvider: const AssetImage('assets/images/profile.jpg'),
+        errorWidget: errorWidget,
+      );
+    }
   }
 }
