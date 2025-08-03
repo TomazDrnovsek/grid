@@ -2,13 +2,13 @@
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../file_utils.dart';
+import '../core/app_config.dart';
 import 'profile_block.dart';
 import 'photo_sliver_grid.dart';
 import 'menu_screen.dart';
@@ -27,39 +27,20 @@ class HighRefreshScrollPhysics extends BouncingScrollPhysics {
 
   @override
   SpringDescription get spring {
-    // Detect high refresh rate displays for optimized physics
-    final refreshRate = SchedulerBinding.instance.platformDispatcher.displays.first.refreshRate;
-    final isHighRefresh = refreshRate > 90; // 120Hz, 144Hz, etc.
-
-    if (isHighRefresh) {
-      // Optimized for 120Hz+ displays
-      return SpringDescription.withDampingRatio(
-        mass: 0.4,        // Lighter for more responsive feel at high refresh rates
-        stiffness: 200.0, // Higher stiffness takes advantage of 120Hz smoothness
-        ratio: 1.1,       // Slight damping for fluid motion
-      );
-    } else {
-      // Optimized for 60Hz displays (our previous excellent settings)
-      return SpringDescription.withDampingRatio(
-        mass: 0.6,        // Slightly heavier for stability
-        stiffness: 120.0, // Perfect for 60Hz
-        ratio: 1.2,       // More damping for softer bounce
-      );
-    }
+    // Use cached performance configuration
+    return AppConfig().optimizedSpringDescription;
   }
 
   @override
   double get minFlingVelocity {
-    // Lower threshold for high refresh rate responsiveness
-    final refreshRate = SchedulerBinding.instance.platformDispatcher.displays.first.refreshRate;
-    return refreshRate > 90 ? 30.0 : 50.0;
+    // Use cached configuration
+    return AppConfig().minFlingVelocity;
   }
 
   @override
   double get maxFlingVelocity {
-    // Higher max velocity for smooth high-speed scrolls on capable displays
-    final refreshRate = SchedulerBinding.instance.platformDispatcher.displays.first.refreshRate;
-    return refreshRate > 90 ? 12000.0 : 8000.0;
+    // Use cached configuration
+    return AppConfig().maxFlingVelocity;
   }
 }
 
@@ -76,7 +57,10 @@ class _GridHomePageState extends State<GridHomePage>
     with AutomaticKeepAliveClientMixin, TickerProviderStateMixin {
   final List<File> _images = [];
   final List<File> _thumbnails = [];
-  final Set<int> _selectedIndexes = {};
+
+  // OPTIMIZED: Use ValueNotifier for selection state to avoid full rebuilds
+  final ValueNotifier<Set<int>> _selectedIndexesNotifier = ValueNotifier<Set<int>>({});
+
   final ImagePicker _picker = ImagePicker();
   bool _showDeleteConfirm = false;
   bool _isLoading = false;
@@ -113,6 +97,7 @@ class _GridHomePageState extends State<GridHomePage>
     _scrollController.dispose();
     _headerUsernameController.dispose();
     _headerUsernameFocus.dispose();
+    _selectedIndexesNotifier.dispose(); // Dispose ValueNotifier
     super.dispose();
   }
 
@@ -122,9 +107,8 @@ class _GridHomePageState extends State<GridHomePage>
       // Optimize scroll position updates for high refresh rate
       final offset = _scrollController.offset;
 
-      // Use a smaller buffer for high refresh rate displays for more responsive feedback
-      final refreshRate = SchedulerBinding.instance.platformDispatcher.displays.first.refreshRate;
-      final buffer = refreshRate > 90 ? 50.0 : 100.0; // Smaller buffer for 120Hz
+      // Use cached scroll buffer setting
+      final buffer = AppConfig().scrollBuffer;
 
       if (offset <= buffer && !_isAtTop) {
         setState(() => _isAtTop = true);
@@ -185,29 +169,26 @@ class _GridHomePageState extends State<GridHomePage>
 
   /// Validates and cleans up selected indexes to ensure they're within bounds
   void _validateSelectedIndexes() {
-    if (_selectedIndexes.isEmpty) return;
+    final currentSelection = _selectedIndexesNotifier.value;
+    if (currentSelection.isEmpty) return;
 
     final maxIndex = _images.length - 1;
-    final invalidIndexes = _selectedIndexes.where((index) => index < 0 || index > maxIndex).toList();
+    final invalidIndexes = currentSelection.where((index) => index < 0 || index > maxIndex).toList();
 
     if (invalidIndexes.isNotEmpty) {
       debugPrint('Removing invalid selected indexes: $invalidIndexes');
-      setState(() {
-        _selectedIndexes.removeAll(invalidIndexes);
-      });
+      // OPTIMIZED: Update selection through ValueNotifier
+      final newSelection = Set<int>.from(currentSelection);
+      newSelection.removeAll(invalidIndexes);
+      _selectedIndexesNotifier.value = newSelection;
     }
   }
 
   /// Optimized scroll to top for high refresh rate displays
   void _scrollToTop() {
-    final refreshRate = SchedulerBinding.instance.platformDispatcher.displays.first.refreshRate;
-    final duration = refreshRate > 90
-        ? const Duration(milliseconds: 200)  // Faster animation for 120Hz
-        : const Duration(milliseconds: 300); // Standard timing for 60Hz
-
     _scrollController.animateTo(
       0.0,
-      duration: duration,
+      duration: AppConfig().fastAnimationDuration,
       curve: Curves.easeOutCubic, // Smooth curve optimized for high refresh rate
     );
   }
@@ -490,13 +471,14 @@ class _GridHomePageState extends State<GridHomePage>
       return;
     }
 
-    setState(() {
-      if (_selectedIndexes.contains(index)) {
-        _selectedIndexes.remove(index);
-      } else {
-        _selectedIndexes.add(index);
-      }
-    });
+    // OPTIMIZED: Update selection without setState - only selection UI rebuilds
+    final currentSelection = Set<int>.from(_selectedIndexesNotifier.value);
+    if (currentSelection.contains(index)) {
+      currentSelection.remove(index);
+    } else {
+      currentSelection.add(index);
+    }
+    _selectedIndexesNotifier.value = currentSelection;
   }
 
   void _handleDoubleTap(int index) {
@@ -530,8 +512,10 @@ class _GridHomePageState extends State<GridHomePage>
       return;
     }
 
+    // OPTIMIZED: Clear selection without setState, then reorder
+    _selectedIndexesNotifier.value = <int>{};
+
     setState(() {
-      _selectedIndexes.clear();
       final item = _images.removeAt(oldIndex);
       final thumbnail = _thumbnails.removeAt(oldIndex);
       _images.insert(newIndex, item);
@@ -558,7 +542,8 @@ class _GridHomePageState extends State<GridHomePage>
     });
 
     try {
-      final sorted = _selectedIndexes.toList()..sort((a, b) => b.compareTo(a));
+      // FIXED: Use cascade operator to avoid void assignment error
+      final sorted = _selectedIndexesNotifier.value.toList()..sort((a, b) => b.compareTo(a));
 
       final imagesToDelete = <File>[];
       final thumbnailsToDelete = <File>[];
@@ -574,8 +559,9 @@ class _GridHomePageState extends State<GridHomePage>
         }
       }
 
-      _selectedIndexes.clear();
-      setState(() {});
+      // OPTIMIZED: Clear selection without setState
+      _selectedIndexesNotifier.value = <int>{};
+      setState(() {}); // Only rebuild for image list changes
 
       // Ensure arrays are still in sync after deletion
       if (_thumbnails.length != _images.length) {
@@ -608,15 +594,13 @@ class _GridHomePageState extends State<GridHomePage>
 
   Future<void> _deleteFilesInBackground(List<File> files) async {
     try {
-      final refreshRate = SchedulerBinding.instance.platformDispatcher.displays.first.refreshRate;
-      final delay = refreshRate > 90 ? 0 : 1; // Faster cleanup for high refresh rate
-
       final deletedCount = await FileUtils.deleteFilesSafely(files);
       debugPrint('Deleted $deletedCount of ${files.length} files');
 
-      // Small delay to ensure UI remains responsive
-      if (delay > 0) {
-        await Future.delayed(Duration(milliseconds: delay));
+      // Use cached batch delay setting
+      final delay = AppConfig().batchDelay;
+      if (delay.inMilliseconds > 0) {
+        await Future.delayed(delay);
       }
     } catch (e) {
       debugPrint('Error in background file deletion: $e');
@@ -624,10 +608,11 @@ class _GridHomePageState extends State<GridHomePage>
   }
 
   Future<void> _shareSelectedImage() async {
-    if (_selectedIndexes.length != 1) return;
+    final selectedIndexes = _selectedIndexesNotifier.value;
+    if (selectedIndexes.length != 1) return;
 
     try {
-      final imageIndex = _selectedIndexes.first;
+      final imageIndex = selectedIndexes.first;
       if (imageIndex >= _images.length) {
         throw Exception('Invalid image index');
       }
@@ -658,23 +643,17 @@ class _GridHomePageState extends State<GridHomePage>
   }
 
   void _onMenuPressed() {
-    // Optimized navigation for high refresh rate
-    final refreshRate = SchedulerBinding.instance.platformDispatcher.displays.first.refreshRate;
-    final duration = refreshRate > 90
-        ? const Duration(milliseconds: 200)
-        : const Duration(milliseconds: 250);
-
     Navigator.of(context).push(
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) =>
             MenuScreen(themeNotifier: widget.themeNotifier),
-        transitionDuration: duration,
-        reverseTransitionDuration: duration,
+        transitionDuration: AppConfig().animationDuration,
+        reverseTransitionDuration: AppConfig().animationDuration,
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(
             opacity: CurvedAnimation(
               parent: animation,
-              curve: Curves.easeInOutCubic, // Smooth curve for high refresh rate
+              curve: Curves.easeInOutCubic, // Smooth curve optimized for high refresh rate
             ),
             child: child,
           );
@@ -688,7 +667,6 @@ class _GridHomePageState extends State<GridHomePage>
     super.build(context); // Required for AutomaticKeepAliveClientMixin
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final hasSelection = _selectedIndexes.isNotEmpty;
 
     return AnimatedBuilder(
       animation: widget.themeNotifier,
@@ -701,31 +679,78 @@ class _GridHomePageState extends State<GridHomePage>
             children: [
               Scaffold(
                 backgroundColor: AppColors.scaffoldBackground(isDark),
-                bottomNavigationBar: Container(
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: AppColors.bottomBarBackground(isDark),
-                    border: Border(
-                      top: BorderSide(
-                        color: AppColors.sheetDivider(isDark),
-                        width: 1.0,
+                // OPTIMIZED: Use ValueListenableBuilder for bottom bar to avoid full rebuilds
+                bottomNavigationBar: ValueListenableBuilder<Set<int>>(
+                  valueListenable: _selectedIndexesNotifier,
+                  builder: (context, selectedIndexes, child) {
+                    final hasSelection = selectedIndexes.isNotEmpty;
+
+                    return Container(
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: AppColors.bottomBarBackground(isDark),
+                        border: Border(
+                          top: BorderSide(
+                            color: AppColors.sheetDivider(isDark),
+                            width: 1.0,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                    child: hasSelection
-                        ? Row(
-                      mainAxisAlignment: _selectedIndexes.length == 1
-                          ? MainAxisAlignment.spaceBetween
-                          : MainAxisAlignment.start,
-                      children: [
-                        Row(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                        child: hasSelection
+                            ? Row(
+                          mainAxisAlignment: selectedIndexes.length == 1
+                              ? MainAxisAlignment.spaceBetween
+                              : MainAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                GestureDetector(
+                                  onTap: _showDeleteModal,
+                                  child: SvgPicture.asset(
+                                    'assets/delete_icon.svg',
+                                    width: 24,
+                                    height: 24,
+                                    colorFilter: ColorFilter.mode(
+                                      AppColors.textPrimary(isDark),
+                                      BlendMode.srcIn,
+                                    ),
+                                  ),
+                                ),
+                                if (selectedIndexes.length >= 2) ...[
+                                  const SizedBox(width: 16),
+                                  Text(
+                                    '${selectedIndexes.length}',
+                                    style: AppTheme.bodyMedium(isDark).copyWith(
+                                      color: AppColors.textPrimary(isDark),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            if (selectedIndexes.length == 1)
+                              GestureDetector(
+                                onTap: _shareSelectedImage,
+                                child: SvgPicture.asset(
+                                  'assets/share_icon.svg',
+                                  width: 24,
+                                  height: 24,
+                                  colorFilter: ColorFilter.mode(
+                                    AppColors.textPrimary(isDark),
+                                    BlendMode.srcIn,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        )
+                            : Row(
+                          mainAxisAlignment: MainAxisAlignment.start,
                           children: [
                             GestureDetector(
-                              onTap: _showDeleteModal,
+                              onTap: _scrollToTop,
                               child: SvgPicture.asset(
-                                'assets/delete_icon.svg',
+                                _isAtTop ? 'assets/home_icon-fill.svg' : 'assets/home_icon-outline.svg',
                                 width: 24,
                                 height: 24,
                                 colorFilter: ColorFilter.mode(
@@ -734,55 +759,16 @@ class _GridHomePageState extends State<GridHomePage>
                                 ),
                               ),
                             ),
-                            if (_selectedIndexes.length >= 2) ...[
-                              const SizedBox(width: 16),
-                              Text(
-                                '${_selectedIndexes.length}',
-                                style: AppTheme.bodyMedium(isDark).copyWith(
-                                  color: AppColors.textPrimary(isDark),
-                                ),
-                              ),
-                            ],
                           ],
                         ),
-                        if (_selectedIndexes.length == 1)
-                          GestureDetector(
-                            onTap: _shareSelectedImage,
-                            child: SvgPicture.asset(
-                              'assets/share_icon.svg',
-                              width: 24,
-                              height: 24,
-                              colorFilter: ColorFilter.mode(
-                                AppColors.textPrimary(isDark),
-                                BlendMode.srcIn,
-                              ),
-                            ),
-                          ),
-                      ],
-                    )
-                        : Row(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: [
-                        GestureDetector(
-                          onTap: _scrollToTop,
-                          child: SvgPicture.asset(
-                            _isAtTop ? 'assets/home_icon-fill.svg' : 'assets/home_icon-outline.svg',
-                            width: 24,
-                            height: 24,
-                            colorFilter: ColorFilter.mode(
-                              AppColors.textPrimary(isDark),
-                              BlendMode.srcIn,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                      ),
+                    );
+                  },
                 ),
                 body: CustomScrollView(
                   controller: _scrollController,
                   physics: const HighRefreshScrollPhysics(), // Use our optimized physics
-                  cacheExtent: 2000, // Increased cache for smoother scrolling on high refresh rate
+                  cacheExtent: AppConfig().optimalCacheExtent, // Use cached optimal cache extent
                   slivers: [
                     SliverToBoxAdapter(
                       child: Container(
@@ -867,16 +853,22 @@ class _GridHomePageState extends State<GridHomePage>
                         ),
                       ),
                     if (_images.isNotEmpty)
-                      PhotoSliverGrid(
-                        images: _images,
-                        thumbnails: _thumbnails.length == _images.length
-                            ? _thumbnails
-                            : List<File>.from(_images), // Fallback if thumbnails out of sync
-                        selectedIndexes: _selectedIndexes,
-                        onTap: _handleTap,
-                        onDoubleTap: _handleDoubleTap,
-                        onLongPress: (_) {},
-                        onReorder: _handleReorder,
+                    // OPTIMIZED: Use ValueListenableBuilder for grid selection state
+                      ValueListenableBuilder<Set<int>>(
+                        valueListenable: _selectedIndexesNotifier,
+                        builder: (context, selectedIndexes, child) {
+                          return PhotoSliverGrid(
+                            images: _images,
+                            thumbnails: _thumbnails.length == _images.length
+                                ? _thumbnails
+                                : List<File>.from(_images), // Fallback if thumbnails out of sync
+                            selectedIndexes: selectedIndexes,
+                            onTap: _handleTap,
+                            onDoubleTap: _handleDoubleTap,
+                            onLongPress: (_) {},
+                            onReorder: _handleReorder,
+                          );
+                        },
                       ),
                     const SliverToBoxAdapter(child: SizedBox(height: 90)),
                   ],
@@ -886,7 +878,7 @@ class _GridHomePageState extends State<GridHomePage>
               // Modal overlays with optimized animations
               AnimatedOpacity(
                 opacity: _showDeleteConfirm ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 150), // Faster for high refresh rate
+                duration: AppConfig().fastAnimationDuration, // Use cached fast animation duration
                 curve: Curves.easeInOutCubic,
                 child: _showDeleteConfirm
                     ? DeleteConfirmModal(

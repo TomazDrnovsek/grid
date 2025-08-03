@@ -1,9 +1,8 @@
 // File: lib/ui/photo_sliver_grid.dart
 import 'dart:io';
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:grid/app_theme.dart';
+import 'package:grid/core/app_config.dart';
 
 class PhotoSliverGrid extends StatelessWidget {
   final List<File> images;
@@ -44,7 +43,7 @@ class PhotoSliverGrid extends StatelessWidget {
           final thumbnail = index < thumbnails.length ? thumbnails[index] : images[index];
 
           return _PhotoGridItem(
-            key: ValueKey('photo_${images[index].path}'), // Simplified key that doesn't change
+            key: ValueKey('photo_${images[index].path}'), // Stable key for image caching
             file: images[index],
             thumbnail: thumbnail,
             index: index,
@@ -55,26 +54,10 @@ class PhotoSliverGrid extends StatelessWidget {
           );
         },
         childCount: images.length,
-        // Optimized for smooth scrolling
-        addAutomaticKeepAlives: true,   // Keep visible items alive for smooth scrolling
+        // Optimized for smooth scrolling and image persistence
+        addAutomaticKeepAlives: true,   // Critical: Keep visible items alive
         addRepaintBoundaries: true,     // Isolate repaints for better performance
         addSemanticIndexes: false,      // Skip semantic indexing for performance
-        findChildIndexCallback: (Key key) {
-          // Help Flutter find widgets more efficiently
-          if (key is ValueKey<String>) {
-            final value = key.value;
-            if (value.startsWith('photo_')) {
-              final parts = value.split('_');
-              if (parts.length >= 3) {
-                final index = int.tryParse(parts[parts.length - 2]);
-                if (index != null && index < images.length) {
-                  return index;
-                }
-              }
-            }
-          }
-          return null;
-        },
       ),
     );
   }
@@ -107,7 +90,7 @@ class _PhotoGridItem extends StatefulWidget {
 class _PhotoGridItemState extends State<_PhotoGridItem>
     with AutomaticKeepAliveClientMixin {
 
-  // Keep grid items alive for better scrolling performance
+  // Critical: Keep grid items alive for better scrolling performance
   @override
   bool get wantKeepAlive => true;
 
@@ -117,7 +100,7 @@ class _PhotoGridItemState extends State<_PhotoGridItem>
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Memory-optimized image widget
+    // Simple, stable image widget
     final optimizedImage = _MemoryOptimizedImage(
       thumbnailFile: widget.thumbnail,
       fullImageFile: widget.file,
@@ -201,7 +184,7 @@ class _PhotoGridItemState extends State<_PhotoGridItem>
   }
 }
 
-/// Memory-optimized image widget that handles loading issues better
+/// Simple, reliable image widget with clean lifecycle management
 class _MemoryOptimizedImage extends StatefulWidget {
   final File thumbnailFile;
   final File fullImageFile;
@@ -220,83 +203,11 @@ class _MemoryOptimizedImage extends StatefulWidget {
 }
 
 class _MemoryOptimizedImageState extends State<_MemoryOptimizedImage>
-    with SingleTickerProviderStateMixin {
+    with AutomaticKeepAliveClientMixin {
 
-  late AnimationController _fadeController;
-  late Animation<double> _fadeAnimation;
-
-  // Track widget state to prevent race conditions
-  bool _isDisposed = false;
-  bool _isMounted = true;
-
-  // Track current loading state
-  String? _currentImagePath;
-  bool _isLoadingImage = false;
-  bool _hasError = false;
-  bool _useFallback = false;
-  Timer? _loadingTimeout;
-
+  // Keep image widgets alive across theme changes and scrolling
   @override
-  void initState() {
-    super.initState();
-
-    // Detect refresh rate for optimized animation timing
-    final refreshRate = SchedulerBinding.instance.platformDispatcher.displays.first.refreshRate;
-    final frameDuration = refreshRate > 90
-        ? const Duration(milliseconds: 8)  // ~1 frame at 120Hz
-        : const Duration(milliseconds: 16); // ~1 frame at 60Hz
-
-    _fadeController = AnimationController(
-      duration: frameDuration,
-      vsync: this,
-    );
-
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeOut,
-    ));
-  }
-
-  @override
-  void didUpdateWidget(_MemoryOptimizedImage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-
-    // Only reset if the actual file paths changed
-    if (oldWidget.thumbnailFile.path != widget.thumbnailFile.path ||
-        oldWidget.fullImageFile.path != widget.fullImageFile.path) {
-
-      // Cancel any pending operations
-      _currentImagePath = null;
-      _isLoadingImage = false;
-      _loadingTimeout?.cancel();
-
-      if (_isMounted && !_isDisposed) {
-        setState(() {
-          _hasError = false;
-          _useFallback = false;
-          _fadeController.reset();
-        });
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _isDisposed = true;
-    _isMounted = false;
-    _loadingTimeout?.cancel();
-    _fadeController.dispose();
-    super.dispose();
-  }
-
-  void _safeSetState(VoidCallback fn) {
-    if (_isMounted && mounted && !_isDisposed) {
-      setState(fn);
-    }
-  }
+  bool get wantKeepAlive => true;
 
   Widget _buildErrorWidget() {
     return Container(
@@ -309,135 +220,30 @@ class _MemoryOptimizedImageState extends State<_MemoryOptimizedImage>
     );
   }
 
-  Widget _buildLoadingWidget() {
-    return Container(
-      color: AppColors.gridErrorBackground(widget.isDark),
-      child: Center(
-        child: SizedBox(
-          width: 16,
-          height: 16,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(
-              AppColors.gridErrorIcon(widget.isDark),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildImageWidget(File imageFile) {
-    final imagePath = imageFile.path;
-
-    // Prevent multiple simultaneous loads of the same image
-    if (_currentImagePath == imagePath && _isLoadingImage) {
-      return _buildLoadingWidget();
-    }
-
-    // Reset state for new image
-    if (_currentImagePath != imagePath) {
-      _currentImagePath = imagePath;
-      _isLoadingImage = true;
-      _hasError = false;
-
-      // Cancel any existing timeout
-      _loadingTimeout?.cancel();
-
-      // Set a timeout for image loading
-      _loadingTimeout = Timer(const Duration(seconds: 10), () {
-        if (_isLoadingImage && _isMounted && mounted && !_isDisposed) {
-          debugPrint('Image loading timeout for: $imagePath');
-          _safeSetState(() {
-            _isLoadingImage = false;
-            _hasError = true;
-          });
-        }
-      });
-
-      // Reset animation safely
-      SchedulerBinding.instance.addPostFrameCallback((_) {
-        if (_isMounted && mounted && !_isDisposed) {
-          _fadeController.reset();
-        }
-      });
-    }
-
-    // Calculate optimal cache width based on device
-    final devicePixelRatio = View.of(context).devicePixelRatio;
-    final cacheWidth = (360 * devicePixelRatio).round(); // 360 logical pixels * device pixel ratio for sharp grid display
-
     return Image.file(
       imageFile,
       fit: BoxFit.cover,
-      gaplessPlayback: true,
-      cacheWidth: cacheWidth,
-      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-        if (_isDisposed || !_isMounted) {
-          return const SizedBox.shrink();
-        }
+      gaplessPlayback: true, // Critical for preventing flicker during rebuilds
+      cacheWidth: AppConfig().thumbnailCacheWidth, // Use cached optimal width
+      errorBuilder: (context, error, stackTrace) {
+        debugPrint('Image error for ${imageFile.path}: $error');
 
-        if (wasSynchronouslyLoaded) {
-          _isLoadingImage = false;
-          _loadingTimeout?.cancel();
-          return child;
-        }
-
-        if (frame != null) {
-          // Image loaded successfully
-          _isLoadingImage = false;
-          _loadingTimeout?.cancel();
-
-          // Safely trigger fade animation
-          SchedulerBinding.instance.addPostFrameCallback((_) {
-            if (_isMounted && mounted && !_isDisposed && !_hasError) {
-              _fadeController.forward();
-            }
-          });
-
-          return AnimatedBuilder(
-            animation: _fadeAnimation,
-            builder: (context, animChild) {
-              return Opacity(
-                opacity: _fadeAnimation.value,
-                child: animChild,
-              );
+        // Try fallback to full image if thumbnail fails
+        if (imageFile.path == widget.thumbnailFile.path &&
+            widget.thumbnailFile.path != widget.fullImageFile.path) {
+          return Image.file(
+            widget.fullImageFile,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            cacheWidth: AppConfig().thumbnailCacheWidth,
+            errorBuilder: (context, error, stackTrace) {
+              debugPrint('Full image error for ${widget.fullImageFile.path}: $error');
+              return _buildErrorWidget();
             },
-            child: child,
           );
         }
 
-        // Still loading
-        return _buildLoadingWidget();
-      },
-      errorBuilder: (context, error, stackTrace) {
-        if (_isDisposed || !_isMounted) {
-          return const SizedBox.shrink();
-        }
-
-        debugPrint('Image failed to load: ${imageFile.path}, error: $error');
-        _isLoadingImage = false;
-        _hasError = true;
-        _loadingTimeout?.cancel();
-
-        // Try fallback to full image if thumbnail fails and we haven't tried it yet
-        if (!_useFallback && imageFile.path == widget.thumbnailFile.path) {
-          debugPrint('Thumbnail failed, scheduling fallback to full image');
-
-          // Use post frame callback to avoid setState during build
-          SchedulerBinding.instance.addPostFrameCallback((_) {
-            _safeSetState(() {
-              _useFallback = true;
-              _currentImagePath = null;
-              _isLoadingImage = false;
-            });
-          });
-
-          // Show loading state while switching
-          return _buildLoadingWidget();
-        }
-
-        // Show error if both thumbnail and full image fail
         return _buildErrorWidget();
       },
     );
@@ -445,70 +251,49 @@ class _MemoryOptimizedImageState extends State<_MemoryOptimizedImage>
 
   @override
   Widget build(BuildContext context) {
-    if (_isDisposed || !_isMounted) {
-      return const SizedBox.shrink();
-    }
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
 
-    try {
-      final imageFile = _useFallback ? widget.fullImageFile : widget.thumbnailFile;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Hero(
+          tag: 'image_${widget.fullImageFile.path}',
+          flightShuttleBuilder: (
+              BuildContext flightContext,
+              Animation<double> animation,
+              HeroFlightDirection flightDirection,
+              BuildContext fromHeroContext,
+              BuildContext toHeroContext,
+              ) {
+            // Stable hero animation
+            return FadeTransition(
+              opacity: animation,
+              child: _buildImageWidget(widget.fullImageFile),
+            );
+          },
+          child: _buildImageWidget(widget.thumbnailFile),
+        ),
 
-      // Quick existence check to fail fast
-      if (!imageFile.existsSync()) {
-        return _buildErrorWidget();
-      }
-
-      return Stack(
-        fit: StackFit.expand,
-        children: [
-          Hero(
-            tag: 'image_${widget.fullImageFile.path}',
-            flightShuttleBuilder: (
-                BuildContext flightContext,
-                Animation<double> animation,
-                HeroFlightDirection flightDirection,
-                BuildContext fromHeroContext,
-                BuildContext toHeroContext,
-                ) {
-              // Custom flight animation to prevent glitches
-              return AnimatedBuilder(
-                animation: animation,
-                builder: (context, child) {
-                  return FadeTransition(
-                    opacity: animation.drive(
-                      Tween<double>(begin: 1.0, end: 1.0),
-                    ),
-                    child: _buildImageWidget(widget.fullImageFile),
-                  );
-                },
-              );
-            },
-            child: _buildImageWidget(imageFile),
-          ),
-
-          // Selection indicator
-          if (widget.isSelected)
-            Positioned(
-              bottom: 8,
-              right: 8,
-              child: Container(
-                width: 24,
-                height: 24,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.textPrimaryLight,
-                ),
-                child: const Icon(
-                  Icons.check,
-                  size: 16,
-                  color: AppColors.pureWhite,
-                ),
+        // Selection indicator
+        if (widget.isSelected)
+          Positioned(
+            bottom: 8,
+            right: 8,
+            child: Container(
+              width: 24,
+              height: 24,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.textPrimaryLight,
+              ),
+              child: const Icon(
+                Icons.check,
+                size: 16,
+                color: AppColors.pureWhite,
               ),
             ),
-        ],
-      );
-    } catch (e) {
-      debugPrint('Error building image widget: $e');
-      return _buildErrorWidget();
-    }
+          ),
+      ],
+    );
   }
 }

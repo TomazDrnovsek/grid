@@ -1,19 +1,29 @@
 // File: lib/main.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:grid/app_theme.dart';
+import 'package:grid/core/app_config.dart';
 import 'ui/splash_screen.dart';
 
-void main() {
-  // Configure image cache for better performance
+void main() async {
+  // Ensure Flutter is initialized
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Increase image cache size for smooth scrolling
-  // Default is 100MB and 1000 images, we'll increase it
-  PaintingBinding.instance.imageCache.maximumSize = 1000; // Max number of images
-  PaintingBinding.instance.imageCache.maximumSizeBytes = 500 * 1024 * 1024; // 500MB
+  // Initialize app configuration (performance settings, refresh rate, etc.)
+  await AppConfig().initialize();
+
+  // Configure image cache with much larger limits to prevent reloading
+  _configureImageCache();
 
   runApp(const GridApp());
+}
+
+/// Configure image cache for optimal performance - increased limits to prevent reloading
+void _configureImageCache() {
+  // Much larger cache limits to prevent image reloading
+  PaintingBinding.instance.imageCache.maximumSize = 200; // Increased from 50-75
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 300 * 1024 * 1024; // 300MB instead of 100-150MB
+
+  debugPrint('Image cache configured: 200 images, 300MB');
 }
 
 class GridApp extends StatefulWidget {
