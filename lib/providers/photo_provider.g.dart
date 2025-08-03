@@ -6,10 +6,10 @@ part of 'photo_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$photoNotifierHash() => r'9ddf988d955d87960dc1e8f1042e90075acd8970';
+String _$photoNotifierHash() => r'71c387c4d5662261811827bd837c7dcd09684e98';
 
 /// Riverpod provider for photo state management
-/// Replaces the setState-based state management from grid_home.dart
+/// Now uses repository layer for all business logic
 ///
 /// Copied from [PhotoNotifier].
 @ProviderFor(PhotoNotifier)
