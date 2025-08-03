@@ -1,5 +1,6 @@
 // File: lib/main.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:grid/app_theme.dart';
 import 'package:grid/core/app_config.dart';
 import 'ui/splash_screen.dart';
@@ -14,7 +15,8 @@ void main() async {
   // Configure image cache with much larger limits to prevent reloading
   _configureImageCache();
 
-  runApp(const GridApp());
+  // Wrap the app with ProviderScope to enable Riverpod state management
+  runApp(const ProviderScope(child: GridApp()));
 }
 
 /// Configure image cache for optimal performance - increased limits to prevent reloading

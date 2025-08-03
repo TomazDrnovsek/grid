@@ -31,6 +31,7 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # Existing dependencies
   flutter_svg: ^2.0.10
   image_picker: ^1.0.4
   shared_preferences: ^2.0.15
@@ -42,6 +43,12 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
+  # PHASE 2 ADDITIONS: Riverpod State Management & Code Generation
+  flutter_riverpod: ^2.5.0
+  riverpod_annotation: ^2.3.0
+  freezed: ^2.4.0
+  freezed_annotation: ^2.4.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -52,6 +59,10 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+
+  # PHASE 2 DEV ADDITIONS: Code generation for Riverpod and Freezed
+  build_runner: ^2.4.0
+  riverpod_generator: ^2.3.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
