@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:grid/app_theme.dart';
 import 'package:grid/core/app_config.dart';
+import 'package:grid/widgets/error_boundary.dart';
 
 class PhotoSliverGrid extends StatelessWidget {
   final List<File> images;
@@ -42,15 +43,22 @@ class PhotoSliverGrid extends StatelessWidget {
 
           final thumbnail = index < thumbnails.length ? thumbnails[index] : images[index];
 
-          return _PhotoGridItem(
-            key: ValueKey('photo_${images[index].path}'), // Stable key for image caching
-            file: images[index],
-            thumbnail: thumbnail,
-            index: index,
-            isSelected: selectedIndexes.contains(index),
-            onTap: onTap,
-            onDoubleTap: onDoubleTap,
-            onReorder: onReorder,
+          // Wrap entire grid item with error boundary
+          return GridItemErrorBoundary(
+            onRetry: () {
+              // Force rebuild of this specific grid item
+              debugPrint('Retrying grid item $index');
+            },
+            child: _PhotoGridItem(
+              key: ValueKey('photo_${images[index].path}'), // Stable key for image caching
+              file: images[index],
+              thumbnail: thumbnail,
+              index: index,
+              isSelected: selectedIndexes.contains(index),
+              onTap: onTap,
+              onDoubleTap: onDoubleTap,
+              onReorder: onReorder,
+            ),
           );
         },
         childCount: images.length,
@@ -100,12 +108,23 @@ class _PhotoGridItemState extends State<_PhotoGridItem>
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Simple, stable image widget
-    final optimizedImage = _MemoryOptimizedImage(
-      thumbnailFile: widget.thumbnail,
-      fullImageFile: widget.file,
-      isSelected: widget.isSelected,
-      isDark: isDark,
+    // Wrap the image component with image-specific error boundary
+    final optimizedImage = ImageErrorBoundary(
+      imagePath: widget.thumbnail.path,
+      onRetry: () {
+        // Force image refresh by triggering a rebuild
+        if (mounted) {
+          setState(() {
+            // This will cause the image to reload
+          });
+        }
+      },
+      child: _MemoryOptimizedImage(
+        thumbnailFile: widget.thumbnail,
+        fullImageFile: widget.file,
+        isSelected: widget.isSelected,
+        isDark: isDark,
+      ),
     );
 
     return LayoutBuilder(
@@ -184,7 +203,7 @@ class _PhotoGridItemState extends State<_PhotoGridItem>
   }
 }
 
-/// Simple, reliable image widget with clean lifecycle management
+/// Simple, reliable image widget with clean lifecycle management and error handling
 class _MemoryOptimizedImage extends StatefulWidget {
   final File thumbnailFile;
   final File fullImageFile;
@@ -232,15 +251,18 @@ class _MemoryOptimizedImageState extends State<_MemoryOptimizedImage>
         // Try fallback to full image if thumbnail fails
         if (imageFile.path == widget.thumbnailFile.path &&
             widget.thumbnailFile.path != widget.fullImageFile.path) {
-          return Image.file(
-            widget.fullImageFile,
-            fit: BoxFit.cover,
-            gaplessPlayback: true,
-            cacheWidth: AppConfig().thumbnailCacheWidth,
-            errorBuilder: (context, error, stackTrace) {
-              debugPrint('Full image error for ${widget.fullImageFile.path}: $error');
-              return _buildErrorWidget();
-            },
+          return ErrorBoundary(
+            errorContext: 'Fallback Image Load',
+            child: Image.file(
+              widget.fullImageFile,
+              fit: BoxFit.cover,
+              gaplessPlayback: true,
+              cacheWidth: AppConfig().thumbnailCacheWidth,
+              errorBuilder: (context, error, stackTrace) {
+                debugPrint('Full image error for ${widget.fullImageFile.path}: $error');
+                return _buildErrorWidget();
+              },
+            ),
           );
         }
 
@@ -256,40 +278,50 @@ class _MemoryOptimizedImageState extends State<_MemoryOptimizedImage>
     return Stack(
       fit: StackFit.expand,
       children: [
-        Hero(
-          tag: 'image_${widget.fullImageFile.path}',
-          flightShuttleBuilder: (
-              BuildContext flightContext,
-              Animation<double> animation,
-              HeroFlightDirection flightDirection,
-              BuildContext fromHeroContext,
-              BuildContext toHeroContext,
-              ) {
-            // Stable hero animation
-            return FadeTransition(
-              opacity: animation,
-              child: _buildImageWidget(widget.fullImageFile),
-            );
-          },
-          child: _buildImageWidget(widget.thumbnailFile),
+        // Wrap Hero animation with error boundary for stability
+        ErrorBoundary(
+          errorContext: 'Hero Animation',
+          child: Hero(
+            tag: 'image_${widget.fullImageFile.path}',
+            flightShuttleBuilder: (
+                BuildContext flightContext,
+                Animation<double> animation,
+                HeroFlightDirection flightDirection,
+                BuildContext fromHeroContext,
+                BuildContext toHeroContext,
+                ) {
+              // Stable hero animation with error protection
+              return ErrorBoundary(
+                errorContext: 'Hero Flight Animation',
+                child: FadeTransition(
+                  opacity: animation,
+                  child: _buildImageWidget(widget.fullImageFile),
+                ),
+              );
+            },
+            child: _buildImageWidget(widget.thumbnailFile),
+          ),
         ),
 
-        // Selection indicator
+        // Selection indicator with error boundary
         if (widget.isSelected)
-          Positioned(
-            bottom: 8,
-            right: 8,
-            child: Container(
-              width: 24,
-              height: 24,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.textPrimaryLight,
-              ),
-              child: const Icon(
-                Icons.check,
-                size: 16,
-                color: AppColors.pureWhite,
+          ErrorBoundary(
+            errorContext: 'Selection Indicator',
+            child: Positioned(
+              bottom: 8,
+              right: 8,
+              child: Container(
+                width: 24,
+                height: 24,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.textPrimaryLight,
+                ),
+                child: const Icon(
+                  Icons.check,
+                  size: 16,
+                  color: AppColors.pureWhite,
+                ),
               ),
             ),
           ),

@@ -6,7 +6,7 @@ part of 'photo_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$photoNotifierHash() => r'71c387c4d5662261811827bd837c7dcd09684e98';
+String _$photoNotifierHash() => r'e374df37b3463eb17adf44eef15f0b20d1d2472e';
 
 /// Riverpod provider for photo state management
 /// Now uses repository layer for all business logic

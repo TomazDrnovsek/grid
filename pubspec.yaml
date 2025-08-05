@@ -49,6 +49,10 @@ dependencies:
   freezed: ^2.4.0
   freezed_annotation: ^2.4.0
 
+  # PHASE 2 TASK 2.4: SQLite Database
+  sqflite: ^2.3.0
+  path: ^1.8.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
