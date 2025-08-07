@@ -28,7 +28,6 @@ class ScrollOptimizationService {
   Timer? _lightMemoryTimer;
 
   // FIXED: Lightweight performance tracking
-  int _frameOptimizations = 0;
   int _cacheOptimizations = 0;
   int _preloadOperations = 0;
 
@@ -207,7 +206,7 @@ class ScrollOptimizationService {
       isInitialized: _isInitialized,
       isScrolling: _isScrolling,
       scrollVelocity: _scrollVelocity,
-      frameOptimizations: _frameOptimizations,
+      frameOptimizations: 0, // FIXED: Not currently tracked
       cacheOptimizations: _cacheOptimizations,
       preloadOperations: _preloadOperations,
       preloadedImages: 0, // FIXED: Removed heavy tracking
@@ -241,7 +240,6 @@ class ScrollOptimizationService {
     debugPrint('=== Lightweight Scroll Optimization Stats ===');
     debugPrint('Scrolling: ${stats.isScrolling}');
     debugPrint('Velocity: ${stats.scrollVelocity.toStringAsFixed(1)} px/s');
-    debugPrint('Frame Optimizations: ${stats.frameOptimizations}');
     debugPrint('Cache Optimizations: ${stats.cacheOptimizations}');
     debugPrint('Preload Operations: ${stats.preloadOperations}');
     debugPrint('Cache Usage: ${stats.cacheUsagePercent.toStringAsFixed(1)}%');

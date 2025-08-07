@@ -2,9 +2,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:grid/app_theme.dart';
-import 'package:grid/core/app_config.dart';
 import 'package:grid/widgets/error_boundary.dart';
 import 'package:grid/services/scroll_optimization_service.dart';
+import 'package:grid/services/image_cache_service.dart';
 
 class PhotoSliverGrid extends StatefulWidget {
   final List<File> images;
@@ -34,6 +34,7 @@ class PhotoSliverGrid extends StatefulWidget {
 
 class _PhotoSliverGridState extends State<PhotoSliverGrid> {
   final ScrollOptimizationService _scrollOptimizer = ScrollOptimizationService();
+  final ImageCacheService _cacheService = ImageCacheService();
 
   // FIXED: Scroll update throttling to prevent excessive calls
   DateTime _lastScrollUpdate = DateTime.now();
@@ -127,7 +128,7 @@ class _PhotoSliverGridState extends State<PhotoSliverGrid> {
             return const SizedBox.shrink();
           }
 
-          // FIXED: Safe thumbnail access with fallback
+          // MEMORY OPTIMIZED: Use thumbnail with proper fallback
           final thumbnail = (index < widget.thumbnails.length && index >= 0)
               ? widget.thumbnails[index]
               : widget.images[index];
@@ -138,8 +139,8 @@ class _PhotoSliverGridState extends State<PhotoSliverGrid> {
               // FIXED: Simple retry without heavy operations
               debugPrint('Retrying grid item $index');
             },
-            child: _PhotoGridItem(
-              key: ValueKey('photo_${index}_${widget.images[index].path.hashCode}'), // FIXED: More stable key
+            child: _MemoryOptimizedGridItem(
+              key: ValueKey('photo_${index}_${widget.images[index].path.hashCode}'),
               file: widget.images[index],
               thumbnail: thumbnail,
               index: index,
@@ -147,11 +148,12 @@ class _PhotoSliverGridState extends State<PhotoSliverGrid> {
               onTap: widget.onTap,
               onDoubleTap: widget.onDoubleTap,
               onReorder: widget.onReorder,
+              cacheService: _cacheService,
             ),
           );
         },
         childCount: widget.images.length,
-        // FIXED: Optimized for smooth scrolling without heavy keep-alives
+        // MEMORY OPTIMIZED: Settings for reduced memory pressure
         addAutomaticKeepAlives: false,      // FIXED: Disable to reduce memory pressure
         addRepaintBoundaries: true,        // Keep: Isolate repaints for better performance
         addSemanticIndexes: false,         // Skip semantic indexing for performance
@@ -160,7 +162,8 @@ class _PhotoSliverGridState extends State<PhotoSliverGrid> {
   }
 }
 
-class _PhotoGridItem extends StatefulWidget {
+/// MEMORY OPTIMIZED: Grid item with aggressive memory management
+class _MemoryOptimizedGridItem extends StatefulWidget {
   final File file;
   final File thumbnail;
   final int index;
@@ -168,8 +171,9 @@ class _PhotoGridItem extends StatefulWidget {
   final void Function(int) onTap;
   final void Function(int) onDoubleTap;
   final void Function(int oldIndex, int newIndex) onReorder;
+  final ImageCacheService cacheService;
 
-  const _PhotoGridItem({
+  const _MemoryOptimizedGridItem({
     super.key,
     required this.file,
     required this.thumbnail,
@@ -178,16 +182,17 @@ class _PhotoGridItem extends StatefulWidget {
     required this.onTap,
     required this.onDoubleTap,
     required this.onReorder,
+    required this.cacheService,
   });
 
   @override
-  State<_PhotoGridItem> createState() => _PhotoGridItemState();
+  State<_MemoryOptimizedGridItem> createState() => _MemoryOptimizedGridItemState();
 }
 
-class _PhotoGridItemState extends State<_PhotoGridItem>
+class _MemoryOptimizedGridItemState extends State<_MemoryOptimizedGridItem>
     with AutomaticKeepAliveClientMixin {
 
-  // FIXED: Disabled keep alive to reduce memory pressure
+  // MEMORY OPTIMIZED: Disabled keep alive to reduce memory pressure
   @override
   bool get wantKeepAlive => false;
 
@@ -197,7 +202,7 @@ class _PhotoGridItemState extends State<_PhotoGridItem>
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // FIXED: Simplified error boundary with minimal overhead
+    // MEMORY OPTIMIZED: Use thumbnail with proper memory tracking
     final optimizedImage = ImageErrorBoundary(
       imagePath: widget.thumbnail.path,
       onRetry: () {
@@ -208,11 +213,12 @@ class _PhotoGridItemState extends State<_PhotoGridItem>
           });
         }
       },
-      child: _LightweightOptimizedImage(
+      child: _MemoryAwareImage(
         thumbnailFile: widget.thumbnail,
         fullImageFile: widget.file,
         isSelected: widget.isSelected,
         isDark: isDark,
+        cacheService: widget.cacheService,
       ),
     );
 
@@ -292,30 +298,39 @@ class _PhotoGridItemState extends State<_PhotoGridItem>
   }
 }
 
-/// FIXED: Lightweight optimized image widget with minimal overhead
-class _LightweightOptimizedImage extends StatefulWidget {
+/// MEMORY OPTIMIZED: Image widget with aggressive memory management and cache tracking
+class _MemoryAwareImage extends StatefulWidget {
   final File thumbnailFile;
   final File fullImageFile;
   final bool isSelected;
   final bool isDark;
+  final ImageCacheService cacheService;
 
-  const _LightweightOptimizedImage({
+  const _MemoryAwareImage({
     required this.thumbnailFile,
     required this.fullImageFile,
     required this.isSelected,
     required this.isDark,
+    required this.cacheService,
   });
 
   @override
-  State<_LightweightOptimizedImage> createState() => _LightweightOptimizedImageState();
+  State<_MemoryAwareImage> createState() => _MemoryAwareImageState();
 }
 
-class _LightweightOptimizedImageState extends State<_LightweightOptimizedImage>
+class _MemoryAwareImageState extends State<_MemoryAwareImage>
     with AutomaticKeepAliveClientMixin {
 
-  // FIXED: Disabled keep alive to reduce memory pressure during scroll
+  // MEMORY OPTIMIZED: Disabled keep alive during memory crisis
   @override
   bool get wantKeepAlive => false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Track image access for cache management
+    widget.cacheService.trackImageAccess(widget.thumbnailFile.path);
+  }
 
   Widget _buildErrorWidget() {
     return Container(
@@ -328,15 +343,24 @@ class _LightweightOptimizedImageState extends State<_LightweightOptimizedImage>
     );
   }
 
-  /// FIXED: Streamlined image widget without heavy operations
-  Widget _buildOptimizedImageWidget(File imageFile) {
+  /// FIXED: Proper image cropping without distortion
+  Widget _buildMemoryOptimizedImageWidget(File imageFile) {
     return Image.file(
       imageFile,
       fit: BoxFit.cover,
       gaplessPlayback: true, // Critical for preventing flicker during rebuilds
-      cacheWidth: AppConfig().thumbnailCacheWidth, // Use cached optimal width
-      // FIXED: Simplified frame builder without complex animations
+      // FIXED: Only specify cacheWidth to maintain aspect ratio
+      cacheWidth: 360, // Maintains aspect ratio - no stretching!
+      // REMOVED: cacheHeight to prevent distortion
+      // MEMORY OPTIMIZED: Simplified frame builder
       frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+        // Track cache hit/miss
+        if (frame != null) {
+          widget.cacheService.trackImageAccess(imageFile.path);
+        } else {
+          widget.cacheService.trackCacheMiss(imageFile.path);
+        }
+
         if (wasSynchronouslyLoaded || frame != null) {
           return child;
         }
@@ -347,7 +371,8 @@ class _LightweightOptimizedImageState extends State<_LightweightOptimizedImage>
         );
       },
       errorBuilder: (context, error, stackTrace) {
-        // FIXED: Simple error handling without complex fallback logic
+        // MEMORY OPTIMIZED: Track failed loads
+        widget.cacheService.trackCacheMiss(imageFile.path);
         return _buildErrorWidget();
       },
     );
@@ -362,12 +387,13 @@ class _LightweightOptimizedImageState extends State<_LightweightOptimizedImage>
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // FIXED: Simplified Hero animation without complex flight builders
+          // MEMORY OPTIMIZED: Hero animation with memory tracking
           ErrorBoundary(
             errorContext: 'Hero Animation',
             child: Hero(
               tag: 'image_${widget.fullImageFile.path}',
-              child: _buildOptimizedImageWidget(widget.thumbnailFile),
+              // CRITICAL: Always use thumbnail for grid display to reduce memory usage
+              child: _buildMemoryOptimizedImageWidget(widget.thumbnailFile),
             ),
           ),
 

@@ -16,8 +16,8 @@ void main() async {
   // Initialize app configuration (performance settings, refresh rate, etc.)
   await AppConfig().initialize();
 
-  // Configure advanced image cache management
-  _configureImageCache();
+  // ENHANCED: Configure aggressive memory management for 79-image grid
+  _configureEnhancedImageCache();
 
   // Initialize thumbnail service for lazy loading
   _initializeThumbnailService();
@@ -32,25 +32,28 @@ void main() async {
   runApp(const ProviderScope(child: GridApp()));
 }
 
-/// Configure advanced image cache with smart management and LRU eviction
-void _configureImageCache() {
+/// ENHANCED: Configure aggressive image cache management to prevent 99% memory usage
+void _configureEnhancedImageCache() {
   try {
-    // Use the new ImageCacheService for advanced cache management
+    // Use the enhanced ImageCacheService for aggressive memory management
     ImageCacheService().configureCache();
 
-    // Print cache statistics in debug mode
+    // ENHANCED: Print cache statistics with memory warnings
     if (const bool.fromEnvironment('dart.vm.product') == false) {
       // Small delay to let the cache initialize before printing stats
       Future.delayed(const Duration(milliseconds: 100), () {
         ImageCacheService().printStatistics();
+        debugPrint('🧠 MEMORY CRISIS MODE: Aggressive cache management active');
+        debugPrint('📉 REDUCED LIMITS: Conservative memory thresholds');
+        debugPrint('🔄 AUTO-EVICTION: LRU cleanup at 70% usage');
       });
     }
 
   } catch (e) {
-    debugPrint('Error configuring ImageCacheService: $e');
+    debugPrint('Error configuring Enhanced ImageCacheService: $e');
 
-    // Fallback to basic configuration if the service fails
-    _configureFallbackCache();
+    // Fallback to ultra-conservative configuration if the service fails
+    _configureUltraConservativeCache();
   }
 }
 
@@ -113,14 +116,25 @@ void _initializePerformanceMonitoring() {
       monitor.addFrameCallback((frameData) {
         if (frameData.isCritical) {
           debugPrint('🚨 Critical frame performance: ${frameData.totalMs.toStringAsFixed(1)}ms');
+
+          // ENHANCED: Also log memory pressure during critical frames
+          final cacheService = ImageCacheService();
+          final stats = cacheService.getStatistics();
+          final usagePercent = stats.maximumSizeBytes > 0
+              ? (stats.currentSizeBytes / stats.maximumSizeBytes * 100)
+              : 0.0;
+
+          if (usagePercent > 85) {
+            debugPrint('🧠 Memory pressure during critical frame: ${usagePercent.toStringAsFixed(1)}%');
+          }
         }
       });
 
-      // Schedule periodic performance reports (every 30 seconds in debug)
-      _schedulePerformanceReports(monitor);
+      // ENHANCED: Schedule more frequent performance reports during memory crisis
+      _scheduleEnhancedPerformanceReports(monitor);
     }
 
-    debugPrint('✅ Performance monitoring initialized');
+    debugPrint('✅ Performance monitoring initialized with memory crisis detection');
 
   } catch (e) {
     debugPrint('⚠️ Error initializing performance monitoring: $e');
@@ -128,13 +142,44 @@ void _initializePerformanceMonitoring() {
   }
 }
 
-/// Schedule periodic performance reports for debugging
-void _schedulePerformanceReports(PerformanceMonitor monitor) {
+/// ENHANCED: Schedule frequent performance reports for memory crisis monitoring
+void _scheduleEnhancedPerformanceReports(PerformanceMonitor monitor) {
   if (const bool.fromEnvironment('dart.vm.product')) return;
 
-  // Print detailed performance report every 30 seconds in debug mode
-  Future.delayed(const Duration(seconds: 30), () {
+  // ENHANCED: More frequent reports during memory crisis - every 20 seconds
+  Future.delayed(const Duration(seconds: 20), () {
     monitor.printPerformanceReport();
+
+    // Enhanced cache statistics during memory crisis
+    try {
+      final cacheService = ImageCacheService();
+      final stats = cacheService.getStatistics();
+      final usagePercent = stats.maximumSizeBytes > 0
+          ? (stats.currentSizeBytes / stats.maximumSizeBytes * 100)
+          : 0.0;
+      final avgSizeMB = stats.currentSize > 0
+          ? (stats.currentSizeBytes / stats.currentSize / 1024 / 1024)
+          : 0.0;
+
+      debugPrint('🧠 MEMORY CRISIS MONITORING:');
+      debugPrint('  Usage: ${usagePercent.toStringAsFixed(1)}% (${stats.currentSize} images)');
+      debugPrint('  Average: ${avgSizeMB.toStringAsFixed(1)}MB per image');
+      debugPrint('  Pressure Events: ${stats.memoryPressureEvents}');
+      debugPrint('  Aggressive Cleanups: ${stats.aggressiveCleanups}');
+      debugPrint('  Pressure Mode: ${stats.memoryPressureMode}');
+
+      // Alert if still in crisis
+      if (usagePercent > 85) {
+        debugPrint('🚨 MEMORY STILL IN CRISIS: ${usagePercent.toStringAsFixed(1)}% usage');
+      } else if (usagePercent > 70) {
+        debugPrint('⚠️ MEMORY WARNING: ${usagePercent.toStringAsFixed(1)}% usage');
+      } else {
+        debugPrint('✅ MEMORY HEALTHY: ${usagePercent.toStringAsFixed(1)}% usage');
+      }
+
+    } catch (e) {
+      debugPrint('Error getting enhanced cache stats: $e');
+    }
 
     // Also print thumbnail service stats
     try {
@@ -152,20 +197,20 @@ void _schedulePerformanceReports(PerformanceMonitor monitor) {
       debugPrint('Error getting scroll optimization stats: $e');
     }
 
-    _schedulePerformanceReports(monitor); // Reschedule
+    _scheduleEnhancedPerformanceReports(monitor); // Reschedule
   });
 }
 
-/// Fallback cache configuration for error cases
-void _configureFallbackCache() {
+/// ENHANCED: Ultra-conservative fallback cache configuration for memory crisis
+void _configureUltraConservativeCache() {
   try {
-    // Basic cache configuration as fallback
-    PaintingBinding.instance.imageCache.maximumSize = 200;
-    PaintingBinding.instance.imageCache.maximumSizeBytes = 300 * 1024 * 1024; // 300MB
+    // Ultra-conservative cache configuration as fallback
+    PaintingBinding.instance.imageCache.maximumSize = 50;  // Extremely limited
+    PaintingBinding.instance.imageCache.maximumSizeBytes = 80 * 1024 * 1024; // 80MB only
 
-    debugPrint('Image cache configured: 200 images, 300MB (fallback)');
+    debugPrint('🚨 ULTRA-CONSERVATIVE cache configured: 50 images, 80MB (emergency fallback)');
   } catch (e) {
-    debugPrint('Critical error: Failed to configure image cache: $e');
+    debugPrint('Critical error: Failed to configure ultra-conservative image cache: $e');
   }
 }
 
@@ -184,7 +229,7 @@ class _GridAppState extends State<GridApp> with WidgetsBindingObserver {
     super.initState();
     _themeNotifier = ThemeNotifier();
 
-    // Observe app lifecycle for performance monitoring
+    // Observe app lifecycle for performance monitoring and memory management
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -214,6 +259,13 @@ class _GridAppState extends State<GridApp> with WidgetsBindingObserver {
       debugPrint('Error disposing scroll optimization service: $e');
     }
 
+    // ENHANCED: Clear image cache on app dispose to free memory
+    try {
+      ImageCacheService().clearCache();
+    } catch (e) {
+      debugPrint('Error clearing image cache: $e');
+    }
+
     super.dispose();
   }
 
@@ -223,6 +275,7 @@ class _GridAppState extends State<GridApp> with WidgetsBindingObserver {
 
     try {
       final monitor = PerformanceMonitor.instance;
+      final cacheService = ImageCacheService();
 
       switch (state) {
         case AppLifecycleState.resumed:
@@ -231,6 +284,8 @@ class _GridAppState extends State<GridApp> with WidgetsBindingObserver {
             monitor.startMonitoring();
             debugPrint('📱 App resumed - Performance monitoring restarted');
           }
+          // ENHANCED: Exit memory pressure mode when app resumes
+          cacheService.exitMemoryPressureMode();
           break;
 
         case AppLifecycleState.paused:
@@ -240,10 +295,13 @@ class _GridAppState extends State<GridApp> with WidgetsBindingObserver {
             monitor.stopMonitoring();
             debugPrint('📱 App paused - Performance monitoring stopped');
           }
+          // ENHANCED: Enter memory pressure mode to free memory when backgrounded
+          cacheService.enterMemoryPressureMode();
           break;
 
         case AppLifecycleState.inactive:
-        // Keep monitoring during brief inactive states
+        // ENHANCED: Aggressive cleanup during brief inactive states
+          cacheService.performSmartCleanup();
           break;
 
         case AppLifecycleState.hidden:

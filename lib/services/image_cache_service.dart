@@ -6,8 +6,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 import '../core/app_config.dart';
 
-/// Advanced image cache management service with LRU eviction and smart preloading
-/// Integrates with AppConfig performance settings and provides monitoring capabilities
+/// ENHANCED: Advanced image cache management service with aggressive memory control
+/// FIXES: 99% memory usage (346MB/350MB) with only 63 images (5.5MB per image)
+/// TARGETS: <80% memory usage, <2MB per image average
 class ImageCacheService {
   static final ImageCacheService _instance = ImageCacheService._internal();
   factory ImageCacheService() => _instance;
@@ -18,16 +19,23 @@ class ImageCacheService {
   final Map<String, int> _accessCounts = {};
   final Set<String> _preloadingQueue = {};
 
-  // Cache statistics
+  // ENHANCED: Aggressive cache statistics and monitoring
   int _cacheHits = 0;
   int _cacheMisses = 0;
   int _evictions = 0;
+  int _memoryPressureEvents = 0;
+  int _aggressiveCleanups = 0;
   DateTime? _lastCleanup;
 
   bool _isInitialized = false;
   bool _memoryPressureMode = false;
 
-  /// Initialize and configure the image cache with AppConfig settings
+  // ENHANCED: More aggressive memory thresholds
+  static const double _memoryWarningThreshold = 0.70; // 70% instead of 80%
+  static const double _memoryCriticalThreshold = 0.85; // 85% instead of 90%
+  static const double _memoryEmergencyThreshold = 0.95; // 95%
+
+  /// ENHANCED: Configure cache with aggressive memory management for 79-image grid
   void configureCache() {
     if (_isInitialized) {
       debugPrint('ImageCacheService already configured');
@@ -37,59 +45,60 @@ class ImageCacheService {
     try {
       final imageCache = PaintingBinding.instance.imageCache;
 
-      // Use AppConfig settings as foundation
+      // REDUCED: More conservative cache limits to prevent 99% usage
       final config = AppConfig();
-      final cacheSize = config.isHighRefreshRate ? 250 : 200; // Slightly higher for high refresh rate
+
+      // FIXED: Significantly reduced cache sizes to prevent memory crisis
+      final cacheSize = config.isHighRefreshRate ? 120 : 100; // Reduced from 250→120, 200→100
       final cacheSizeBytes = config.isHighRefreshRate
-          ? 350 * 1024 * 1024  // 350MB for high refresh rate devices
-          : 300 * 1024 * 1024; // 300MB for standard devices
+          ? 200 * 1024 * 1024  // Reduced from 350MB → 200MB for high refresh rate
+          : 150 * 1024 * 1024; // Reduced from 300MB → 150MB for standard
 
       // Configure cache limits
       imageCache.maximumSize = cacheSize;
       imageCache.maximumSizeBytes = cacheSizeBytes;
 
-      // Setup memory pressure handling
-      _setupMemoryPressureHandling();
+      // ENHANCED: Setup aggressive memory pressure handling
+      _setupAggressiveMemoryHandling();
 
       _isInitialized = true;
 
-      debugPrint('ImageCacheService configured:');
-      debugPrint('  Max images: $cacheSize');
-      debugPrint('  Max memory: ${(cacheSizeBytes / 1024 / 1024).round()}MB');
+      debugPrint('🔧 Enhanced ImageCacheService configured:');
+      debugPrint('  Max images: $cacheSize (REDUCED)');
+      debugPrint('  Max memory: ${(cacheSizeBytes / 1024 / 1024).round()}MB (REDUCED)');
       debugPrint('  High refresh rate: ${config.isHighRefreshRate}');
+      debugPrint('  Memory thresholds: Warning ${(_memoryWarningThreshold * 100)}%, Critical ${(_memoryCriticalThreshold * 100)}%');
 
     } catch (e) {
-      debugPrint('Error configuring ImageCacheService: $e');
+      debugPrint('Error configuring Enhanced ImageCacheService: $e');
       // Fallback to basic configuration
       _configureFallbackCache();
       _isInitialized = true;
     }
   }
 
-  /// Setup memory pressure handling for automatic cache management
-  void _setupMemoryPressureHandling() {
-    // Note: Flutter doesn't have direct memory pressure APIs, but we can monitor
-    // cache size and implement proactive cleanup
-    _schedulePeriodicCleanup();
+  /// ENHANCED: Setup aggressive memory pressure handling
+  void _setupAggressiveMemoryHandling() {
+    // More frequent cleanup - every 30 seconds instead of 2 minutes
+    _scheduleAggressiveCleanup();
   }
 
-  /// Schedule periodic cache cleanup and optimization
-  void _schedulePeriodicCleanup() {
-    // Perform cleanup every 2 minutes during active use
-    Future.delayed(const Duration(minutes: 2), () {
+  /// ENHANCED: Schedule frequent aggressive cache cleanup
+  void _scheduleAggressiveCleanup() {
+    Future.delayed(const Duration(seconds: 30), () {
       if (_isInitialized) {
-        _performMaintenanceCleanup();
-        _schedulePeriodicCleanup(); // Reschedule
+        _performAggressiveMaintenanceCleanup();
+        _scheduleAggressiveCleanup(); // Reschedule
       }
     });
   }
 
-  /// Fallback cache configuration if AppConfig fails
+  /// ENHANCED: Fallback cache configuration with conservative limits
   void _configureFallbackCache() {
     final imageCache = PaintingBinding.instance.imageCache;
-    imageCache.maximumSize = 200;
-    imageCache.maximumSizeBytes = 300 * 1024 * 1024; // 300MB
-    debugPrint('ImageCacheService: Using fallback configuration');
+    imageCache.maximumSize = 80;  // Reduced from 200
+    imageCache.maximumSizeBytes = 120 * 1024 * 1024; // Reduced from 300MB → 120MB
+    debugPrint('Enhanced ImageCacheService: Using conservative fallback configuration');
   }
 
   /// Track image access for LRU management
@@ -113,13 +122,129 @@ class ImageCacheService {
       // Track cache hit
       _cacheHits++;
 
+      // ENHANCED: Immediate memory check after access
+      _checkMemoryPressureImmediate();
+
       // Trim access history if it gets too large
-      if (_accessHistory.length > 500) {
+      if (_accessHistory.length > 300) { // Reduced from 500
         _trimAccessHistory();
       }
 
     } catch (e) {
       debugPrint('Error tracking image access: $e');
+    }
+  }
+
+  /// ENHANCED: Immediate memory pressure check
+  void _checkMemoryPressureImmediate() {
+    try {
+      final imageCache = PaintingBinding.instance.imageCache;
+      final usageRatio = imageCache.currentSizeBytes / imageCache.maximumSizeBytes;
+
+      if (usageRatio > _memoryEmergencyThreshold) {
+        // EMERGENCY: 95%+ usage
+        debugPrint('🚨 MEMORY EMERGENCY: ${(usageRatio * 100).toStringAsFixed(1)}% usage');
+        _handleEmergencyMemoryPressure();
+      } else if (usageRatio > _memoryCriticalThreshold) {
+        // CRITICAL: 85%+ usage
+        debugPrint('🔥 MEMORY CRITICAL: ${(usageRatio * 100).toStringAsFixed(1)}% usage');
+        _handleCriticalMemoryPressure();
+      } else if (usageRatio > _memoryWarningThreshold) {
+        // WARNING: 70%+ usage
+        debugPrint('⚠️ MEMORY WARNING: ${(usageRatio * 100).toStringAsFixed(1)}% usage');
+        _handleMemoryWarning();
+      }
+
+    } catch (e) {
+      debugPrint('Error in immediate memory check: $e');
+    }
+  }
+
+  /// ENHANCED: Emergency memory pressure (95%+) - aggressive eviction
+  void _handleEmergencyMemoryPressure() {
+    try {
+      _memoryPressureEvents++;
+      _memoryPressureMode = true;
+
+      final imageCache = PaintingBinding.instance.imageCache;
+
+      // AGGRESSIVE: Clear 60% of cache immediately
+      final targetEvictions = (imageCache.currentSize * 0.6).round();
+      _evictLeastRecentlyUsed(targetEvictions);
+
+      debugPrint('🚨 Emergency cleanup: Evicted $targetEvictions images');
+
+    } catch (e) {
+      debugPrint('Error in emergency memory pressure handling: $e');
+    }
+  }
+
+  /// ENHANCED: Critical memory pressure (85%+) - significant eviction
+  void _handleCriticalMemoryPressure() {
+    try {
+      _memoryPressureEvents++;
+
+      final imageCache = PaintingBinding.instance.imageCache;
+
+      // SIGNIFICANT: Clear 40% of cache
+      final targetEvictions = (imageCache.currentSize * 0.4).round();
+      _evictLeastRecentlyUsed(targetEvictions);
+
+      debugPrint('🔥 Critical cleanup: Evicted $targetEvictions images');
+
+    } catch (e) {
+      debugPrint('Error in critical memory pressure handling: $e');
+    }
+  }
+
+  /// ENHANCED: Memory warning (70%+) - moderate eviction
+  void _handleMemoryWarning() {
+    try {
+      final imageCache = PaintingBinding.instance.imageCache;
+
+      // MODERATE: Clear 25% of cache
+      final targetEvictions = (imageCache.currentSize * 0.25).round();
+      _evictLeastRecentlyUsed(targetEvictions);
+
+      debugPrint('⚠️ Warning cleanup: Evicted $targetEvictions images');
+
+    } catch (e) {
+      debugPrint('Error in memory warning handling: $e');
+    }
+  }
+
+  /// ENHANCED: Evict least recently used images
+  void _evictLeastRecentlyUsed(int count) {
+    try {
+      if (count <= 0) return;
+
+      // Sort access history by least recently used
+      final sortedEntries = _accessHistory.entries.toList();
+      sortedEntries.sort((a, b) => a.value.lastAccessed.compareTo(b.value.lastAccessed));
+
+      // Evict least recently used
+      final toEvict = sortedEntries.take(count).map((e) => e.key).toList();
+
+      for (final imagePath in toEvict) {
+        try {
+          final imageProvider = FileImage(File(imagePath));
+          final imageCache = PaintingBinding.instance.imageCache;
+          imageCache.evict(imageProvider);
+
+          // Remove from tracking
+          _accessHistory.remove(imagePath);
+          _accessCounts.remove(imagePath);
+          _evictions++;
+
+        } catch (e) {
+          debugPrint('Error evicting $imagePath: $e');
+        }
+      }
+
+      debugPrint('LRU evicted: ${toEvict.length} images');
+
+    } catch (e) {
+      debugPrint('Error in LRU eviction: $e');
     }
   }
 
@@ -129,13 +254,22 @@ class ImageCacheService {
     _cacheMisses++;
   }
 
-  /// Preload images that are likely to be accessed soon
+  /// ENHANCED: Preload with immediate memory check
   Future<void> preloadImages(List<String> imagePaths, {int priority = 0}) async {
     if (!_isInitialized || _memoryPressureMode) return;
 
+    // ENHANCED: Check memory before preloading
+    final imageCache = PaintingBinding.instance.imageCache;
+    final usageRatio = imageCache.currentSizeBytes / imageCache.maximumSizeBytes;
+
+    if (usageRatio > _memoryWarningThreshold) {
+      debugPrint('Skipping preload - memory usage at ${(usageRatio * 100).toStringAsFixed(1)}%');
+      return;
+    }
+
     try {
-      // Limit concurrent preloading to avoid memory pressure
-      const maxConcurrentPreloads = 5;
+      // Limit concurrent preloading more aggressively
+      const maxConcurrentPreloads = 3; // Reduced from 5
       int activePreloads = 0;
 
       for (final imagePath in imagePaths) {
@@ -154,20 +288,29 @@ class ImageCacheService {
       }
 
     } catch (e) {
-      debugPrint('Error in preloadImages: $e');
+      debugPrint('Error in enhanced preloadImages: $e');
     }
   }
 
-  /// Preload a single image
+  /// Preload a single image with memory checks
   Future<void> _preloadImage(String imagePath) async {
     try {
+      // Double-check memory before loading
+      final imageCache = PaintingBinding.instance.imageCache;
+      final usageRatio = imageCache.currentSizeBytes / imageCache.maximumSizeBytes;
+
+      if (usageRatio > _memoryCriticalThreshold) {
+        debugPrint('Aborting preload - memory critical');
+        return;
+      }
+
       final file = File(imagePath);
       if (!await file.exists()) return;
 
       final imageProvider = FileImage(file);
       final imageStream = imageProvider.resolve(ImageConfiguration.empty);
 
-      // Force image into cache
+      // Force image into cache with timeout
       final completer = Completer<void>();
       late ImageStreamListener listener;
 
@@ -183,7 +326,7 @@ class ImageCacheService {
       );
 
       imageStream.addListener(listener);
-      await completer.future.timeout(const Duration(seconds: 5));
+      await completer.future.timeout(const Duration(seconds: 3)); // Reduced timeout
 
     } catch (e) {
       // Preload failures are not critical
@@ -206,8 +349,6 @@ class ImageCacheService {
       _accessCounts.remove(imagePath);
 
       _evictions++;
-
-      debugPrint('Evicted image: $imagePath');
 
     } catch (e) {
       debugPrint('Error evicting image: $e');
@@ -243,46 +384,47 @@ class ImageCacheService {
     }
   }
 
-  /// Perform smart cache cleanup based on LRU and access patterns
+  /// ENHANCED: Aggressive cache cleanup based on LRU and memory pressure
   void performSmartCleanup() {
     if (!_isInitialized) return;
 
     try {
       final imageCache = PaintingBinding.instance.imageCache;
-      final currentSize = imageCache.currentSize;
-      final maxSize = imageCache.maximumSize;
+      final usageRatio = imageCache.currentSizeBytes / imageCache.maximumSizeBytes;
 
-      // Only clean if we're approaching capacity
-      if (currentSize < maxSize * 0.8) return;
+      // ENHANCED: More aggressive cleanup thresholds
+      if (usageRatio > _memoryWarningThreshold) {
+        final now = DateTime.now();
+        final candidates = <String>[];
 
-      final now = DateTime.now();
-      final candidates = <String>[];
+        // Find LRU candidates for eviction with more aggressive criteria
+        for (final entry in _accessHistory.entries) {
+          final age = now.difference(entry.value.lastAccessed);
+          final accessCount = entry.value.accessCount;
 
-      // Find LRU candidates for eviction
-      for (final entry in _accessHistory.entries) {
-        final age = now.difference(entry.value.lastAccessed);
-        final accessCount = entry.value.accessCount;
-
-        // Evict if old and not frequently accessed
-        if (age.inMinutes > 30 && accessCount < 3) {
-          candidates.add(entry.key);
+          // ENHANCED: More aggressive eviction criteria
+          if (age.inMinutes > 15 && accessCount < 5) { // Reduced from 30 min, 3 access
+            candidates.add(entry.key);
+          }
         }
-      }
 
-      // Sort by least recently used
-      candidates.sort((a, b) {
-        final aEntry = _accessHistory[a]!;
-        final bEntry = _accessHistory[b]!;
-        return aEntry.lastAccessed.compareTo(bEntry.lastAccessed);
-      });
+        // Sort by least recently used
+        candidates.sort((a, b) {
+          final aEntry = _accessHistory[a]!;
+          final bEntry = _accessHistory[b]!;
+          return aEntry.lastAccessed.compareTo(bEntry.lastAccessed);
+        });
 
-      // Evict up to 25% of candidates to free space
-      final evictCount = (candidates.length * 0.25).ceil();
-      final toEvict = candidates.take(evictCount).toList();
+        // ENHANCED: Evict more aggressively based on memory pressure
+        final evictPercentage = usageRatio > _memoryCriticalThreshold ? 0.5 : 0.3;
+        final evictCount = (candidates.length * evictPercentage).ceil();
+        final toEvict = candidates.take(evictCount).toList();
 
-      if (toEvict.isNotEmpty) {
-        evictImages(toEvict);
-        debugPrint('Smart cleanup: evicted ${toEvict.length} images');
+        if (toEvict.isNotEmpty) {
+          evictImages(toEvict);
+          _aggressiveCleanups++;
+          debugPrint('🧹 Aggressive cleanup: evicted ${toEvict.length} images (${(usageRatio * 100).toStringAsFixed(1)}% usage)');
+        }
       }
 
     } catch (e) {
@@ -290,33 +432,42 @@ class ImageCacheService {
     }
   }
 
-  /// Perform maintenance cleanup (called periodically)
-  void _performMaintenanceCleanup() {
+  /// ENHANCED: Aggressive maintenance cleanup
+  void _performAggressiveMaintenanceCleanup() {
     try {
       _lastCleanup = DateTime.now();
 
-      // Trim access history
+      // Trim access history more aggressively
       _trimAccessHistory();
 
-      // Perform smart cleanup if needed
+      // Perform smart cleanup
       performSmartCleanup();
 
       // Clean up preloading queue
       _preloadingQueue.clear();
 
+      // Exit memory pressure mode if memory usage is now acceptable
+      final imageCache = PaintingBinding.instance.imageCache;
+      final usageRatio = imageCache.currentSizeBytes / imageCache.maximumSizeBytes;
+
+      if (_memoryPressureMode && usageRatio < _memoryWarningThreshold) {
+        _memoryPressureMode = false;
+        debugPrint('✅ Exited memory pressure mode - usage: ${(usageRatio * 100).toStringAsFixed(1)}%');
+      }
+
       if (kDebugMode) {
-        debugPrint('Cache maintenance completed');
+        debugPrint('🧹 Enhanced maintenance completed - usage: ${(usageRatio * 100).toStringAsFixed(1)}%');
       }
 
     } catch (e) {
-      debugPrint('Error in maintenance cleanup: $e');
+      debugPrint('Error in aggressive maintenance cleanup: $e');
     }
   }
 
-  /// Trim access history to prevent memory buildup
+  /// Trim access history more aggressively
   void _trimAccessHistory() {
     try {
-      const maxHistorySize = 300;
+      const maxHistorySize = 200; // Reduced from 300
 
       if (_accessHistory.length <= maxHistorySize) return;
 
@@ -339,7 +490,7 @@ class ImageCacheService {
     }
   }
 
-  /// Enter memory pressure mode (reduce cache aggressiveness)
+  /// Enter memory pressure mode with immediate aggressive cleanup
   void enterMemoryPressureMode() {
     if (_memoryPressureMode) return;
 
@@ -348,17 +499,17 @@ class ImageCacheService {
     try {
       final imageCache = PaintingBinding.instance.imageCache;
 
-      // Reduce cache size temporarily
-      final reducedSize = (imageCache.maximumSize * 0.6).round();
-      final reducedBytes = (imageCache.maximumSizeBytes * 0.6).round();
+      // ENHANCED: More aggressive cache reduction
+      final reducedSize = (imageCache.maximumSize * 0.4).round(); // Reduced to 40%
+      final reducedBytes = (imageCache.maximumSizeBytes * 0.4).round(); // Reduced to 40%
 
       imageCache.maximumSize = reducedSize;
       imageCache.maximumSizeBytes = reducedBytes;
 
-      // Aggressive cleanup
-      performSmartCleanup();
+      // Immediate aggressive cleanup
+      _handleEmergencyMemoryPressure();
 
-      debugPrint('Entered memory pressure mode');
+      debugPrint('🚨 Entered AGGRESSIVE memory pressure mode');
       debugPrint('  Reduced cache: $reducedSize images, ${(reducedBytes / 1024 / 1024).round()}MB');
 
     } catch (e) {
@@ -366,17 +517,17 @@ class ImageCacheService {
     }
   }
 
-  /// Exit memory pressure mode (restore normal cache limits)
+  /// Exit memory pressure mode and restore cache limits
   void exitMemoryPressureMode() {
     if (!_memoryPressureMode) return;
 
     _memoryPressureMode = false;
 
     try {
-      // Restore original cache configuration
+      // Restore original cache configuration (but more conservative)
       configureCache();
 
-      debugPrint('Exited memory pressure mode - cache restored');
+      debugPrint('✅ Exited memory pressure mode - cache restored to conservative limits');
 
     } catch (e) {
       debugPrint('Error exiting memory pressure mode: $e');
@@ -401,15 +552,17 @@ class ImageCacheService {
       _cacheHits = 0;
       _cacheMisses = 0;
       _evictions = 0;
+      _memoryPressureEvents = 0;
+      _aggressiveCleanups = 0;
 
-      debugPrint('Image cache cleared completely');
+      debugPrint('🧹 Enhanced image cache cleared completely');
 
     } catch (e) {
       debugPrint('Error clearing cache: $e');
     }
   }
 
-  /// Get cache statistics for monitoring
+  /// Get enhanced cache statistics
   CacheStatistics getStatistics() {
     if (!_isInitialized) {
       return CacheStatistics(
@@ -424,6 +577,8 @@ class ImageCacheService {
         hitRate: 0.0,
         accessHistorySize: 0,
         memoryPressureMode: false,
+        memoryPressureEvents: 0,
+        aggressiveCleanups: 0,
       );
     }
 
@@ -445,10 +600,12 @@ class ImageCacheService {
         accessHistorySize: _accessHistory.length,
         memoryPressureMode: _memoryPressureMode,
         lastCleanup: _lastCleanup,
+        memoryPressureEvents: _memoryPressureEvents,
+        aggressiveCleanups: _aggressiveCleanups,
       );
 
     } catch (e) {
-      debugPrint('Error getting cache statistics: $e');
+      debugPrint('Error getting enhanced cache statistics: $e');
       return CacheStatistics(
         isInitialized: true,
         currentSize: -1,
@@ -461,29 +618,41 @@ class ImageCacheService {
         hitRate: 0.0,
         accessHistorySize: 0,
         memoryPressureMode: false,
+        memoryPressureEvents: _memoryPressureEvents,
+        aggressiveCleanups: _aggressiveCleanups,
       );
     }
   }
 
-  /// Print cache statistics to debug console
+  /// Print enhanced cache statistics
   void printStatistics() {
     if (!kDebugMode) return;
 
     final stats = getStatistics();
-    debugPrint('=== Image Cache Statistics ===');
+    final usageRatio = stats.maximumSizeBytes > 0
+        ? stats.currentSizeBytes / stats.maximumSizeBytes
+        : 0.0;
+    final avgSizeMB = stats.currentSize > 0
+        ? (stats.currentSizeBytes / stats.currentSize / 1024 / 1024)
+        : 0.0;
+
+    debugPrint('=== ENHANCED Image Cache Statistics ===');
     debugPrint('Initialized: ${stats.isInitialized}');
     debugPrint('Current Size: ${stats.currentSize}/${stats.maximumSize} images');
-    debugPrint('Memory Usage: ${(stats.currentSizeBytes / 1024 / 1024).toStringAsFixed(1)}MB/${(stats.maximumSizeBytes / 1024 / 1024).toStringAsFixed(1)}MB');
+    debugPrint('Memory Usage: ${(stats.currentSizeBytes / 1024 / 1024).toStringAsFixed(1)}MB/${(stats.maximumSizeBytes / 1024 / 1024).toStringAsFixed(1)}MB (${(usageRatio * 100).toStringAsFixed(1)}%)');
+    debugPrint('Average Size: ${avgSizeMB.toStringAsFixed(1)}MB per image');
     debugPrint('Cache Hits: ${stats.cacheHits}');
     debugPrint('Cache Misses: ${stats.cacheMisses}');
     debugPrint('Hit Rate: ${(stats.hitRate * 100).toStringAsFixed(1)}%');
     debugPrint('Evictions: ${stats.evictions}');
+    debugPrint('Memory Pressure Events: ${stats.memoryPressureEvents}');
+    debugPrint('Aggressive Cleanups: ${stats.aggressiveCleanups}');
     debugPrint('Access History: ${stats.accessHistorySize} entries');
     debugPrint('Memory Pressure Mode: ${stats.memoryPressureMode}');
     if (stats.lastCleanup != null) {
       debugPrint('Last Cleanup: ${stats.lastCleanup}');
     }
-    debugPrint('==============================');
+    debugPrint('=======================================');
   }
 }
 
@@ -500,7 +669,7 @@ class CacheEntry {
   });
 }
 
-/// Data class for cache statistics
+/// ENHANCED: Data class for cache statistics with memory pressure metrics
 class CacheStatistics {
   final bool isInitialized;
   final int currentSize;
@@ -514,6 +683,8 @@ class CacheStatistics {
   final int accessHistorySize;
   final bool memoryPressureMode;
   final DateTime? lastCleanup;
+  final int memoryPressureEvents;
+  final int aggressiveCleanups;
 
   CacheStatistics({
     required this.isInitialized,
@@ -528,5 +699,7 @@ class CacheStatistics {
     required this.accessHistorySize,
     required this.memoryPressureMode,
     this.lastCleanup,
+    this.memoryPressureEvents = 0,
+    this.aggressiveCleanups = 0,
   });
 }
