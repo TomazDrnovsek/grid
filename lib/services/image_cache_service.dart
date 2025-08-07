@@ -38,7 +38,9 @@ class ImageCacheService {
   /// ENHANCED: Configure cache with aggressive memory management for 79-image grid
   void configureCache() {
     if (_isInitialized) {
-      debugPrint('ImageCacheService already configured');
+      if (kDebugMode) {
+        debugPrint('ImageCacheService already configured');
+      }
       return;
     }
 
@@ -63,14 +65,18 @@ class ImageCacheService {
 
       _isInitialized = true;
 
-      debugPrint('🔧 Enhanced ImageCacheService configured:');
-      debugPrint('  Max images: $cacheSize (REDUCED)');
-      debugPrint('  Max memory: ${(cacheSizeBytes / 1024 / 1024).round()}MB (REDUCED)');
-      debugPrint('  High refresh rate: ${config.isHighRefreshRate}');
-      debugPrint('  Memory thresholds: Warning ${(_memoryWarningThreshold * 100)}%, Critical ${(_memoryCriticalThreshold * 100)}%');
+      if (kDebugMode) {
+        debugPrint('🔧 Enhanced ImageCacheService configured:');
+        debugPrint('  Max images: $cacheSize (REDUCED)');
+        debugPrint('  Max memory: ${(cacheSizeBytes / 1024 / 1024).round()}MB (REDUCED)');
+        debugPrint('  High refresh rate: ${config.isHighRefreshRate}');
+        debugPrint('  Memory thresholds: Warning ${(_memoryWarningThreshold * 100)}%, Critical ${(_memoryCriticalThreshold * 100)}%');
+      }
 
     } catch (e) {
-      debugPrint('Error configuring Enhanced ImageCacheService: $e');
+      if (kDebugMode) {
+        debugPrint('Error configuring Enhanced ImageCacheService: $e');
+      }
       // Fallback to basic configuration
       _configureFallbackCache();
       _isInitialized = true;
@@ -98,7 +104,9 @@ class ImageCacheService {
     final imageCache = PaintingBinding.instance.imageCache;
     imageCache.maximumSize = 80;  // Reduced from 200
     imageCache.maximumSizeBytes = 120 * 1024 * 1024; // Reduced from 300MB → 120MB
-    debugPrint('Enhanced ImageCacheService: Using conservative fallback configuration');
+    if (kDebugMode) {
+      debugPrint('Enhanced ImageCacheService: Using conservative fallback configuration');
+    }
   }
 
   /// Track image access for LRU management
@@ -131,7 +139,9 @@ class ImageCacheService {
       }
 
     } catch (e) {
-      debugPrint('Error tracking image access: $e');
+      if (kDebugMode) {
+        debugPrint('Error tracking image access: $e');
+      }
     }
   }
 
@@ -143,20 +153,28 @@ class ImageCacheService {
 
       if (usageRatio > _memoryEmergencyThreshold) {
         // EMERGENCY: 95%+ usage
-        debugPrint('🚨 MEMORY EMERGENCY: ${(usageRatio * 100).toStringAsFixed(1)}% usage');
+        if (kDebugMode) {
+          debugPrint('🚨 MEMORY EMERGENCY: ${(usageRatio * 100).toStringAsFixed(1)}% usage');
+        }
         _handleEmergencyMemoryPressure();
       } else if (usageRatio > _memoryCriticalThreshold) {
         // CRITICAL: 85%+ usage
-        debugPrint('🔥 MEMORY CRITICAL: ${(usageRatio * 100).toStringAsFixed(1)}% usage');
+        if (kDebugMode) {
+          debugPrint('🔥 MEMORY CRITICAL: ${(usageRatio * 100).toStringAsFixed(1)}% usage');
+        }
         _handleCriticalMemoryPressure();
       } else if (usageRatio > _memoryWarningThreshold) {
         // WARNING: 70%+ usage
-        debugPrint('⚠️ MEMORY WARNING: ${(usageRatio * 100).toStringAsFixed(1)}% usage');
+        if (kDebugMode) {
+          debugPrint('⚠️ MEMORY WARNING: ${(usageRatio * 100).toStringAsFixed(1)}% usage');
+        }
         _handleMemoryWarning();
       }
 
     } catch (e) {
-      debugPrint('Error in immediate memory check: $e');
+      if (kDebugMode) {
+        debugPrint('Error in immediate memory check: $e');
+      }
     }
   }
 
@@ -172,10 +190,14 @@ class ImageCacheService {
       final targetEvictions = (imageCache.currentSize * 0.6).round();
       _evictLeastRecentlyUsed(targetEvictions);
 
-      debugPrint('🚨 Emergency cleanup: Evicted $targetEvictions images');
+      if (kDebugMode) {
+        debugPrint('🚨 Emergency cleanup: Evicted $targetEvictions images');
+      }
 
     } catch (e) {
-      debugPrint('Error in emergency memory pressure handling: $e');
+      if (kDebugMode) {
+        debugPrint('Error in emergency memory pressure handling: $e');
+      }
     }
   }
 
@@ -190,10 +212,14 @@ class ImageCacheService {
       final targetEvictions = (imageCache.currentSize * 0.4).round();
       _evictLeastRecentlyUsed(targetEvictions);
 
-      debugPrint('🔥 Critical cleanup: Evicted $targetEvictions images');
+      if (kDebugMode) {
+        debugPrint('🔥 Critical cleanup: Evicted $targetEvictions images');
+      }
 
     } catch (e) {
-      debugPrint('Error in critical memory pressure handling: $e');
+      if (kDebugMode) {
+        debugPrint('Error in critical memory pressure handling: $e');
+      }
     }
   }
 
@@ -206,10 +232,14 @@ class ImageCacheService {
       final targetEvictions = (imageCache.currentSize * 0.25).round();
       _evictLeastRecentlyUsed(targetEvictions);
 
-      debugPrint('⚠️ Warning cleanup: Evicted $targetEvictions images');
+      if (kDebugMode) {
+        debugPrint('⚠️ Warning cleanup: Evicted $targetEvictions images');
+      }
 
     } catch (e) {
-      debugPrint('Error in memory warning handling: $e');
+      if (kDebugMode) {
+        debugPrint('Error in memory warning handling: $e');
+      }
     }
   }
 
@@ -237,14 +267,20 @@ class ImageCacheService {
           _evictions++;
 
         } catch (e) {
-          debugPrint('Error evicting $imagePath: $e');
+          if (kDebugMode) {
+            debugPrint('Error evicting $imagePath: $e');
+          }
         }
       }
 
-      debugPrint('LRU evicted: ${toEvict.length} images');
+      if (kDebugMode) {
+        debugPrint('LRU evicted: ${toEvict.length} images');
+      }
 
     } catch (e) {
-      debugPrint('Error in LRU eviction: $e');
+      if (kDebugMode) {
+        debugPrint('Error in LRU eviction: $e');
+      }
     }
   }
 
@@ -263,7 +299,9 @@ class ImageCacheService {
     final usageRatio = imageCache.currentSizeBytes / imageCache.maximumSizeBytes;
 
     if (usageRatio > _memoryWarningThreshold) {
-      debugPrint('Skipping preload - memory usage at ${(usageRatio * 100).toStringAsFixed(1)}%');
+      if (kDebugMode) {
+        debugPrint('Skipping preload - memory usage at ${(usageRatio * 100).toStringAsFixed(1)}%');
+      }
       return;
     }
 
@@ -281,14 +319,18 @@ class ImageCacheService {
 
         // Preload in background without blocking
         _preloadImage(imagePath).catchError((e) {
-          debugPrint('Preload failed for $imagePath: $e');
+          if (kDebugMode) {
+            debugPrint('Preload failed for $imagePath: $e');
+          }
         }).whenComplete(() {
           _preloadingQueue.remove(imagePath);
         });
       }
 
     } catch (e) {
-      debugPrint('Error in enhanced preloadImages: $e');
+      if (kDebugMode) {
+        debugPrint('Error in enhanced preloadImages: $e');
+      }
     }
   }
 
@@ -300,7 +342,9 @@ class ImageCacheService {
       final usageRatio = imageCache.currentSizeBytes / imageCache.maximumSizeBytes;
 
       if (usageRatio > _memoryCriticalThreshold) {
-        debugPrint('Aborting preload - memory critical');
+        if (kDebugMode) {
+          debugPrint('Aborting preload - memory critical');
+        }
         return;
       }
 
@@ -330,7 +374,9 @@ class ImageCacheService {
 
     } catch (e) {
       // Preload failures are not critical
-      debugPrint('Preload timeout/error for $imagePath: $e');
+      if (kDebugMode) {
+        debugPrint('Preload timeout/error for $imagePath: $e');
+      }
     }
   }
 
@@ -351,7 +397,9 @@ class ImageCacheService {
       _evictions++;
 
     } catch (e) {
-      debugPrint('Error evicting image: $e');
+      if (kDebugMode) {
+        debugPrint('Error evicting image: $e');
+      }
     }
   }
 
@@ -373,14 +421,20 @@ class ImageCacheService {
 
           _evictions++;
         } catch (e) {
-          debugPrint('Error evicting image $imagePath: $e');
+          if (kDebugMode) {
+            debugPrint('Error evicting image $imagePath: $e');
+          }
         }
       }
 
-      debugPrint('Batch evicted ${imagePaths.length} images');
+      if (kDebugMode) {
+        debugPrint('Batch evicted ${imagePaths.length} images');
+      }
 
     } catch (e) {
-      debugPrint('Error in batch eviction: $e');
+      if (kDebugMode) {
+        debugPrint('Error in batch eviction: $e');
+      }
     }
   }
 
@@ -423,12 +477,16 @@ class ImageCacheService {
         if (toEvict.isNotEmpty) {
           evictImages(toEvict);
           _aggressiveCleanups++;
-          debugPrint('🧹 Aggressive cleanup: evicted ${toEvict.length} images (${(usageRatio * 100).toStringAsFixed(1)}% usage)');
+          if (kDebugMode) {
+            debugPrint('🧹 Aggressive cleanup: evicted ${toEvict.length} images (${(usageRatio * 100).toStringAsFixed(1)}% usage)');
+          }
         }
       }
 
     } catch (e) {
-      debugPrint('Error in smart cleanup: $e');
+      if (kDebugMode) {
+        debugPrint('Error in smart cleanup: $e');
+      }
     }
   }
 
@@ -452,7 +510,9 @@ class ImageCacheService {
 
       if (_memoryPressureMode && usageRatio < _memoryWarningThreshold) {
         _memoryPressureMode = false;
-        debugPrint('✅ Exited memory pressure mode - usage: ${(usageRatio * 100).toStringAsFixed(1)}%');
+        if (kDebugMode) {
+          debugPrint('✅ Exited memory pressure mode - usage: ${(usageRatio * 100).toStringAsFixed(1)}%');
+        }
       }
 
       if (kDebugMode) {
@@ -460,7 +520,9 @@ class ImageCacheService {
       }
 
     } catch (e) {
-      debugPrint('Error in aggressive maintenance cleanup: $e');
+      if (kDebugMode) {
+        debugPrint('Error in aggressive maintenance cleanup: $e');
+      }
     }
   }
 
@@ -483,10 +545,14 @@ class ImageCacheService {
         _accessCounts[entry.key] = entry.value.accessCount;
       }
 
-      debugPrint('Trimmed access history to $maxHistorySize entries');
+      if (kDebugMode) {
+        debugPrint('Trimmed access history to $maxHistorySize entries');
+      }
 
     } catch (e) {
-      debugPrint('Error trimming access history: $e');
+      if (kDebugMode) {
+        debugPrint('Error trimming access history: $e');
+      }
     }
   }
 
@@ -509,11 +575,15 @@ class ImageCacheService {
       // Immediate aggressive cleanup
       _handleEmergencyMemoryPressure();
 
-      debugPrint('🚨 Entered AGGRESSIVE memory pressure mode');
-      debugPrint('  Reduced cache: $reducedSize images, ${(reducedBytes / 1024 / 1024).round()}MB');
+      if (kDebugMode) {
+        debugPrint('🚨 Entered AGGRESSIVE memory pressure mode');
+        debugPrint('  Reduced cache: $reducedSize images, ${(reducedBytes / 1024 / 1024).round()}MB');
+      }
 
     } catch (e) {
-      debugPrint('Error entering memory pressure mode: $e');
+      if (kDebugMode) {
+        debugPrint('Error entering memory pressure mode: $e');
+      }
     }
   }
 
@@ -527,10 +597,14 @@ class ImageCacheService {
       // Restore original cache configuration (but more conservative)
       configureCache();
 
-      debugPrint('✅ Exited memory pressure mode - cache restored to conservative limits');
+      if (kDebugMode) {
+        debugPrint('✅ Exited memory pressure mode - cache restored to conservative limits');
+      }
 
     } catch (e) {
-      debugPrint('Error exiting memory pressure mode: $e');
+      if (kDebugMode) {
+        debugPrint('Error exiting memory pressure mode: $e');
+      }
     }
   }
 
@@ -555,10 +629,14 @@ class ImageCacheService {
       _memoryPressureEvents = 0;
       _aggressiveCleanups = 0;
 
-      debugPrint('🧹 Enhanced image cache cleared completely');
+      if (kDebugMode) {
+        debugPrint('🧹 Enhanced image cache cleared completely');
+      }
 
     } catch (e) {
-      debugPrint('Error clearing cache: $e');
+      if (kDebugMode) {
+        debugPrint('Error clearing cache: $e');
+      }
     }
   }
 
@@ -605,7 +683,9 @@ class ImageCacheService {
       );
 
     } catch (e) {
-      debugPrint('Error getting enhanced cache statistics: $e');
+      if (kDebugMode) {
+        debugPrint('Error getting enhanced cache statistics: $e');
+      }
       return CacheStatistics(
         isInitialized: true,
         currentSize: -1,

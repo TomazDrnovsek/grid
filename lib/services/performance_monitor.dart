@@ -49,19 +49,25 @@ class PerformanceMonitor {
       // Get device-specific performance targets from AppConfig
       final config = AppConfig();
       if (!config.isReady) {
-        debugPrint('⚠️ PerformanceMonitor: AppConfig not ready, using fallback thresholds');
+        if (kDebugMode) {
+          debugPrint('⚠️ PerformanceMonitor: AppConfig not ready, using fallback thresholds');
+        }
         _setFallbackThresholds();
       } else {
         _setOptimizedThresholds(config);
       }
 
-      debugPrint('PerformanceMonitor initialized:');
-      debugPrint('  Target frame time: ${_targetFrameTimeMs.toStringAsFixed(1)}ms');
-      debugPrint('  Slow frame threshold: ${_slowFrameThresholdMs.toStringAsFixed(1)}ms');
-      debugPrint('  Critical frame threshold: ${_criticalFrameThresholdMs.toStringAsFixed(1)}ms');
+      if (kDebugMode) {
+        debugPrint('PerformanceMonitor initialized:');
+        debugPrint('  Target frame time: ${_targetFrameTimeMs.toStringAsFixed(1)}ms');
+        debugPrint('  Slow frame threshold: ${_slowFrameThresholdMs.toStringAsFixed(1)}ms');
+        debugPrint('  Critical frame threshold: ${_criticalFrameThresholdMs.toStringAsFixed(1)}ms');
+      }
 
     } catch (e) {
-      debugPrint('Error initializing PerformanceMonitor: $e');
+      if (kDebugMode) {
+        debugPrint('Error initializing PerformanceMonitor: $e');
+      }
       _setFallbackThresholds();
     }
   }
@@ -83,7 +89,9 @@ class PerformanceMonitor {
   /// Start comprehensive performance monitoring
   void startMonitoring() {
     if (_isMonitoring) {
-      debugPrint('PerformanceMonitor already running');
+      if (kDebugMode) {
+        debugPrint('PerformanceMonitor already running');
+      }
       return;
     }
 
@@ -97,10 +105,14 @@ class PerformanceMonitor {
       // Start memory monitoring
       _startMemoryMonitoring();
 
-      debugPrint('🚀 PerformanceMonitor started');
+      if (kDebugMode) {
+        debugPrint('🚀 PerformanceMonitor started');
+      }
 
     } catch (e) {
-      debugPrint('Error starting PerformanceMonitor: $e');
+      if (kDebugMode) {
+        debugPrint('Error starting PerformanceMonitor: $e');
+      }
       _isMonitoring = false;
     }
   }
@@ -122,10 +134,14 @@ class PerformanceMonitor {
       _memoryTimer?.cancel();
       _memoryTimer = null;
 
-      debugPrint('🛑 PerformanceMonitor stopped');
+      if (kDebugMode) {
+        debugPrint('🛑 PerformanceMonitor stopped');
+      }
 
     } catch (e) {
-      debugPrint('Error stopping PerformanceMonitor: $e');
+      if (kDebugMode) {
+        debugPrint('Error stopping PerformanceMonitor: $e');
+      }
     }
   }
 
@@ -136,9 +152,13 @@ class PerformanceMonitor {
     try {
       SchedulerBinding.instance.addTimingsCallback(_onFrameTimings);
       _isFrameMonitoringActive = true;
-      debugPrint('Frame monitoring active');
+      if (kDebugMode) {
+        debugPrint('Frame monitoring active');
+      }
     } catch (e) {
-      debugPrint('Error starting frame monitoring: $e');
+      if (kDebugMode) {
+        debugPrint('Error starting frame monitoring: $e');
+      }
     }
   }
 
@@ -169,7 +189,9 @@ class PerformanceMonitor {
           try {
             callback(frameData);
           } catch (e) {
-            debugPrint('Error in frame callback: $e');
+            if (kDebugMode) {
+              debugPrint('Error in frame callback: $e');
+            }
           }
         }
 
@@ -179,7 +201,9 @@ class PerformanceMonitor {
         }
       }
     } catch (e) {
-      debugPrint('Error processing frame timings: $e');
+      if (kDebugMode) {
+        debugPrint('Error processing frame timings: $e');
+      }
     }
   }
 
@@ -204,6 +228,8 @@ class PerformanceMonitor {
 
   /// Log slow frame information for debugging
   void _logSlowFrame(FramePerformanceData frame) {
+    if (!kDebugMode) return;
+
     debugPrint('🐌 Slow frame detected (${frame.totalMs.toStringAsFixed(1)}ms):');
     debugPrint('  Target: ${_targetFrameTimeMs.toStringAsFixed(1)}ms');
     debugPrint('  Build: ${frame.buildMs.toStringAsFixed(1)}ms');
@@ -251,7 +277,9 @@ class PerformanceMonitor {
       }
 
     } catch (e) {
-      debugPrint('Error taking memory snapshot: $e');
+      if (kDebugMode) {
+        debugPrint('Error taking memory snapshot: $e');
+      }
     }
   }
 
@@ -270,7 +298,9 @@ class PerformanceMonitor {
     try {
       _activeOperations[operationName] = DateTime.now();
     } catch (e) {
-      debugPrint('Error starting operation timing: $e');
+      if (kDebugMode) {
+        debugPrint('Error starting operation timing: $e');
+      }
     }
   }
 
@@ -295,7 +325,9 @@ class PerformanceMonitor {
         }
       }
     } catch (e) {
-      debugPrint('Error ending operation timing: $e');
+      if (kDebugMode) {
+        debugPrint('Error ending operation timing: $e');
+      }
     }
   }
 
@@ -344,7 +376,9 @@ class PerformanceMonitor {
         trackedOperationsCount: _operationTimings.length,
       );
     } catch (e) {
-      debugPrint('Error getting performance statistics: $e');
+      if (kDebugMode) {
+        debugPrint('Error getting performance statistics: $e');
+      }
       return PerformanceStatistics.empty();
     }
   }
@@ -377,7 +411,9 @@ class PerformanceMonitor {
 
       return stats;
     } catch (e) {
-      debugPrint('Error getting operation stats: $e');
+      if (kDebugMode) {
+        debugPrint('Error getting operation stats: $e');
+      }
       return {};
     }
   }
@@ -438,7 +474,9 @@ class PerformanceMonitor {
       debugPrint('═══════════════════════════════════════');
 
     } catch (e) {
-      debugPrint('Error printing performance report: $e');
+      if (kDebugMode) {
+        debugPrint('Error printing performance report: $e');
+      }
     }
   }
 
@@ -454,9 +492,13 @@ class PerformanceMonitor {
       _totalFrameTime = Duration.zero;
       _monitoringStartTime = DateTime.now();
 
-      debugPrint('Performance data cleared');
+      if (kDebugMode) {
+        debugPrint('Performance data cleared');
+      }
     } catch (e) {
-      debugPrint('Error clearing performance data: $e');
+      if (kDebugMode) {
+        debugPrint('Error clearing performance data: $e');
+      }
     }
   }
 }

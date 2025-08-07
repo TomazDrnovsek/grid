@@ -94,7 +94,8 @@ class BatchResult {
 /// Reduces cascading rebuilds from multiple operations (5 photos = 1 state update)
 @riverpod
 class PhotoNotifier extends _$PhotoNotifier {
-  late final PhotoRepository _repository;
+  // FIXED: Initialize repository as field initializer (null safety compliant)
+  final PhotoRepository _repository = PhotoRepository();
 
   // ENHANCED: Batch operation infrastructure
   final List<BatchOperation> _batchQueue = [];
@@ -108,14 +109,33 @@ class PhotoNotifier extends _$PhotoNotifier {
 
   @override
   PhotoState build() {
-    // Initialize repository
-    _repository = PhotoRepository();
-
     // Schedule initial data loading after provider is built
-    Future.microtask(() => _loadInitialData());
+    // FIXED: Use ref.onDispose for proper cleanup
+    ref.onDispose(() {
+      _cleanup();
+    });
+
+    // Schedule initial data loading
+    Future.microtask(() {
+      _loadInitialData();
+    });
 
     // Return initial empty state
     return const PhotoState();
+  }
+
+  /// FIXED: Proper cleanup using Riverpod lifecycle
+  void _cleanup() {
+    // Clean up batch timer with null safety
+    _batchTimer?.cancel();
+    _batchTimer = null;
+
+    // Clear batch queue
+    _batchQueue.clear();
+
+    if (kDebugMode) {
+      debugPrint('PhotoNotifier disposed and cleaned up');
+    }
   }
 
   /// ENHANCED: Add operation to batch queue with intelligent scheduling
@@ -1017,6 +1037,6 @@ class PhotoNotifier extends _$PhotoNotifier {
 
 // ============================================================================
 // NOTE: Riverpod AutoDisposeNotifier handles cleanup automatically
-// No manual disposal needed - batch timer will be cleaned up when provider disposes
+// The ref.onDispose() method ensures proper resource cleanup
 // ============================================================================
 }

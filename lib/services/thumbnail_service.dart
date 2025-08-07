@@ -57,7 +57,9 @@ class ThumbnailService {
       return null; // Will be generated asynchronously
 
     } catch (e) {
-      debugPrint('Error requesting thumbnail for $imagePath: $e');
+      if (kDebugMode) {
+        debugPrint('Error requesting thumbnail for $imagePath: $e');
+      }
       return null;
     }
   }
@@ -109,7 +111,9 @@ class ThumbnailService {
       // Start performance monitoring
       PerformanceMonitor.instance.startOperation('lazy_thumbnail_generation');
 
-      debugPrint('🔄 Generating lazy thumbnail: ${request.imagePath} (priority: ${request.priority})');
+      if (kDebugMode) {
+        debugPrint('🔄 Generating lazy thumbnail: ${request.imagePath} (priority: ${request.priority})');
+      }
 
       // Generate thumbnail using existing FileUtils
       final thumbnailFile = await FileUtils.generateThumbnail(XFile(request.imagePath));
@@ -124,7 +128,9 @@ class ThumbnailService {
           try {
             callback(thumbnailFile);
           } catch (e) {
-            debugPrint('Error in thumbnail callback: $e');
+            if (kDebugMode) {
+              debugPrint('Error in thumbnail callback: $e');
+            }
           }
         }
       }
@@ -132,10 +138,14 @@ class ThumbnailService {
       // End performance monitoring
       PerformanceMonitor.instance.endOperation('lazy_thumbnail_generation');
 
-      debugPrint('✅ Lazy thumbnail completed: ${thumbnailFile.path}');
+      if (kDebugMode) {
+        debugPrint('✅ Lazy thumbnail completed: ${thumbnailFile.path}');
+      }
 
     } catch (e) {
-      debugPrint('❌ Error generating lazy thumbnail for ${request.imagePath}: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error generating lazy thumbnail for ${request.imagePath}: $e');
+      }
       PerformanceMonitor.instance.endOperation('lazy_thumbnail_generation');
     } finally {
       _processing.remove(request.imagePath);
@@ -147,7 +157,9 @@ class ThumbnailService {
     _isProcessing = false;
     _processingTimer?.cancel();
     _processingTimer = null;
-    debugPrint('Thumbnail processing stopped - queue empty');
+    if (kDebugMode) {
+      debugPrint('Thumbnail processing stopped - queue empty');
+    }
   }
 
   /// Get processing statistics
@@ -191,7 +203,9 @@ class ThumbnailService {
       }
 
     } catch (e) {
-      debugPrint('Error preloading visible range: $e');
+      if (kDebugMode) {
+        debugPrint('Error preloading visible range: $e');
+      }
     }
   }
 
@@ -216,7 +230,9 @@ class ThumbnailService {
       return thumbnailFile;
 
     } catch (e) {
-      debugPrint('Error generating immediate thumbnail: $e');
+      if (kDebugMode) {
+        debugPrint('Error generating immediate thumbnail: $e');
+      }
       PerformanceMonitor.instance.endOperation('immediate_thumbnail_generation');
       return null;
     }

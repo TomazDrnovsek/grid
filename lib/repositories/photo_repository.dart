@@ -245,7 +245,9 @@ class PhotoRepository {
       return result;
 
     } catch (e) {
-      debugPrint('Error in batch database operations: $e');
+      if (kDebugMode) {
+        debugPrint('Error in batch database operations: $e');
+      }
       PerformanceMonitor.instance.endOperation('repository_batch_${operationType.name}');
 
       _completeBatchOperation(
@@ -618,7 +620,9 @@ class PhotoRepository {
       final migrationNeeded = await _isMigrationNeeded();
 
       if (migrationNeeded) {
-        debugPrint('Migration needed: transferring data from SharedPreferences to database');
+        if (kDebugMode) {
+          debugPrint('Migration needed: transferring data from SharedPreferences to database');
+        }
         await _performMigration();
       }
 
@@ -640,7 +644,9 @@ class PhotoRepository {
       final List<File> loadedImages = [];
       final List<File> loadedThumbnails = [];
 
-      debugPrint('🚀 LAZY LOADING: Processing ${photoEntries.length} images immediately, thumbnails in background');
+      if (kDebugMode) {
+        debugPrint('🚀 LAZY LOADING: Processing ${photoEntries.length} images immediately, thumbnails in background');
+      }
 
       // PHASE 1: Load images immediately (FAST)
       for (final entry in photoEntries) {
@@ -651,7 +657,9 @@ class PhotoRepository {
           if (!imageFile.existsSync()) {
             // Remove invalid entries from database
             await _database.deletePhotosByPaths([entry.imagePath]);
-            debugPrint('Removed invalid database entry: ${entry.imagePath}');
+            if (kDebugMode) {
+              debugPrint('Removed invalid database entry: ${entry.imagePath}');
+            }
             continue;
           }
 
@@ -663,7 +671,9 @@ class PhotoRepository {
           loadedThumbnails.add(imageFile);
 
         } catch (e) {
-          debugPrint('Error processing image ${entry.imagePath}: $e');
+          if (kDebugMode) {
+            debugPrint('Error processing image ${entry.imagePath}: $e');
+          }
           continue;
         }
       }
@@ -671,7 +681,9 @@ class PhotoRepository {
       // End performance monitoring for initial load
       PerformanceMonitor.instance.endOperation('load_saved_photos_lazy');
 
-      debugPrint('✅ IMMEDIATE LOAD COMPLETE: ${loadedImages.length} images loaded in background thread');
+      if (kDebugMode) {
+        debugPrint('✅ IMMEDIATE LOAD COMPLETE: ${loadedImages.length} images loaded in background thread');
+      }
 
       // PHASE 2: Start lazy thumbnail generation (BACKGROUND)
       _startLazyThumbnailGeneration(validPaths);
@@ -687,7 +699,9 @@ class PhotoRepository {
 
     } catch (e) {
       PerformanceMonitor.instance.endOperation('load_saved_photos_lazy');
-      debugPrint('Error loading all saved photos: $e');
+      if (kDebugMode) {
+        debugPrint('Error loading all saved photos: $e');
+      }
       return const LoadPhotosResult(
         images: <File>[],
         thumbnails: <File>[],
@@ -702,7 +716,9 @@ class PhotoRepository {
   /// Start lazy thumbnail generation for all images
   void _startLazyThumbnailGeneration(List<String> imagePaths) {
     try {
-      debugPrint('🔄 Starting lazy thumbnail generation for ${imagePaths.length} images');
+      if (kDebugMode) {
+        debugPrint('🔄 Starting lazy thumbnail generation for ${imagePaths.length} images');
+      }
 
       // Request thumbnails with priority (visible items first)
       for (int i = 0; i < imagePaths.length; i++) {
@@ -715,10 +731,14 @@ class PhotoRepository {
       }
 
       final stats = _thumbnailService.getStats();
-      debugPrint('Thumbnail service stats: $stats');
+      if (kDebugMode) {
+        debugPrint('Thumbnail service stats: $stats');
+      }
 
     } catch (e) {
-      debugPrint('Error starting lazy thumbnail generation: $e');
+      if (kDebugMode) {
+        debugPrint('Error starting lazy thumbnail generation: $e');
+      }
     }
   }
 
@@ -733,7 +753,9 @@ class PhotoRepository {
         return await _thumbnailService.requestThumbnail(imagePath, priority: 8);
       }
     } catch (e) {
-      debugPrint('Error getting thumbnail for $imagePath: $e');
+      if (kDebugMode) {
+        debugPrint('Error getting thumbnail for $imagePath: $e');
+      }
       return null;
     }
   }
@@ -764,7 +786,9 @@ class PhotoRepository {
       return legacyPaths != null && legacyPaths.isNotEmpty;
 
     } catch (e) {
-      debugPrint('Error checking migration status: $e');
+      if (kDebugMode) {
+        debugPrint('Error checking migration status: $e');
+      }
       return false;
     }
   }
@@ -777,7 +801,9 @@ class PhotoRepository {
       // Migrate image paths
       final legacyPaths = prefs.getStringList(_legacyImagePathsKey) ?? [];
       if (legacyPaths.isNotEmpty) {
-        debugPrint('Migrating ${legacyPaths.length} image paths to database');
+        if (kDebugMode) {
+          debugPrint('Migrating ${legacyPaths.length} image paths to database');
+        }
 
         final photoEntries = <PhotoDatabaseEntry>[];
         final now = DateTime.now();
@@ -792,13 +818,17 @@ class PhotoRepository {
               orderIndex: i,
             ));
           } catch (e) {
-            debugPrint('Error creating database entry for $path: $e');
+            if (kDebugMode) {
+              debugPrint('Error creating database entry for $path: $e');
+            }
           }
         }
 
         if (photoEntries.isNotEmpty) {
           await _database.insertPhotos(photoEntries);
-          debugPrint('Successfully migrated ${photoEntries.length} photos to database');
+          if (kDebugMode) {
+            debugPrint('Successfully migrated ${photoEntries.length} photos to database');
+          }
         }
       }
 
@@ -806,16 +836,22 @@ class PhotoRepository {
       final legacyUsername = prefs.getString(_legacyHeaderUsernameKey);
       if (legacyUsername != null) {
         await _database.setSetting('header_username', legacyUsername);
-        debugPrint('Migrated header username to database');
+        if (kDebugMode) {
+          debugPrint('Migrated header username to database');
+        }
       }
 
       // Mark migration as complete
       await _database.setSetting(_migrationCompleteKey, true);
 
-      debugPrint('Migration completed successfully');
+      if (kDebugMode) {
+        debugPrint('Migration completed successfully');
+      }
 
     } catch (e) {
-      debugPrint('Error during migration: $e');
+      if (kDebugMode) {
+        debugPrint('Error during migration: $e');
+      }
       rethrow;
     }
   }
@@ -826,7 +862,9 @@ class PhotoRepository {
       await _database.updatePhotoOrders(paths);
       return true;
     } catch (e) {
-      debugPrint('Error saving image paths to database: $e');
+      if (kDebugMode) {
+        debugPrint('Error saving image paths to database: $e');
+      }
       return false;
     }
   }
@@ -841,14 +879,20 @@ class PhotoRepository {
       );
 
       if (!result.isSuccess) {
-        debugPrint('Batch add photos failed: ${result.errors.join(', ')}');
+        if (kDebugMode) {
+          debugPrint('Batch add photos failed: ${result.errors.join(', ')}');
+        }
         throw Exception('Failed to add photos to database in batch: ${result.errors.first}');
       }
 
-      debugPrint('✅ Batch added ${result.successCount}/${result.operationsProcessed} photos to database');
+      if (kDebugMode) {
+        debugPrint('✅ Batch added ${result.successCount}/${result.operationsProcessed} photos to database');
+      }
 
     } catch (e) {
-      debugPrint('Error adding photos to database: $e');
+      if (kDebugMode) {
+        debugPrint('Error adding photos to database: $e');
+      }
       rethrow;
     }
   }
@@ -859,7 +903,9 @@ class PhotoRepository {
       final List<XFile> picks = await _picker.pickMultiImage();
       return picks;
     } catch (e) {
-      debugPrint('Error picking images: $e');
+      if (kDebugMode) {
+        debugPrint('Error picking images: $e');
+      }
       return <XFile>[];
     }
   }
@@ -876,7 +922,9 @@ class PhotoRepository {
     }
 
     try {
-      debugPrint('🔄 Processing ${imageFiles.length} images with initial thumbnails');
+      if (kDebugMode) {
+        debugPrint('🔄 Processing ${imageFiles.length} images with initial thumbnails');
+      }
 
       final List<ProcessedImage> processedImages = [];
       final List<String> errors = [];
@@ -886,7 +934,9 @@ class PhotoRepository {
       // Process images with initial thumbnails (will be improved by lazy loading)
       for (final imageFile in imageFiles) {
         try {
-          debugPrint('Processing image: ${imageFile.path}');
+          if (kDebugMode) {
+            debugPrint('Processing image: ${imageFile.path}');
+          }
 
           // Use proven FileUtils approach for initial processing
           final result = await FileUtils.processImageWithThumbnail(imageFile);
@@ -899,10 +949,14 @@ class PhotoRepository {
           processedImages.add(processedImage);
           successCount++;
 
-          debugPrint('✅ Successfully processed: ${processedImage.image.path}');
+          if (kDebugMode) {
+            debugPrint('✅ Successfully processed: ${processedImage.image.path}');
+          }
 
         } catch (e) {
-          debugPrint('❌ Error processing ${imageFile.path}: $e');
+          if (kDebugMode) {
+            debugPrint('❌ Error processing ${imageFile.path}: $e');
+          }
           errors.add(e.toString());
           failureCount++;
         }
@@ -918,7 +972,9 @@ class PhotoRepository {
         try {
           await addPhotosToDatabase(processedImages);
         } catch (e) {
-          debugPrint('Error adding processed images to database: $e');
+          if (kDebugMode) {
+            debugPrint('Error adding processed images to database: $e');
+          }
         }
       }
 
@@ -927,11 +983,15 @@ class PhotoRepository {
         try {
           await File(xfile.path).delete();
         } catch (e) {
-          debugPrint('Failed to delete original file ${xfile.path}: $e');
+          if (kDebugMode) {
+            debugPrint('Failed to delete original file ${xfile.path}: $e');
+          }
         }
       }
 
-      debugPrint('✅ Batch processing complete: $successCount success, $failureCount failed');
+      if (kDebugMode) {
+        debugPrint('✅ Batch processing complete: $successCount success, $failureCount failed');
+      }
 
       return BatchImageResult(
         processedImages: processedImages,
@@ -941,7 +1001,9 @@ class PhotoRepository {
       );
 
     } catch (e) {
-      debugPrint('❌ Error in batch processing: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error in batch processing: $e');
+      }
 
       return BatchImageResult(
         processedImages: const <ProcessedImage>[],
@@ -974,7 +1036,9 @@ class PhotoRepository {
         error: fileResult.hasErrors ? fileResult.errors.first : null,
       );
     } catch (e) {
-      debugPrint('Error deleting images: $e');
+      if (kDebugMode) {
+        debugPrint('Error deleting images: $e');
+      }
       return DeleteResult(
         requestedCount: images.length + thumbnails.length,
         deletedCount: 0,
@@ -990,7 +1054,9 @@ class PhotoRepository {
       await FileUtils.cleanupOrphanedThumbnails(validImagePaths);
       return 0; // FileUtils doesn't return count, but operation succeeded
     } catch (e) {
-      debugPrint('Error cleaning up orphaned thumbnails: $e');
+      if (kDebugMode) {
+        debugPrint('Error cleaning up orphaned thumbnails: $e');
+      }
       return -1; // Indicate error
     }
   }
@@ -1010,7 +1076,9 @@ class PhotoRepository {
 
       return const ShareResult(success: true);
     } catch (e) {
-      debugPrint('Error sharing image: $e');
+      if (kDebugMode) {
+        debugPrint('Error sharing image: $e');
+      }
       return ShareResult(
         success: false,
         error: e.toString(),
@@ -1031,7 +1099,9 @@ class PhotoRepository {
       final prefs = await SharedPreferences.getInstance();
       return prefs.getString(_legacyHeaderUsernameKey) ?? 'tomazdrnovsek';
     } catch (e) {
-      debugPrint('Error loading header username: $e');
+      if (kDebugMode) {
+        debugPrint('Error loading header username: $e');
+      }
       return 'tomazdrnovsek';
     }
   }
@@ -1042,7 +1112,9 @@ class PhotoRepository {
       await _database.setSetting('header_username', username);
       return true;
     } catch (e) {
-      debugPrint('Error saving header username: $e');
+      if (kDebugMode) {
+        debugPrint('Error saving header username: $e');
+      }
       return false;
     }
   }
@@ -1065,7 +1137,9 @@ class PhotoRepository {
         repositoryPerformanceGrade: _getOverallPerformanceGrade(),
       );
     } catch (e) {
-      debugPrint('Error getting storage stats: $e');
+      if (kDebugMode) {
+        debugPrint('Error getting storage stats: $e');
+      }
       return StorageStats(
         totalImages: 0,
         totalBytes: 0,
@@ -1078,6 +1152,8 @@ class PhotoRepository {
 
   /// Debug method to check migration status and current data storage (enhanced with batch info)
   Future<void> printMigrationStatus() async {
+    if (!kDebugMode) return;
+
     try {
       debugPrint('=== MIGRATION STATUS CHECK ===');
 
