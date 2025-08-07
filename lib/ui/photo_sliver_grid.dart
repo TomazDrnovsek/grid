@@ -243,6 +243,7 @@ class _MemoryOptimizedGridItemState extends State<_MemoryOptimizedGridItem>
           child: DragTarget<int>(
             onWillAcceptWithDetails: (details) => details.data != widget.index,
             onAcceptWithDetails: (details) {
+              // FIXED: Immediate reorder processing (no batching for drag UX)
               widget.onReorder(details.data, widget.index);
             },
             builder: (context, candidateData, rejectedData) {

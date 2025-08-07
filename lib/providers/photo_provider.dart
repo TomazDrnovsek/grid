@@ -1,5 +1,6 @@
 // File: lib/providers/photo_provider.dart
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:image_picker/image_picker.dart';
@@ -11,11 +12,99 @@ import '../services/performance_monitor.dart';
 
 part 'photo_provider.g.dart';
 
-/// Riverpod provider for photo state management with comprehensive error handling
-/// Now uses repository layer for all business logic with error boundaries
+/// ENHANCED: Batch operation types for intelligent operation grouping
+enum BatchOperationType {
+  addPhotos,
+  deletePhotos,
+  reorderPhotos,
+  selectPhotos,
+  deselectPhotos,
+}
+
+/// ENHANCED: Batch operation data container
+class BatchOperation {
+  final BatchOperationType type;
+  final Map<String, dynamic> data;
+  final DateTime timestamp;
+
+  BatchOperation({
+    required this.type,
+    required this.data,
+    DateTime? timestamp,
+  }) : timestamp = timestamp ?? DateTime.now();
+
+  /// Factory constructors for different operation types
+  factory BatchOperation.addPhotos(List<ProcessedImage> images) {
+    return BatchOperation(
+      type: BatchOperationType.addPhotos,
+      data: {'images': images},
+    );
+  }
+
+  factory BatchOperation.deletePhotos(List<int> indexes) {
+    return BatchOperation(
+      type: BatchOperationType.deletePhotos,
+      data: {'indexes': indexes},
+    );
+  }
+
+  factory BatchOperation.reorderPhoto(int oldIndex, int newIndex) {
+    return BatchOperation(
+      type: BatchOperationType.reorderPhotos,
+      data: {'oldIndex': oldIndex, 'newIndex': newIndex},
+    );
+  }
+
+  factory BatchOperation.selectPhotos(List<int> indexes) {
+    return BatchOperation(
+      type: BatchOperationType.selectPhotos,
+      data: {'indexes': indexes},
+    );
+  }
+
+  factory BatchOperation.deselectPhotos(List<int> indexes) {
+    return BatchOperation(
+      type: BatchOperationType.deselectPhotos,
+      data: {'indexes': indexes},
+    );
+  }
+}
+
+/// ENHANCED: Batch processing result
+class BatchResult {
+  final int operationsProcessed;
+  final int successCount;
+  final int failureCount;
+  final Duration processingTime;
+  final List<String> errors;
+
+  const BatchResult({
+    required this.operationsProcessed,
+    required this.successCount,
+    required this.failureCount,
+    required this.processingTime,
+    this.errors = const [],
+  });
+
+  bool get isSuccess => failureCount == 0;
+  bool get hasErrors => errors.isNotEmpty;
+}
+
+/// Riverpod provider for photo state management with ENHANCED batch processing
+/// Reduces cascading rebuilds from multiple operations (5 photos = 1 state update)
 @riverpod
 class PhotoNotifier extends _$PhotoNotifier {
   late final PhotoRepository _repository;
+
+  // ENHANCED: Batch operation infrastructure
+  final List<BatchOperation> _batchQueue = [];
+  Timer? _batchTimer;
+  bool _isBatchProcessing = false;
+
+  // ENHANCED: Batch configuration
+  static const Duration _batchDelay = Duration(milliseconds: 100); // 100ms batch window
+  static const int _maxBatchSize = 20; // Max operations per batch
+  static const Duration _maxBatchAge = Duration(milliseconds: 500); // Max age before force processing
 
   @override
   PhotoState build() {
@@ -27,6 +116,414 @@ class PhotoNotifier extends _$PhotoNotifier {
 
     // Return initial empty state
     return const PhotoState();
+  }
+
+  /// ENHANCED: Add operation to batch queue with intelligent scheduling
+  void _enqueueBatchOperation(BatchOperation operation) {
+    try {
+      _batchQueue.add(operation);
+
+      // ENHANCED: Smart batch scheduling logic
+      if (_shouldProcessBatchImmediately()) {
+        _processBatchImmediately();
+      } else {
+        _scheduleBatchProcessing();
+      }
+
+      if (kDebugMode) {
+        debugPrint('📦 Batch: Enqueued ${operation.type} (queue: ${_batchQueue.length})');
+      }
+
+    } catch (e) {
+      debugPrint('Error enqueueing batch operation: $e');
+      // Fallback: process operation immediately without batching
+      _processSingleOperation(operation);
+    }
+  }
+
+  /// ENHANCED: Smart batch scheduling with performance optimization
+  void _scheduleBatchProcessing() {
+    _batchTimer?.cancel();
+
+    _batchTimer = Timer(_batchDelay, () {
+      if (_batchQueue.isNotEmpty) {
+        _processBatch();
+      }
+    });
+  }
+
+  /// ENHANCED: Determine if batch should be processed immediately
+  bool _shouldProcessBatchImmediately() {
+    if (_batchQueue.isEmpty) return false;
+
+    // Process immediately if:
+    // 1. Queue is full
+    if (_batchQueue.length >= _maxBatchSize) return true;
+
+    // 2. Oldest operation is too old
+    final oldestOperation = _batchQueue.first;
+    final age = DateTime.now().difference(oldestOperation.timestamp);
+    if (age > _maxBatchAge) return true;
+
+    // 3. Critical operations that need immediate processing
+    final criticalTypes = {
+      BatchOperationType.deletePhotos,
+      BatchOperationType.reorderPhotos,
+    };
+    if (_batchQueue.any((op) => criticalTypes.contains(op.type))) return true;
+
+    return false;
+  }
+
+  /// ENHANCED: Process batch immediately for critical operations
+  void _processBatchImmediately() {
+    _batchTimer?.cancel();
+    _processBatch();
+  }
+
+  /// ENHANCED: Core batch processing with optimized state updates
+  Future<void> _processBatch() async {
+    if (_isBatchProcessing || _batchQueue.isEmpty) return;
+
+    _isBatchProcessing = true;
+    final startTime = DateTime.now();
+
+    try {
+      // Start performance monitoring
+      PerformanceMonitor.instance.startOperation('batch_processing');
+
+      // Create a copy of the queue for processing
+      final operationsToProcess = List<BatchOperation>.from(_batchQueue);
+      _batchQueue.clear();
+
+      if (kDebugMode) {
+        debugPrint('📦 Batch: Processing ${operationsToProcess.length} operations');
+      }
+
+      // ENHANCED: Group and optimize operations
+      final optimizedOperations = _optimizeBatchOperations(operationsToProcess);
+
+      // Process each operation type in optimized order
+      await _processBatchOperations(optimizedOperations);
+
+      // End performance monitoring
+      PerformanceMonitor.instance.endOperation('batch_processing');
+
+      final processingTime = DateTime.now().difference(startTime);
+      if (kDebugMode) {
+        debugPrint('📦 Batch: Completed in ${processingTime.inMilliseconds}ms');
+      }
+
+    } catch (e) {
+      debugPrint('Error in batch processing: $e');
+      PerformanceMonitor.instance.endOperation('batch_processing');
+    } finally {
+      _isBatchProcessing = false;
+    }
+  }
+
+  /// ENHANCED: Optimize batch operations by grouping and deduplicating
+  Map<BatchOperationType, List<BatchOperation>> _optimizeBatchOperations(
+      List<BatchOperation> operations
+      ) {
+    final grouped = <BatchOperationType, List<BatchOperation>>{};
+
+    for (final operation in operations) {
+      grouped.putIfAbsent(operation.type, () => []).add(operation);
+    }
+
+    // ENHANCED: Deduplicate and optimize within each group
+    for (final type in grouped.keys) {
+      switch (type) {
+        case BatchOperationType.selectPhotos:
+        case BatchOperationType.deselectPhotos:
+        // Combine all selection operations
+          grouped[type] = _optimizeSelectionOperations(grouped[type]!);
+          break;
+        case BatchOperationType.deletePhotos:
+        // Combine all delete operations
+          grouped[type] = _optimizeDeleteOperations(grouped[type]!);
+          break;
+        default:
+        // Keep other operations as-is
+          break;
+      }
+    }
+
+    return grouped;
+  }
+
+  /// ENHANCED: Optimize selection operations by combining indexes
+  List<BatchOperation> _optimizeSelectionOperations(List<BatchOperation> operations) {
+    if (operations.isEmpty) return [];
+
+    final allIndexes = <int>{};
+    for (final op in operations) {
+      final indexes = op.data['indexes'] as List<int>? ?? [];
+      allIndexes.addAll(indexes);
+    }
+
+    if (allIndexes.isEmpty) return [];
+
+    // Return single optimized operation
+    return [BatchOperation(
+      type: operations.first.type,
+      data: {'indexes': allIndexes.toList()},
+    )];
+  }
+
+  /// ENHANCED: Optimize delete operations by combining indexes
+  List<BatchOperation> _optimizeDeleteOperations(List<BatchOperation> operations) {
+    if (operations.isEmpty) return [];
+
+    final allIndexes = <int>{};
+    for (final op in operations) {
+      final indexes = op.data['indexes'] as List<int>? ?? [];
+      allIndexes.addAll(indexes);
+    }
+
+    if (allIndexes.isEmpty) return [];
+
+    // Return single optimized operation
+    return [BatchOperation.deletePhotos(allIndexes.toList())];
+  }
+
+  /// ENHANCED: Process grouped batch operations with single state update
+  Future<void> _processBatchOperations(
+      Map<BatchOperationType, List<BatchOperation>> groupedOperations
+      ) async {
+    // Track what needs to be updated in final state
+    PhotoState updatedState = state;
+
+    // Process each operation type
+    for (final type in _getOptimalProcessingOrder()) {
+      final operations = groupedOperations[type];
+      if (operations == null || operations.isEmpty) continue;
+
+      switch (type) {
+        case BatchOperationType.addPhotos:
+          updatedState = await _processBatchAddPhotos(operations, updatedState);
+          break;
+        case BatchOperationType.deletePhotos:
+          updatedState = await _processBatchDeletePhotos(operations, updatedState);
+          break;
+        case BatchOperationType.selectPhotos:
+          updatedState = _processBatchSelectPhotos(operations, updatedState);
+          break;
+        case BatchOperationType.deselectPhotos:
+          updatedState = _processBatchDeselectPhotos(operations, updatedState);
+          break;
+        case BatchOperationType.reorderPhotos:
+          updatedState = await _processBatchReorderPhotos(operations, updatedState);
+          break;
+      }
+    }
+
+    // ENHANCED: Single state update for entire batch
+    if (updatedState != state) {
+      state = updatedState;
+      if (kDebugMode) {
+        debugPrint('📦 Batch: Applied single state update');
+      }
+    }
+  }
+
+  /// ENHANCED: Optimal processing order for batch operations
+  List<BatchOperationType> _getOptimalProcessingOrder() {
+    return [
+      BatchOperationType.deletePhotos,    // Process deletions first
+      BatchOperationType.addPhotos,       // Then additions
+      BatchOperationType.reorderPhotos,   // Then reordering
+      BatchOperationType.selectPhotos,    // Then selections
+      BatchOperationType.deselectPhotos,  // Finally deselections
+    ];
+  }
+
+  /// ENHANCED: Process batch add photos operations
+  Future<PhotoState> _processBatchAddPhotos(
+      List<BatchOperation> operations,
+      PhotoState currentState
+      ) async {
+    final allNewImages = <File>[];
+    final allNewThumbnails = <File>[];
+
+    for (final operation in operations) {
+      final images = operation.data['images'] as List<ProcessedImage>? ?? [];
+      for (final processed in images) {
+        allNewImages.add(processed.image);
+        allNewThumbnails.add(processed.thumbnail);
+      }
+    }
+
+    if (allNewImages.isEmpty) return currentState;
+
+    // Insert all new images at the beginning
+    final updatedImages = [...allNewImages.reversed, ...currentState.images];
+    final updatedThumbnails = [...allNewThumbnails.reversed, ...currentState.thumbnails];
+
+    // Save the new image order
+    await _saveImageOrder();
+
+    return currentState.copyWith(
+      images: updatedImages,
+      thumbnails: updatedThumbnails,
+      imageCount: updatedImages.length,
+      arraysInSync: updatedImages.length == updatedThumbnails.length,
+    );
+  }
+
+  /// ENHANCED: Process batch delete photos operations
+  Future<PhotoState> _processBatchDeletePhotos(
+      List<BatchOperation> operations,
+      PhotoState currentState
+      ) async {
+    final allIndexesToDelete = <int>{};
+
+    for (final operation in operations) {
+      final indexes = operation.data['indexes'] as List<int>? ?? [];
+      allIndexesToDelete.addAll(indexes);
+    }
+
+    if (allIndexesToDelete.isEmpty) return currentState;
+
+    final sorted = allIndexesToDelete.toList()..sort((a, b) => b.compareTo(a));
+
+    final imagesToDelete = <File>[];
+    final thumbnailsToDelete = <File>[];
+    final newImages = List<File>.from(currentState.images);
+    final newThumbnails = List<File>.from(currentState.thumbnails);
+
+    // Collect files to delete and remove from arrays
+    for (final i in sorted) {
+      if (i >= 0 && i < newImages.length && i < newThumbnails.length) {
+        imagesToDelete.add(newImages[i]);
+        thumbnailsToDelete.add(newThumbnails[i]);
+        newImages.removeAt(i);
+        newThumbnails.removeAt(i);
+      }
+    }
+
+    // Perform background operations
+    if (imagesToDelete.isNotEmpty) {
+      final deleteResult = await _repository.deleteImages(imagesToDelete, thumbnailsToDelete);
+      debugPrint('Batch delete result: ${deleteResult.deletedCount}/${deleteResult.requestedCount} files deleted');
+
+      // Save updated order and cleanup
+      await _saveImageOrder();
+      await _repository.cleanupOrphanedThumbnails(newImages.map((f) => f.path).toList());
+    }
+
+    return currentState.copyWith(
+      images: newImages,
+      thumbnails: newThumbnails,
+      selectedIndexes: <int>{}, // Clear selections after delete
+      imageCount: newImages.length,
+      arraysInSync: newImages.length == newThumbnails.length,
+    );
+  }
+
+  /// ENHANCED: Process batch select photos operations
+  PhotoState _processBatchSelectPhotos(
+      List<BatchOperation> operations,
+      PhotoState currentState
+      ) {
+    final newSelection = Set<int>.from(currentState.selectedIndexes);
+
+    for (final operation in operations) {
+      final indexes = operation.data['indexes'] as List<int>? ?? [];
+      for (final index in indexes) {
+        if (index >= 0 && index < currentState.images.length) {
+          newSelection.add(index);
+        }
+      }
+    }
+
+    return currentState.copyWith(selectedIndexes: newSelection);
+  }
+
+  /// ENHANCED: Process batch deselect photos operations
+  PhotoState _processBatchDeselectPhotos(
+      List<BatchOperation> operations,
+      PhotoState currentState
+      ) {
+    final newSelection = Set<int>.from(currentState.selectedIndexes);
+
+    for (final operation in operations) {
+      final indexes = operation.data['indexes'] as List<int>? ?? [];
+      for (final index in indexes) {
+        newSelection.remove(index);
+      }
+    }
+
+    return currentState.copyWith(selectedIndexes: newSelection);
+  }
+
+  /// ENHANCED: Process batch reorder photos operations
+  Future<PhotoState> _processBatchReorderPhotos(
+      List<BatchOperation> operations,
+      PhotoState currentState
+      ) async {
+    var newImages = List<File>.from(currentState.images);
+    var newThumbnails = List<File>.from(currentState.thumbnails);
+
+    // Apply reorder operations sequentially
+    for (final operation in operations) {
+      final oldIndex = operation.data['oldIndex'] as int?;
+      final newIndex = operation.data['newIndex'] as int?;
+
+      if (oldIndex != null && newIndex != null &&
+          oldIndex >= 0 && oldIndex < newImages.length &&
+          newIndex >= 0 && newIndex < newImages.length &&
+          oldIndex != newIndex) {
+
+        final movedImage = newImages.removeAt(oldIndex);
+        final movedThumbnail = newThumbnails.removeAt(oldIndex);
+
+        newImages.insert(newIndex, movedImage);
+        newThumbnails.insert(newIndex, movedThumbnail);
+      }
+    }
+
+    await _saveImageOrder();
+
+    return currentState.copyWith(
+      images: newImages,
+      thumbnails: newThumbnails,
+      selectedIndexes: <int>{}, // Clear selection during reorder
+    );
+  }
+
+  /// ENHANCED: Fallback for processing single operation without batching
+  Future<void> _processSingleOperation(BatchOperation operation) async {
+    try {
+      switch (operation.type) {
+        case BatchOperationType.addPhotos:
+          final images = operation.data['images'] as List<ProcessedImage>? ?? [];
+          await _applySingleAddPhotos(images);
+          break;
+        case BatchOperationType.deletePhotos:
+          final indexes = operation.data['indexes'] as List<int>? ?? [];
+          await _applySingleDeletePhotos(indexes);
+          break;
+        case BatchOperationType.selectPhotos:
+          final indexes = operation.data['indexes'] as List<int>? ?? [];
+          _applySingleSelectPhotos(indexes);
+          break;
+        case BatchOperationType.deselectPhotos:
+          final indexes = operation.data['indexes'] as List<int>? ?? [];
+          _applySingleDeselectPhotos(indexes);
+          break;
+        case BatchOperationType.reorderPhotos:
+          final oldIndex = operation.data['oldIndex'] as int?;
+          final newIndex = operation.data['newIndex'] as int?;
+          if (oldIndex != null && newIndex != null) {
+            await _applySingleReorderPhotos(oldIndex, newIndex);
+          }
+          break;
+      }
+    } catch (e) {
+      debugPrint('Error processing single operation: $e');
+    }
   }
 
   /// Load initial data (photos and header username) with error handling
@@ -139,7 +636,11 @@ class PhotoNotifier extends _$PhotoNotifier {
     );
   }
 
-  /// Pick and add multiple photos to the grid with comprehensive error handling
+  // ============================================================================
+  // PUBLIC API METHODS - ENHANCED with batch operations
+  // ============================================================================
+
+  /// ENHANCED: Pick and add multiple photos with batch processing
   Future<void> addPhotos() async {
     if (state.isLoading) return;
 
@@ -178,29 +679,13 @@ class PhotoNotifier extends _$PhotoNotifier {
       PerformanceMonitor.instance.endOperation('process_batch_images');
 
       if (batchResult.processedImages.isNotEmpty) {
-        // Extract images and thumbnails
-        final newImages = batchResult.processedImages.map((p) => p.image).toList();
-        final newThumbnails = batchResult.processedImages.map((p) => p.thumbnail).toList();
+        // ENHANCED: Use batch operation instead of direct state update
+        _enqueueBatchOperation(BatchOperation.addPhotos(batchResult.processedImages));
 
-        // Insert all new images at the beginning
-        final updatedImages = [...newImages.reversed, ...state.images];
-        final updatedThumbnails = [...newThumbnails.reversed, ...state.thumbnails];
-
-        state = state.copyWith(
-          images: updatedImages,
-          thumbnails: updatedThumbnails,
-          imageCount: updatedImages.length,
-          arraysInSync: updatedImages.length == updatedThumbnails.length,
-          isLoading: false,
-        );
-
-        // Save the new image order with error handling
-        await _saveImageOrder();
-
-        debugPrint('Added ${batchResult.successCount} images successfully');
-      } else {
-        state = state.copyWith(isLoading: false);
+        debugPrint('📦 Batch: Added ${batchResult.successCount} images to queue');
       }
+
+      state = state.copyWith(isLoading: false);
 
       // Log any failures
       if (batchResult.failureCount > 0) {
@@ -220,7 +705,7 @@ class PhotoNotifier extends _$PhotoNotifier {
     }
   }
 
-  /// Toggle selection state for an image at the given index
+  /// ENHANCED: Toggle selection state with batch processing for rapid selections
   void toggleSelection(int index) {
     // Validate index with error handling
     final validatedIndex = RepositoryErrorHandler.handleSyncOperation(
@@ -241,17 +726,20 @@ class PhotoNotifier extends _$PhotoNotifier {
 
     final currentSelection = Set<int>.from(state.selectedIndexes);
     if (currentSelection.contains(validatedIndex)) {
-      currentSelection.remove(validatedIndex);
+      // ENHANCED: Use batch operation for deselection
+      _enqueueBatchOperation(BatchOperation.deselectPhotos([validatedIndex]));
     } else {
-      currentSelection.add(validatedIndex);
+      // ENHANCED: Use batch operation for selection
+      _enqueueBatchOperation(BatchOperation.selectPhotos([validatedIndex]));
     }
-
-    state = state.copyWith(selectedIndexes: currentSelection);
   }
 
   /// Clear all selections
   void clearSelection() {
-    state = state.copyWith(selectedIndexes: <int>{});
+    if (state.selectedIndexes.isNotEmpty) {
+      // ENHANCED: Use batch operation for clearing selections
+      _enqueueBatchOperation(BatchOperation.deselectPhotos(state.selectedIndexes.toList()));
+    }
   }
 
   /// Show image preview modal for the given index with validation
@@ -283,7 +771,7 @@ class PhotoNotifier extends _$PhotoNotifier {
     );
   }
 
-  /// Reorder images by moving from oldIndex to newIndex with error handling
+  /// ENHANCED: Reorder images IMMEDIATELY (no batching for smooth drag UX)
   Future<void> reorderImages(int oldIndex, int newIndex) async {
     // Validate indices with error handling
     final validation = RepositoryErrorHandler.handleSyncOperation(
@@ -310,27 +798,8 @@ class PhotoNotifier extends _$PhotoNotifier {
       return;
     }
 
-    try {
-      // Clear selection and reorder
-      final newImages = List<File>.from(state.images);
-      final newThumbnails = List<File>.from(state.thumbnails);
-
-      final movedImage = newImages.removeAt(oldIndex);
-      final movedThumbnail = newThumbnails.removeAt(oldIndex);
-
-      newImages.insert(newIndex, movedImage);
-      newThumbnails.insert(newIndex, movedThumbnail);
-
-      state = state.copyWith(
-        images: newImages,
-        thumbnails: newThumbnails,
-        selectedIndexes: <int>{}, // Clear selection during reorder
-      );
-
-      await _saveImageOrder();
-    } catch (e) {
-      debugPrint('Error in reorderImages: $e');
-    }
+    // FIXED: Process reorder immediately for smooth drag UX (no batching)
+    await _applySingleReorderPhotos(oldIndex, newIndex);
   }
 
   /// Show delete confirmation modal
@@ -343,7 +812,7 @@ class PhotoNotifier extends _$PhotoNotifier {
     state = state.copyWith(showDeleteConfirm: false);
   }
 
-  /// Confirm and execute delete operation with comprehensive error handling
+  /// ENHANCED: Confirm and execute delete operation with batch processing
   Future<void> confirmDelete() async {
     state = state.copyWith(showDeleteConfirm: false);
 
@@ -353,54 +822,8 @@ class PhotoNotifier extends _$PhotoNotifier {
     PerformanceMonitor.instance.startOperation('delete_photos');
 
     try {
-      await RepositoryErrorHandler.handleAsyncOperation(
-            () async {
-          final sorted = state.selectedIndexes.toList()..sort((a, b) => b.compareTo(a));
-
-          final imagesToDelete = <File>[];
-          final thumbnailsToDelete = <File>[];
-          final newImages = List<File>.from(state.images);
-          final newThumbnails = List<File>.from(state.thumbnails);
-
-          // Collect files to delete and remove from arrays
-          for (final i in sorted) {
-            if (i >= 0 && i < newImages.length && i < newThumbnails.length) {
-              imagesToDelete.add(newImages[i]);
-              thumbnailsToDelete.add(newThumbnails[i]);
-              newImages.removeAt(i);
-              newThumbnails.removeAt(i);
-            } else {
-              debugPrint('Warning: Invalid index $i for deletion');
-            }
-          }
-
-          // Update state immediately
-          state = state.copyWith(
-            images: newImages,
-            thumbnails: newThumbnails,
-            selectedIndexes: <int>{},
-            imageCount: newImages.length,
-            arraysInSync: newImages.length == newThumbnails.length,
-          );
-
-          // Perform background operations
-          if (imagesToDelete.isNotEmpty) {
-            // Delete files using repository
-            final deleteResult = await _repository.deleteImages(imagesToDelete, thumbnailsToDelete);
-            debugPrint('Delete result: ${deleteResult.deletedCount}/${deleteResult.requestedCount} files deleted');
-
-            if (!deleteResult.success) {
-              debugPrint('Delete operation had issues: ${deleteResult.error}');
-            }
-
-            // Save updated order and cleanup
-            await _saveImageOrder();
-            await _repository.cleanupOrphanedThumbnails(state.images.map((f) => f.path).toList());
-          }
-        },
-        fallbackValue: null,
-        context: 'Delete Operation',
-      );
+      // ENHANCED: Use batch operation for deleting
+      _enqueueBatchOperation(BatchOperation.deletePhotos(state.selectedIndexes.toList()));
 
       // End performance monitoring
       PerformanceMonitor.instance.endOperation('delete_photos');
@@ -501,4 +924,99 @@ class PhotoNotifier extends _$PhotoNotifier {
       context: 'Storage Statistics',
     );
   }
+
+  // ============================================================================
+  // FALLBACK METHODS - For single operation processing when batching fails
+  // ============================================================================
+
+  Future<void> _applySingleAddPhotos(List<ProcessedImage> images) async {
+    final newImages = images.map((p) => p.image).toList();
+    final newThumbnails = images.map((p) => p.thumbnail).toList();
+
+    final updatedImages = [...newImages.reversed, ...state.images];
+    final updatedThumbnails = [...newThumbnails.reversed, ...state.thumbnails];
+
+    state = state.copyWith(
+      images: updatedImages,
+      thumbnails: updatedThumbnails,
+      imageCount: updatedImages.length,
+      arraysInSync: updatedImages.length == updatedThumbnails.length,
+    );
+
+    await _saveImageOrder();
+  }
+
+  Future<void> _applySingleDeletePhotos(List<int> indexes) async {
+    final sorted = indexes.toList()..sort((a, b) => b.compareTo(a));
+
+    final imagesToDelete = <File>[];
+    final thumbnailsToDelete = <File>[];
+    final newImages = List<File>.from(state.images);
+    final newThumbnails = List<File>.from(state.thumbnails);
+
+    for (final i in sorted) {
+      if (i >= 0 && i < newImages.length && i < newThumbnails.length) {
+        imagesToDelete.add(newImages[i]);
+        thumbnailsToDelete.add(newThumbnails[i]);
+        newImages.removeAt(i);
+        newThumbnails.removeAt(i);
+      }
+    }
+
+    state = state.copyWith(
+      images: newImages,
+      thumbnails: newThumbnails,
+      selectedIndexes: <int>{},
+      imageCount: newImages.length,
+      arraysInSync: newImages.length == newThumbnails.length,
+    );
+
+    if (imagesToDelete.isNotEmpty) {
+      await _repository.deleteImages(imagesToDelete, thumbnailsToDelete);
+      await _saveImageOrder();
+      await _repository.cleanupOrphanedThumbnails(newImages.map((f) => f.path).toList());
+    }
+  }
+
+  void _applySingleSelectPhotos(List<int> indexes) {
+    final newSelection = Set<int>.from(state.selectedIndexes);
+    for (final index in indexes) {
+      if (index >= 0 && index < state.images.length) {
+        newSelection.add(index);
+      }
+    }
+    state = state.copyWith(selectedIndexes: newSelection);
+  }
+
+  void _applySingleDeselectPhotos(List<int> indexes) {
+    final newSelection = Set<int>.from(state.selectedIndexes);
+    for (final index in indexes) {
+      newSelection.remove(index);
+    }
+    state = state.copyWith(selectedIndexes: newSelection);
+  }
+
+  Future<void> _applySingleReorderPhotos(int oldIndex, int newIndex) async {
+    final newImages = List<File>.from(state.images);
+    final newThumbnails = List<File>.from(state.thumbnails);
+
+    final movedImage = newImages.removeAt(oldIndex);
+    final movedThumbnail = newThumbnails.removeAt(oldIndex);
+
+    newImages.insert(newIndex, movedImage);
+    newThumbnails.insert(newIndex, movedThumbnail);
+
+    state = state.copyWith(
+      images: newImages,
+      thumbnails: newThumbnails,
+      selectedIndexes: <int>{},
+    );
+
+    await _saveImageOrder();
+  }
+
+// ============================================================================
+// NOTE: Riverpod AutoDisposeNotifier handles cleanup automatically
+// No manual disposal needed - batch timer will be cleaned up when provider disposes
+// ============================================================================
 }

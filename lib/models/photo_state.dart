@@ -44,6 +44,31 @@ class PhotoState with _$PhotoState {
 
     /// Whether arrays are in sync (safety check)
     @Default(true) bool arraysInSync,
+
+    // ========================================================================
+    // PHASE 2: ENHANCED BATCH OPERATION TRACKING
+    // ========================================================================
+
+    /// Current batch operation in progress (null if none)
+    BatchOperationStatus? currentBatchOperation,
+
+    /// History of recent batch operations for debugging
+    @Default([]) List<BatchOperationRecord> batchHistory,
+
+    /// Total number of batch operations completed in this session
+    @Default(0) int totalBatchOperations,
+
+    /// Number of operations currently queued for batch processing
+    @Default(0) int queuedOperations,
+
+    /// Whether batch processing is currently active
+    @Default(false) bool isBatchProcessing,
+
+    /// Last batch operation result for UI feedback
+    BatchResult? lastBatchResult,
+
+    /// Batch processing metrics for performance monitoring
+    @Default(BatchMetrics()) BatchMetrics batchMetrics,
   }) = _PhotoState;
 
   /// Empty state factory for initial state
@@ -78,6 +103,98 @@ class PhotoState with _$PhotoState {
     if (images.isEmpty) return {};
     final maxIndex = images.length - 1;
     return selectedIndexes.where((index) => index >= 0 && index <= maxIndex).toSet();
+  }
+
+  // ========================================================================
+  // PHASE 2: ENHANCED BATCH VALIDATION & DEBUGGING HELPERS
+  // ========================================================================
+
+  /// Validate that state is ready for batch operations
+  BatchValidationResult validateForBatchOperation(BatchOperationType operationType) {
+    final errors = <String>[];
+    final warnings = <String>[];
+
+    // Check if already processing
+    if (isBatchProcessing) {
+      errors.add('Batch operation already in progress');
+    }
+
+    // Check arrays synchronization
+    if (!isArraysSynchronized) {
+      errors.add('Images and thumbnails arrays are out of sync');
+    }
+
+    // Operation-specific validation
+    switch (operationType) {
+      case BatchOperationType.deletePhotos:
+        if (selectedIndexes.isEmpty) {
+          errors.add('No images selected for deletion');
+        }
+        if (selectedIndexes.any((index) => index >= images.length)) {
+          errors.add('Selected indexes out of bounds for deletion');
+        }
+        break;
+
+      case BatchOperationType.addPhotos:
+        if (isLoading) {
+          warnings.add('Adding photos while loading in progress');
+        }
+        break;
+
+      case BatchOperationType.selectPhotos:
+      case BatchOperationType.deselectPhotos:
+        if (images.isEmpty) {
+          errors.add('No images available for selection operations');
+        }
+        break;
+
+      case BatchOperationType.reorderPhotos:
+        if (images.isEmpty) {
+          errors.add('No images available for reorder operations');
+        }
+        break;
+    }
+
+    // Performance warnings
+    if (queuedOperations > 10) {
+      warnings.add('High number of queued operations may impact performance');
+    }
+
+    return BatchValidationResult(
+      isValid: errors.isEmpty,
+      errors: errors,
+      warnings: warnings,
+      operationType: operationType,
+    );
+  }
+
+  /// Get batch operation statistics for debugging
+  BatchDebugInfo getBatchDebugInfo() {
+    final recentHistory = batchHistory.length > 10
+        ? batchHistory.skip(batchHistory.length - 10).toList()
+        : batchHistory;
+
+    return BatchDebugInfo(
+      currentOperation: currentBatchOperation,
+      queuedOperations: queuedOperations,
+      isBatchProcessing: isBatchProcessing,
+      totalOperations: totalBatchOperations,
+      recentHistory: recentHistory,
+      metrics: batchMetrics,
+      lastResult: lastBatchResult,
+      arraysInSync: arraysInSync,
+      imagesCount: images.length,
+      thumbnailsCount: thumbnails.length,
+      selectedCount: selectedCount,
+    );
+  }
+
+  /// Check if state is healthy for batch operations
+  bool get isBatchHealthy {
+    return arraysInSync &&
+        !isBatchProcessing &&
+        queuedOperations < 20 &&
+        batchMetrics.averageProcessingTime.inMilliseconds < 1000;
   }
 }
 
@@ -121,4 +238,297 @@ class PhotoOperationEvent with _$PhotoOperationEvent {
     @Default('') String message,
     DateTime? timestamp,
   }) = _PhotoOperationEvent;
+}
+
+// ============================================================================
+// PHASE 2: ENHANCED BATCH OPERATION MODELS & TRACKING
+// ============================================================================
+
+/// Enum for batch operation types (matches provider implementation)
+enum BatchOperationType {
+  addPhotos,
+  deletePhotos,
+  reorderPhotos,
+  selectPhotos,
+  deselectPhotos,
+}
+
+/// Current batch operation status for real-time tracking
+@freezed
+class BatchOperationStatus with _$BatchOperationStatus {
+  const factory BatchOperationStatus({
+    required BatchOperationType type,
+    required DateTime startTime,
+    required int operationCount,
+    @Default('Processing...') String status,
+    @Default(0) int completedOperations,
+    @Default([]) List<String> currentMessages,
+  }) = _BatchOperationStatus;
+
+  const BatchOperationStatus._();
+
+  /// Calculate progress percentage (0.0 to 1.0)
+  double get progress => operationCount > 0
+      ? (completedOperations / operationCount).clamp(0.0, 1.0)
+      : 0.0;
+
+  /// Get elapsed time since operation started
+  Duration get elapsedTime => DateTime.now().difference(startTime);
+
+  /// Check if operation is taking too long (over 5 seconds)
+  bool get isTakingTooLong => elapsedTime.inSeconds > 5;
+}
+
+/// Complete record of a batch operation for history tracking
+@freezed
+class BatchOperationRecord with _$BatchOperationRecord {
+  const factory BatchOperationRecord({
+    required BatchOperationType type,
+    required DateTime startTime,
+    required DateTime endTime,
+    required int operationCount,
+    required int successCount,
+    required int failureCount,
+    @Default([]) List<String> errors,
+    @Default([]) List<String> warnings,
+    required bool wasOptimized,
+    @Default({}) Map<String, dynamic> metadata,
+  }) = _BatchOperationRecord;
+
+  const BatchOperationRecord._();
+
+  /// Get operation duration
+  Duration get duration => endTime.difference(startTime);
+
+  /// Check if operation was successful
+  bool get wasSuccessful => failureCount == 0;
+
+  /// Get operation efficiency score (0.0 to 1.0)
+  double get efficiencyScore {
+    if (operationCount == 0) return 1.0;
+    final successRate = successCount / operationCount;
+    final speedScore = duration.inMilliseconds < 100 ? 1.0 : 0.5;
+    return (successRate + speedScore) / 2.0;
+  }
+
+  /// Get human-readable summary
+  String get summary {
+    final typeStr = type.toString().split('.').last;
+    final durationStr = '${duration.inMilliseconds}ms';
+    if (wasSuccessful) {
+      return '$typeStr: $successCount operations completed in $durationStr';
+    } else {
+      return '$typeStr: $successCount/$operationCount successful in $durationStr (${errors.length} errors)';
+    }
+  }
+}
+
+/// Enhanced batch result with detailed tracking
+@freezed
+class BatchResult with _$BatchResult {
+  const factory BatchResult({
+    required int operationsProcessed,
+    required int successCount,
+    required int failureCount,
+    required Duration processingTime,
+    @Default([]) List<String> errors,
+    @Default([]) List<String> warnings,
+    required bool wasOptimized,
+    required BatchOperationType primaryOperationType,
+    @Default({}) Map<String, int> operationBreakdown,
+    @Default({}) Map<String, dynamic> performanceMetrics,
+  }) = _BatchResult;
+
+  const BatchResult._();
+
+  /// Check if batch was successful
+  bool get isSuccess => failureCount == 0;
+
+  /// Check if batch had any issues
+  bool get hasErrors => errors.isNotEmpty;
+
+  /// Check if batch had warnings
+  bool get hasWarnings => warnings.isNotEmpty;
+
+  /// Get success rate (0.0 to 1.0)
+  double get successRate => operationsProcessed > 0
+      ? successCount / operationsProcessed
+      : 1.0;
+
+  /// Check if batch was fast (under 100ms)
+  bool get wasFast => processingTime.inMilliseconds < 100;
+
+  /// Get performance grade (A, B, C, D, F)
+  String get performanceGrade {
+    if (isSuccess && wasFast) return 'A';
+    if (isSuccess && processingTime.inMilliseconds < 500) return 'B';
+    if (successRate > 0.8 && processingTime.inMilliseconds < 1000) return 'C';
+    if (successRate > 0.5) return 'D';
+    return 'F';
+  }
+}
+
+/// Validation result for batch operations
+@freezed
+class BatchValidationResult with _$BatchValidationResult {
+  const factory BatchValidationResult({
+    required bool isValid,
+    required List<String> errors,
+    required List<String> warnings,
+    required BatchOperationType operationType,
+  }) = _BatchValidationResult;
+
+  const BatchValidationResult._();
+
+  /// Check if validation has any issues
+  bool get hasIssues => errors.isNotEmpty || warnings.isNotEmpty;
+
+  /// Get validation summary message
+  String get summary {
+    if (isValid && warnings.isEmpty) {
+      return 'Validation passed for ${operationType.toString().split('.').last}';
+    } else if (isValid && warnings.isNotEmpty) {
+      return 'Validation passed with ${warnings.length} warnings';
+    } else {
+      return 'Validation failed with ${errors.length} errors';
+    }
+  }
+}
+
+/// Comprehensive batch debugging information
+@freezed
+class BatchDebugInfo with _$BatchDebugInfo {
+  const factory BatchDebugInfo({
+    BatchOperationStatus? currentOperation,
+    required int queuedOperations,
+    required bool isBatchProcessing,
+    required int totalOperations,
+    required List<BatchOperationRecord> recentHistory,
+    required BatchMetrics metrics,
+    BatchResult? lastResult,
+    required bool arraysInSync,
+    required int imagesCount,
+    required int thumbnailsCount,
+    required int selectedCount,
+  }) = _BatchDebugInfo;
+
+  const BatchDebugInfo._();
+
+  /// Get system health score (0.0 to 1.0)
+  double get healthScore {
+    double score = 1.0;
+
+    // Penalize if arrays out of sync
+    if (!arraysInSync) score -= 0.3;
+
+    // Penalize high queue
+    if (queuedOperations > 10) score -= 0.2;
+
+    // Penalize if processing is taking too long
+    if (currentOperation?.isTakingTooLong == true) score -= 0.2;
+
+    // Penalize poor average performance
+    if (metrics.averageProcessingTime.inMilliseconds > 200) score -= 0.2;
+
+    // Penalize recent failures
+    final recentFailures = recentHistory.where((r) => !r.wasSuccessful).length;
+    if (recentFailures > 2) score -= 0.3;
+
+    return score.clamp(0.0, 1.0);
+  }
+
+  /// Get health status description
+  String get healthStatus {
+    final score = healthScore;
+    if (score >= 0.9) return 'Excellent';
+    if (score >= 0.7) return 'Good';
+    if (score >= 0.5) return 'Fair';
+    if (score >= 0.3) return 'Poor';
+    return 'Critical';
+  }
+
+  /// Check if immediate attention is needed
+  bool get needsAttention => healthScore < 0.5;
+}
+
+/// Performance metrics for batch operations
+@freezed
+class BatchMetrics with _$BatchMetrics {
+  const factory BatchMetrics({
+    @Default(Duration.zero) Duration totalProcessingTime,
+    @Default(0) int totalOperations,
+    @Default(0) int totalBatches,
+    @Default(Duration.zero) Duration averageProcessingTime,
+    @Default(Duration.zero) Duration averageBatchTime,
+    @Default(0) int totalOptimizations,
+    @Default(0) int totalFailures,
+    @Default({}) Map<BatchOperationType, int> operationTypeBreakdown,
+    DateTime? lastResetTime,
+  }) = _BatchMetrics;
+
+  const BatchMetrics._();
+
+  /// Get operations per batch average
+  double get averageOperationsPerBatch => totalBatches > 0
+      ? totalOperations / totalBatches
+      : 0.0;
+
+  /// Get failure rate (0.0 to 1.0)
+  double get failureRate => totalOperations > 0
+      ? totalFailures / totalOperations
+      : 0.0;
+
+  /// Get optimization rate (0.0 to 1.0)
+  double get optimizationRate => totalBatches > 0
+      ? totalOptimizations / totalBatches
+      : 0.0;
+
+  /// Check if metrics indicate good performance
+  bool get isPerformanceGood {
+    return averageProcessingTime.inMilliseconds < 100 &&
+        failureRate < 0.1 &&
+        optimizationRate > 0.5;
+  }
+
+  /// Get performance summary
+  String get performanceSummary {
+    final avgMs = averageProcessingTime.inMilliseconds;
+    final failPercent = (failureRate * 100).toStringAsFixed(1);
+    final optPercent = (optimizationRate * 100).toStringAsFixed(1);
+
+    return 'Avg: ${avgMs}ms, Failures: $failPercent%, Optimizations: $optPercent%';
+  }
+
+  /// Update metrics with new batch result
+  BatchMetrics updateWithBatch(BatchResult result) {
+    final newTotalTime = totalProcessingTime + result.processingTime;
+    final newTotalOps = totalOperations + result.operationsProcessed;
+    final newTotalBatches = totalBatches + 1;
+    final newFailures = totalFailures + result.failureCount;
+    final newOptimizations = totalOptimizations + (result.wasOptimized ? 1 : 0);
+
+    // Update operation type breakdown
+    final updatedBreakdown = Map<BatchOperationType, int>.from(operationTypeBreakdown);
+    updatedBreakdown[result.primaryOperationType] =
+        (updatedBreakdown[result.primaryOperationType] ?? 0) + 1;
+
+    return copyWith(
+      totalProcessingTime: newTotalTime,
+      totalOperations: newTotalOps,
+      totalBatches: newTotalBatches,
+      totalFailures: newFailures,
+      totalOptimizations: newOptimizations,
+      averageProcessingTime: Duration(
+          microseconds: newTotalBatches > 0
+              ? (newTotalTime.inMicroseconds / newTotalBatches).round()
+              : 0
+      ),
+      averageBatchTime: Duration(
+          microseconds: newTotalOps > 0
+              ? (newTotalTime.inMicroseconds / newTotalOps).round()
+              : 0
+      ),
+      operationTypeBreakdown: updatedBreakdown,
+    );
+  }
 }
