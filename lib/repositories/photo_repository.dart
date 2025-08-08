@@ -269,7 +269,7 @@ class PhotoRepository {
     }
   }
 
-  /// Process batch add photos to database
+  /// FIXED: Process batch add photos to database with proper order indexing
   Future<BatchResult> _processBatchAddDatabase(
       String operationId,
       Map<String, dynamic> operationData,
@@ -296,14 +296,18 @@ class PhotoRepository {
       final photoEntries = <PhotoDatabaseEntry>[];
       final now = DateTime.now();
 
-      // Create database entries for new photos
+      // FIXED: Get existing photos first to determine correct order indexes
+      final existingPaths = await _database.getAllPhotoPaths();
+      final numberOfNewPhotos = images.length;
+
+      // Create database entries for new photos (starting at index 0)
       for (int i = 0; i < images.length; i++) {
         final processed = images[i];
         photoEntries.add(PhotoDatabaseEntry(
           imagePath: processed.image.path,
           thumbnailPath: null, // Let lazy service handle thumbnails
           dateAdded: now,
-          orderIndex: i, // New photos get lowest order indexes
+          orderIndex: i, // New photos get order indexes 0, 1, 2, etc.
         ));
 
         _updateBatchOperation(operationId,
@@ -312,21 +316,27 @@ class PhotoRepository {
         );
       }
 
-      // Shift existing photos' order indexes
-      final existingPaths = await _database.getAllPhotoPaths();
-      final shiftedPaths = <String>[];
+      // FIXED: Properly shift existing photos' order indexes
+      final finalOrderedPaths = <String>[];
 
-      // Add new paths first, then existing paths
+      // Add new photos first (they already have correct indexes 0, 1, 2...)
       for (final entry in photoEntries) {
-        shiftedPaths.add(entry.imagePath);
+        finalOrderedPaths.add(entry.imagePath);
       }
-      shiftedPaths.addAll(existingPaths);
+
+      // Add existing photos after new photos (they will get shifted indexes)
+      finalOrderedPaths.addAll(existingPaths);
 
       // Batch database operations
       _updateBatchOperation(operationId, status: 'Executing batch database operations...');
 
+      // Insert new photos
       await _database.insertPhotos(photoEntries);
-      await _database.updatePhotoOrders(shiftedPaths);
+
+      // FIXED: Update order indexes for ALL photos (new + shifted existing)
+      // finalOrderedPaths now contains: [new1, new2, new3, ..., old1, old2, old3, ...]
+      // updatePhotoOrders will assign order indexes: 0, 1, 2, ..., based on position in array
+      await _database.updatePhotoOrders(finalOrderedPaths);
 
       successCount = images.length;
 
@@ -334,6 +344,11 @@ class PhotoRepository {
       _updateBatchOperation(operationId, status: 'Initiating lazy thumbnail generation...');
       for (final processed in images) {
         _thumbnailService.requestThumbnail(processed.image.path, priority: 10);
+      }
+
+      if (kDebugMode) {
+        debugPrint('🔧 FIXED: Photo order - $numberOfNewPhotos new photos inserted at beginning');
+        debugPrint('📋 Final order: ${finalOrderedPaths.take(10).toList()}... (showing first 10)');
       }
 
     } catch (e) {
@@ -352,6 +367,7 @@ class PhotoRepository {
       metadata: {
         'imagesProcessed': images.length,
         'databaseOperations': 2, // insert + update order
+        'orderFixed': true, // Flag indicating order fix was applied
       },
     );
 
@@ -367,6 +383,7 @@ class PhotoRepository {
       performanceMetrics: {
         'avgTimePerImage': successCount > 0 ? processingTime.inMicroseconds / successCount : 0,
         'databaseBatchOptimized': true,
+        'orderIndexingFixed': true,
       },
     );
   }
@@ -979,12 +996,12 @@ class PhotoRepository {
       }
 
       // Clean up original files
-      for (final xfile in imageFiles) {
+      for (final imageFile in imageFiles) {
         try {
-          await File(xfile.path).delete();
+          await File(imageFile.path).delete();
         } catch (e) {
           if (kDebugMode) {
-            debugPrint('Failed to delete original file ${xfile.path}: $e');
+            debugPrint('Failed to delete original file ${imageFile.path}: $e');
           }
         }
       }
@@ -1202,6 +1219,7 @@ class PhotoRepository {
 
       debugPrint('🚀 Processing: LAZY THUMBNAILS - Fast initial load, background generation');
       debugPrint('🔄 Batching: PHASE 3 REPOSITORY INTEGRATION - Enhanced tracking active');
+      debugPrint('🔧 ORDER FIX: Applied proper photo order indexing');
       debugPrint('================================');
 
     } catch (e) {

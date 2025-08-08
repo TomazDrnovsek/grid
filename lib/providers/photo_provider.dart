@@ -238,6 +238,19 @@ class PhotoNotifier extends _$PhotoNotifier {
       // Process each operation type in optimized order
       await _processBatchOperations(optimizedOperations);
 
+      // PHASE 1: Show "Done!" state briefly before clearing modal
+      if (state.currentBatchOperation != null && state.showLoadingModal) {
+        final completedBatch = state.currentBatchOperation!.copyWith(
+          status: 'Done!',
+          completedOperations: state.currentBatchOperation!.operationCount,
+        );
+
+        state = state.copyWith(currentBatchOperation: completedBatch);
+
+        // Brief delay to show "Done!" message
+        await Future.delayed(const Duration(milliseconds: 800));
+      }
+
       // PHASE 1: Clear current batch operation and loading modal
       state = state.copyWith(
         currentBatchOperation: null,

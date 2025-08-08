@@ -768,7 +768,7 @@ class DeleteConfirmModal extends StatelessWidget {
   }
 }
 
-// PHASE 1: Loading modal with progress display
+// PHASE 1: Simplified loading modal matching design requirements
 class LoadingModal extends StatelessWidget {
   final BatchOperationStatus batchOperation;
   final bool isDark;
@@ -782,7 +782,16 @@ class LoadingModal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final progress = batchOperation.progress;
-    final progressPercentage = (progress * 100).round();
+    final isCompleted = progress >= 1.0;
+
+    // Format text: "Processing image x/y" or "Done!"
+    String displayText;
+    if (isCompleted) {
+      displayText = 'Done!';
+    } else {
+      final currentImage = batchOperation.completedOperations + 1;
+      displayText = 'Processing image $currentImage/${batchOperation.operationCount}';
+    }
 
     return Stack(
       children: [
@@ -803,50 +812,25 @@ class LoadingModal extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Progress circle with percentage
+                  // Clean progress circle without percentage
                   SizedBox(
                     width: 64,
                     height: 64,
-                    child: Stack(
-                      children: [
-                        CircularProgressIndicator(
-                          value: progress,
-                          strokeWidth: 4,
-                          backgroundColor: AppColors.textSecondary(isDark).withAlpha(51),
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppColors.textPrimary(isDark),
-                          ),
-                        ),
-                        Positioned.fill(
-                          child: Center(
-                            child: Text(
-                              '$progressPercentage%',
-                              style: AppTheme.bodyMedium(isDark).copyWith(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                    child: CircularProgressIndicator(
+                      value: progress,
+                      strokeWidth: 4,
+                      backgroundColor: AppColors.textSecondary(isDark).withValues(alpha: 0.2),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        AppColors.textPrimary(isDark),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  // Operation status
+                  // Main text using headlineSm style (same as "Tomaž Drnovšek")
                   Text(
-                    batchOperation.status,
+                    displayText,
                     textAlign: TextAlign.center,
-                    style: AppTheme.bodyMedium(isDark),
-                  ),
-                  const SizedBox(height: 8),
-                  // Progress text
-                  Text(
-                    '${batchOperation.completedOperations} of ${batchOperation.operationCount}',
-                    textAlign: TextAlign.center,
-                    style: AppTheme.body(isDark).copyWith(
-                      color: AppColors.textSecondary(isDark),
-                      fontSize: 12,
-                    ),
+                    style: AppTheme.headlineSm(isDark),
                   ),
                 ],
               ),
