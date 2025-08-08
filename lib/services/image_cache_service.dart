@@ -130,8 +130,9 @@ class ImageCacheService {
       // Track cache hit
       _cacheHits++;
 
-      // ENHANCED: Immediate memory check after access
-      _checkMemoryPressureImmediate();
+      // FIXED: Removed immediate memory check - causes scroll stutters
+      // Memory checks now happen during periodic maintenance (every 30 seconds)
+      // _checkMemoryPressureImmediate(); // ← REMOVED THIS LINE
 
       // Trim access history if it gets too large
       if (_accessHistory.length > 300) { // Reduced from 500
@@ -514,6 +515,9 @@ class ImageCacheService {
           debugPrint('✅ Exited memory pressure mode - usage: ${(usageRatio * 100).toStringAsFixed(1)}%');
         }
       }
+
+      // ENHANCED: Memory pressure check during maintenance
+      _checkMemoryPressureImmediate();
 
       if (kDebugMode) {
         debugPrint('🧹 Enhanced maintenance completed - usage: ${(usageRatio * 100).toStringAsFixed(1)}%');
