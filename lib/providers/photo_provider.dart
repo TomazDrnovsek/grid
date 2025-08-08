@@ -9,17 +9,9 @@ import '../models/photo_state.dart';
 import '../repositories/photo_repository.dart';
 import '../widgets/error_boundary.dart';
 import '../services/performance_monitor.dart';
+import '../file_utils.dart';
 
 part 'photo_provider.g.dart';
-
-/// ENHANCED: Batch operation types for intelligent operation grouping
-enum BatchOperationType {
-  addPhotos,
-  deletePhotos,
-  reorderPhotos,
-  selectPhotos,
-  deselectPhotos,
-}
 
 /// ENHANCED: Batch operation data container
 class BatchOperation {
@@ -223,11 +215,35 @@ class PhotoNotifier extends _$PhotoNotifier {
         debugPrint('📦 Batch: Processing ${operationsToProcess.length} operations');
       }
 
+      // PHASE 1: Set current batch operation for loading modal
+      if (operationsToProcess.isNotEmpty) {
+        final firstOp = operationsToProcess.first;
+        final batchStatus = BatchOperationStatus(
+          type: firstOp.type,
+          startTime: startTime,
+          operationCount: operationsToProcess.length,
+          status: _getStatusMessage(firstOp.type, operationsToProcess.length),
+        );
+
+        state = state.copyWith(
+          currentBatchOperation: batchStatus,
+          showLoadingModal: firstOp.type == BatchOperationType.addPhotos,
+          isBatchProcessing: true,
+        );
+      }
+
       // ENHANCED: Group and optimize operations
       final optimizedOperations = _optimizeBatchOperations(operationsToProcess);
 
       // Process each operation type in optimized order
       await _processBatchOperations(optimizedOperations);
+
+      // PHASE 1: Clear current batch operation and loading modal
+      state = state.copyWith(
+        currentBatchOperation: null,
+        showLoadingModal: false,
+        isBatchProcessing: false,
+      );
 
       // End performance monitoring
       PerformanceMonitor.instance.endOperation('batch_processing');
@@ -240,8 +256,31 @@ class PhotoNotifier extends _$PhotoNotifier {
     } catch (e) {
       debugPrint('Error in batch processing: $e');
       PerformanceMonitor.instance.endOperation('batch_processing');
+
+      // PHASE 1: Ensure loading modal is cleared on error
+      state = state.copyWith(
+        currentBatchOperation: null,
+        showLoadingModal: false,
+        isBatchProcessing: false,
+      );
     } finally {
       _isBatchProcessing = false;
+    }
+  }
+
+  /// PHASE 1: Get status message for batch operation
+  String _getStatusMessage(BatchOperationType type, int count) {
+    switch (type) {
+      case BatchOperationType.addPhotos:
+        return count == 1 ? 'Adding image...' : 'Adding $count images...';
+      case BatchOperationType.deletePhotos:
+        return count == 1 ? 'Deleting image...' : 'Deleting $count images...';
+      case BatchOperationType.reorderPhotos:
+        return 'Reordering images...';
+      case BatchOperationType.selectPhotos:
+        return 'Selecting images...';
+      case BatchOperationType.deselectPhotos:
+        return 'Deselecting images...';
     }
   }
 
@@ -311,7 +350,7 @@ class PhotoNotifier extends _$PhotoNotifier {
     return [BatchOperation.deletePhotos(allIndexes.toList())];
   }
 
-  /// ENHANCED: Process grouped batch operations with single state update
+  /// ENHANCED: Process grouped batch operations with single state update and progress tracking
   Future<void> _processBatchOperations(
       Map<BatchOperationType, List<BatchOperation>> groupedOperations
       ) async {
@@ -327,10 +366,30 @@ class PhotoNotifier extends _$PhotoNotifier {
       BatchOperationType.reorderPhotos,   // Finally reordering
     ];
 
+    int totalOperations = 0;
+    int completedOperations = 0;
+
+    // Calculate total operations
+    for (final operations in groupedOperations.values) {
+      totalOperations += operations.length;
+    }
+
     // Process each operation type
     for (final type in processingOrder) {
       final operations = groupedOperations[type];
       if (operations == null || operations.isEmpty) continue;
+
+      // PHASE 1: Update progress before processing each type
+      final currentBatch = state.currentBatchOperation;
+      if (currentBatch != null) {
+        final updatedBatch = currentBatch.copyWith(
+          completedOperations: completedOperations,
+          operationCount: totalOperations,
+          status: _getStatusMessage(type, operations.length),
+        );
+
+        state = state.copyWith(currentBatchOperation: updatedBatch);
+      }
 
       switch (type) {
         case BatchOperationType.addPhotos:
@@ -349,11 +408,29 @@ class PhotoNotifier extends _$PhotoNotifier {
           updatedState = await _processBatchReorderPhotos(operations, updatedState);
           break;
       }
+
+      completedOperations += operations.length;
+
+      // PHASE 1: Update progress after processing each type
+      final currentBatchAfter = state.currentBatchOperation;
+      if (currentBatchAfter != null) {
+        final updatedBatchAfter = currentBatchAfter.copyWith(
+          completedOperations: completedOperations,
+        );
+
+        state = state.copyWith(currentBatchOperation: updatedBatchAfter);
+      }
     }
 
     // ENHANCED: Single state update for entire batch
     if (updatedState != state) {
-      state = updatedState;
+      // Preserve current batch operation and loading modal state
+      final finalState = updatedState.copyWith(
+        currentBatchOperation: state.currentBatchOperation,
+        showLoadingModal: state.showLoadingModal,
+        isBatchProcessing: state.isBatchProcessing,
+      );
+      state = finalState;
       if (kDebugMode) {
         debugPrint('📦 Batch: Applied single state update');
       }
@@ -661,7 +738,7 @@ class PhotoNotifier extends _$PhotoNotifier {
   // PUBLIC API METHODS - ENHANCED with batch operations
   // ============================================================================
 
-  /// ENHANCED: Pick and add multiple photos with batch processing
+  /// FIXED: Pick and add multiple photos with proper loading modal timing
   Future<void> addPhotos() async {
     if (state.isLoading) return;
 
@@ -682,31 +759,59 @@ class PhotoNotifier extends _$PhotoNotifier {
       return;
     }
 
-    state = state.copyWith(isLoading: true);
+    // FIXED: Show loading modal immediately after picking images
+    final startTime = DateTime.now();
+    final initialBatchStatus = BatchOperationStatus(
+      type: BatchOperationType.addPhotos,
+      startTime: startTime,
+      operationCount: pickedFiles.length,
+      status: 'Processing ${pickedFiles.length} images...',
+      completedOperations: 0,
+    );
+
+    state = state.copyWith(
+      isLoading: true,
+      showLoadingModal: true,
+      currentBatchOperation: initialBatchStatus,
+      isBatchProcessing: true,
+    );
 
     try {
-      // Process all picked images with error handling
+      // Process images with progress updates
       PerformanceMonitor.instance.startOperation('process_batch_images');
-      final batchResult = await RepositoryErrorHandler.handleAsyncOperation(
-            () => _repository.processBatchImages(pickedFiles),
-        fallbackValue: const BatchImageResult(
-          processedImages: <ProcessedImage>[],
-          successCount: 0,
-          failureCount: 0,
-          errors: ['Failed to process images'],
-        ),
-        context: 'Batch Image Processing',
-      );
+
+      final batchResult = await _processBatchImagesWithProgress(pickedFiles);
+
       PerformanceMonitor.instance.endOperation('process_batch_images');
 
       if (batchResult.processedImages.isNotEmpty) {
-        // ENHANCED: Use batch operation instead of direct state update
+        // Update progress to show completion
+        final finalBatchStatus = state.currentBatchOperation?.copyWith(
+          status: 'Adding images to grid...',
+          completedOperations: pickedFiles.length,
+        );
+
+        state = state.copyWith(currentBatchOperation: finalBatchStatus);
+
+        // Add small delay to ensure modal is visible for meaningful duration
+        await Future.delayed(const Duration(milliseconds: 500));
+
+        // FIXED: Clear isLoading before enqueueing batch operation
+        state = state.copyWith(isLoading: false);
+
+        // ENHANCED: Use batch operation for adding to grid
         _enqueueBatchOperation(BatchOperation.addPhotos(batchResult.processedImages));
 
         debugPrint('📦 Batch: Added ${batchResult.successCount} images to queue');
+      } else {
+        // Hide modal if no images processed
+        state = state.copyWith(
+          showLoadingModal: false,
+          currentBatchOperation: null,
+          isBatchProcessing: false,
+          isLoading: false,
+        );
       }
-
-      state = state.copyWith(isLoading: false);
 
       // Log any failures
       if (batchResult.failureCount > 0) {
@@ -722,7 +827,127 @@ class PhotoNotifier extends _$PhotoNotifier {
     } catch (e) {
       debugPrint('Critical error in addPhotos: $e');
       PerformanceMonitor.instance.endOperation('add_photos');
-      state = state.copyWith(isLoading: false);
+
+      // Hide modal on error
+      state = state.copyWith(
+        showLoadingModal: false,
+        currentBatchOperation: null,
+        isBatchProcessing: false,
+        isLoading: false,
+      );
+    }
+  }
+
+  /// FIXED: Process batch images with progress updates for loading modal
+  Future<BatchImageResult> _processBatchImagesWithProgress(List<XFile> pickedFiles) async {
+    try {
+      final List<ProcessedImage> processedImages = [];
+      final List<String> errors = [];
+      int successCount = 0;
+      int failureCount = 0;
+
+      // Process images one by one with progress updates
+      for (int i = 0; i < pickedFiles.length; i++) {
+        final imageFile = pickedFiles[i];
+
+        // Update progress for current image
+        final currentBatch = state.currentBatchOperation;
+        if (currentBatch != null) {
+          final updatedBatch = currentBatch.copyWith(
+            completedOperations: i,
+            status: 'Processing image ${i + 1} of ${pickedFiles.length}...',
+          );
+          state = state.copyWith(currentBatchOperation: updatedBatch);
+        }
+
+        try {
+          if (kDebugMode) {
+            debugPrint('Processing image: ${imageFile.path}');
+          }
+
+          // Process single image using FileUtils directly
+          final result = await FileUtils.processImageWithThumbnail(imageFile);
+
+          final processedImage = ProcessedImage(
+            image: result['image']!,
+            thumbnail: result['thumbnail']!,
+          );
+
+          processedImages.add(processedImage);
+          successCount++;
+
+          if (kDebugMode) {
+            debugPrint('✅ Successfully processed: ${processedImage.image.path}');
+          }
+
+          // Small delay to make progress visible (but not too slow)
+          if (pickedFiles.length > 1) {
+            await Future.delayed(const Duration(milliseconds: 100));
+          }
+
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('❌ Error processing ${imageFile.path}: $e');
+          }
+          errors.add(e.toString());
+          failureCount++;
+        }
+      }
+
+      // Update progress to show completion
+      final currentBatch = state.currentBatchOperation;
+      if (currentBatch != null) {
+        final completedBatch = currentBatch.copyWith(
+          completedOperations: pickedFiles.length,
+          status: 'Processing completed',
+        );
+        state = state.copyWith(currentBatchOperation: completedBatch);
+      }
+
+      // Add processed images to database if any succeeded
+      if (processedImages.isNotEmpty) {
+        try {
+          await _repository.addPhotosToDatabase(processedImages);
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('Error adding processed images to database: $e');
+          }
+        }
+      }
+
+      // Clean up original files
+      for (final xfile in pickedFiles) {
+        try {
+          await File(xfile.path).delete();
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('Failed to delete original file ${xfile.path}: $e');
+          }
+        }
+      }
+
+      if (kDebugMode) {
+        debugPrint('✅ Batch processing complete: $successCount success, $failureCount failed');
+      }
+
+      return BatchImageResult(
+        processedImages: processedImages,
+        successCount: successCount,
+        failureCount: failureCount,
+        errors: errors,
+      );
+
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('❌ Error in batch processing: $e');
+      }
+
+      return BatchImageResult(
+        processedImages: const <ProcessedImage>[],
+        successCount: 0,
+        failureCount: pickedFiles.length,
+        errors: ['Batch processing failed: $e'],
+      );
     }
   }
 

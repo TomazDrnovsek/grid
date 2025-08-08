@@ -8,6 +8,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../core/app_config.dart';
 import '../providers/photo_provider.dart';
 import '../services/scroll_optimization_service.dart';
+import '../models/photo_state.dart';
 import 'profile_block.dart';
 import 'photo_sliver_grid.dart';
 import 'menu_screen.dart';
@@ -233,6 +234,12 @@ class _GridHomePageState extends ConsumerState<GridHomePage>
 
               // Modal overlays with optimized animations
               _OptimizedDeleteModal(
+                isDark: isDark,
+                photoNotifier: photoNotifier,
+              ),
+
+              // PHASE 1: Loading modal with progress
+              _OptimizedLoadingModal(
                 isDark: isDark,
                 photoNotifier: photoNotifier,
               ),
@@ -542,6 +549,36 @@ class _OptimizedDeleteModal extends ConsumerWidget {
   }
 }
 
+/// PHASE 1: Loading modal that only rebuilds when loading modal state changes
+class _OptimizedLoadingModal extends ConsumerWidget {
+  final bool isDark;
+  final dynamic photoNotifier;
+
+  const _OptimizedLoadingModal({
+    required this.isDark,
+    required this.photoNotifier,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // OPTIMIZATION: Only watch loading modal state
+    final showLoadingModal = ref.watch(photoNotifierProvider.select((state) => state.showLoadingModal));
+    final currentBatchOperation = ref.watch(photoNotifierProvider.select((state) => state.currentBatchOperation));
+
+    return AnimatedOpacity(
+      opacity: showLoadingModal ? 1.0 : 0.0,
+      duration: AppConfig().fastAnimationDuration,
+      curve: Curves.easeInOutCubic,
+      child: showLoadingModal && currentBatchOperation != null
+          ? LoadingModal(
+        batchOperation: currentBatchOperation,
+        isDark: isDark,
+      )
+          : const SizedBox.shrink(),
+    );
+  }
+}
+
 /// OPTIMIZATION: Image preview modal that only rebuilds when preview state changes
 class _OptimizedImagePreviewModal extends ConsumerWidget {
   final VoidCallback onClose;
@@ -720,6 +757,96 @@ class DeleteConfirmModal extends StatelessWidget {
                         ),
                       ),
                     ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// PHASE 1: Loading modal with progress display
+class LoadingModal extends StatelessWidget {
+  final BatchOperationStatus batchOperation;
+  final bool isDark;
+
+  const LoadingModal({
+    super.key,
+    required this.batchOperation,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = batchOperation.progress;
+    final progressPercentage = (progress * 100).round();
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Container(
+            color: AppColors.modalOverlayBackground(isDark),
+          ),
+        ),
+        Center(
+          child: Semantics(
+            label: 'Loading progress dialog',
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+              decoration: BoxDecoration(
+                color: AppColors.modalContentBackground(isDark),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Progress circle with percentage
+                  SizedBox(
+                    width: 64,
+                    height: 64,
+                    child: Stack(
+                      children: [
+                        CircularProgressIndicator(
+                          value: progress,
+                          strokeWidth: 4,
+                          backgroundColor: AppColors.textSecondary(isDark).withAlpha(51),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppColors.textPrimary(isDark),
+                          ),
+                        ),
+                        Positioned.fill(
+                          child: Center(
+                            child: Text(
+                              '$progressPercentage%',
+                              style: AppTheme.bodyMedium(isDark).copyWith(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Operation status
+                  Text(
+                    batchOperation.status,
+                    textAlign: TextAlign.center,
+                    style: AppTheme.bodyMedium(isDark),
+                  ),
+                  const SizedBox(height: 8),
+                  // Progress text
+                  Text(
+                    '${batchOperation.completedOperations} of ${batchOperation.operationCount}',
+                    textAlign: TextAlign.center,
+                    style: AppTheme.body(isDark).copyWith(
+                      color: AppColors.textSecondary(isDark),
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),

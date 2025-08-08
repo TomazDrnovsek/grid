@@ -120,5 +120,7 @@ flutter:
     - assets/delete_icon.svg
     - assets/share_icon.svg
     - assets/arrow_left.svg
+    - assets/colormap_icon-fill.svg
+    - assets/colormap_icon-outline.svg
     - assets/images/sample1.jpg
     - assets/images/profile.jpg

@@ -32,6 +32,9 @@ mixin _$PhotoState {
   /// Delete confirmation modal state
   bool get showDeleteConfirm => throw _privateConstructorUsedError;
 
+  /// PHASE 1: Loading modal with progress state
+  bool get showLoadingModal => throw _privateConstructorUsedError;
+
   /// Image preview modal state
   bool get showImagePreview => throw _privateConstructorUsedError;
 
@@ -98,6 +101,7 @@ abstract class $PhotoStateCopyWith<$Res> {
     Set<int> selectedIndexes,
     bool isLoading,
     bool showDeleteConfirm,
+    bool showLoadingModal,
     bool showImagePreview,
     int previewImageIndex,
     bool isAtTop,
@@ -139,6 +143,7 @@ class _$PhotoStateCopyWithImpl<$Res, $Val extends PhotoState>
     Object? selectedIndexes = null,
     Object? isLoading = null,
     Object? showDeleteConfirm = null,
+    Object? showLoadingModal = null,
     Object? showImagePreview = null,
     Object? previewImageIndex = null,
     Object? isAtTop = null,
@@ -175,6 +180,10 @@ class _$PhotoStateCopyWithImpl<$Res, $Val extends PhotoState>
             showDeleteConfirm: null == showDeleteConfirm
                 ? _value.showDeleteConfirm
                 : showDeleteConfirm // ignore: cast_nullable_to_non_nullable
+                      as bool,
+            showLoadingModal: null == showLoadingModal
+                ? _value.showLoadingModal
+                : showLoadingModal // ignore: cast_nullable_to_non_nullable
                       as bool,
             showImagePreview: null == showImagePreview
                 ? _value.showImagePreview
@@ -293,6 +302,7 @@ abstract class _$$PhotoStateImplCopyWith<$Res>
     Set<int> selectedIndexes,
     bool isLoading,
     bool showDeleteConfirm,
+    bool showLoadingModal,
     bool showImagePreview,
     int previewImageIndex,
     bool isAtTop,
@@ -336,6 +346,7 @@ class __$$PhotoStateImplCopyWithImpl<$Res>
     Object? selectedIndexes = null,
     Object? isLoading = null,
     Object? showDeleteConfirm = null,
+    Object? showLoadingModal = null,
     Object? showImagePreview = null,
     Object? previewImageIndex = null,
     Object? isAtTop = null,
@@ -372,6 +383,10 @@ class __$$PhotoStateImplCopyWithImpl<$Res>
         showDeleteConfirm: null == showDeleteConfirm
             ? _value.showDeleteConfirm
             : showDeleteConfirm // ignore: cast_nullable_to_non_nullable
+                  as bool,
+        showLoadingModal: null == showLoadingModal
+            ? _value.showLoadingModal
+            : showLoadingModal // ignore: cast_nullable_to_non_nullable
                   as bool,
         showImagePreview: null == showImagePreview
             ? _value.showImagePreview
@@ -443,6 +458,7 @@ class _$PhotoStateImpl extends _PhotoState {
     final Set<int> selectedIndexes = const {},
     this.isLoading = false,
     this.showDeleteConfirm = false,
+    this.showLoadingModal = false,
     this.showImagePreview = false,
     this.previewImageIndex = -1,
     this.isAtTop = true,
@@ -508,6 +524,11 @@ class _$PhotoStateImpl extends _PhotoState {
   @override
   @JsonKey()
   final bool showDeleteConfirm;
+
+  /// PHASE 1: Loading modal with progress state
+  @override
+  @JsonKey()
+  final bool showLoadingModal;
 
   /// Image preview modal state
   @override
@@ -588,7 +609,7 @@ class _$PhotoStateImpl extends _PhotoState {
 
   @override
   String toString() {
-    return 'PhotoState(images: $images, thumbnails: $thumbnails, selectedIndexes: $selectedIndexes, isLoading: $isLoading, showDeleteConfirm: $showDeleteConfirm, showImagePreview: $showImagePreview, previewImageIndex: $previewImageIndex, isAtTop: $isAtTop, editingHeaderUsername: $editingHeaderUsername, headerUsername: $headerUsername, imageCount: $imageCount, arraysInSync: $arraysInSync, currentBatchOperation: $currentBatchOperation, batchHistory: $batchHistory, totalBatchOperations: $totalBatchOperations, queuedOperations: $queuedOperations, isBatchProcessing: $isBatchProcessing, lastBatchResult: $lastBatchResult, batchMetrics: $batchMetrics)';
+    return 'PhotoState(images: $images, thumbnails: $thumbnails, selectedIndexes: $selectedIndexes, isLoading: $isLoading, showDeleteConfirm: $showDeleteConfirm, showLoadingModal: $showLoadingModal, showImagePreview: $showImagePreview, previewImageIndex: $previewImageIndex, isAtTop: $isAtTop, editingHeaderUsername: $editingHeaderUsername, headerUsername: $headerUsername, imageCount: $imageCount, arraysInSync: $arraysInSync, currentBatchOperation: $currentBatchOperation, batchHistory: $batchHistory, totalBatchOperations: $totalBatchOperations, queuedOperations: $queuedOperations, isBatchProcessing: $isBatchProcessing, lastBatchResult: $lastBatchResult, batchMetrics: $batchMetrics)';
   }
 
   @override
@@ -609,6 +630,8 @@ class _$PhotoStateImpl extends _PhotoState {
                 other.isLoading == isLoading) &&
             (identical(other.showDeleteConfirm, showDeleteConfirm) ||
                 other.showDeleteConfirm == showDeleteConfirm) &&
+            (identical(other.showLoadingModal, showLoadingModal) ||
+                other.showLoadingModal == showLoadingModal) &&
             (identical(other.showImagePreview, showImagePreview) ||
                 other.showImagePreview == showImagePreview) &&
             (identical(other.previewImageIndex, previewImageIndex) ||
@@ -648,6 +671,7 @@ class _$PhotoStateImpl extends _PhotoState {
     const DeepCollectionEquality().hash(_selectedIndexes),
     isLoading,
     showDeleteConfirm,
+    showLoadingModal,
     showImagePreview,
     previewImageIndex,
     isAtTop,
@@ -680,6 +704,7 @@ abstract class _PhotoState extends PhotoState {
     final Set<int> selectedIndexes,
     final bool isLoading,
     final bool showDeleteConfirm,
+    final bool showLoadingModal,
     final bool showImagePreview,
     final int previewImageIndex,
     final bool isAtTop,
@@ -716,6 +741,10 @@ abstract class _PhotoState extends PhotoState {
   /// Delete confirmation modal state
   @override
   bool get showDeleteConfirm;
+
+  /// PHASE 1: Loading modal with progress state
+  @override
+  bool get showLoadingModal;
 
   /// Image preview modal state
   @override

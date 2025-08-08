@@ -24,6 +24,9 @@ class PhotoState with _$PhotoState {
     /// Delete confirmation modal state
     @Default(false) bool showDeleteConfirm,
 
+    /// PHASE 1: Loading modal with progress state
+    @Default(false) bool showLoadingModal,
+
     /// Image preview modal state
     @Default(false) bool showImagePreview,
 
