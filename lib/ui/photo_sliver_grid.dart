@@ -139,7 +139,7 @@ class _PhotoSliverGridState extends State<PhotoSliverGrid> {
               // FIXED: Simple retry without heavy operations
               debugPrint('Retrying grid item $index');
             },
-            child: _MemoryOptimizedGridItem(
+            child: _PerformanceOptimizedGridItem(
               key: ValueKey('photo_${index}_${widget.images[index].path.hashCode}'),
               file: widget.images[index],
               thumbnail: thumbnail,
@@ -153,8 +153,8 @@ class _PhotoSliverGridState extends State<PhotoSliverGrid> {
           );
         },
         childCount: widget.images.length,
-        // MEMORY OPTIMIZED: Settings for reduced memory pressure
-        addAutomaticKeepAlives: false,      // FIXED: Disable to reduce memory pressure
+        // PERFORMANCE OPTIMIZED: Enable keepAlive to prevent micro stutters
+        addAutomaticKeepAlives: true,       // ← FIXED: Enable to prevent expensive rebuilds
         addRepaintBoundaries: true,        // Keep: Isolate repaints for better performance
         addSemanticIndexes: false,         // Skip semantic indexing for performance
       ),
@@ -162,8 +162,8 @@ class _PhotoSliverGridState extends State<PhotoSliverGrid> {
   }
 }
 
-/// MEMORY OPTIMIZED: Grid item with aggressive memory management
-class _MemoryOptimizedGridItem extends StatefulWidget {
+/// PERFORMANCE OPTIMIZED: Grid item with smart memory management and keepAlive enabled
+class _PerformanceOptimizedGridItem extends StatefulWidget {
   final File file;
   final File thumbnail;
   final int index;
@@ -173,7 +173,7 @@ class _MemoryOptimizedGridItem extends StatefulWidget {
   final void Function(int oldIndex, int newIndex) onReorder;
   final ImageCacheService cacheService;
 
-  const _MemoryOptimizedGridItem({
+  const _PerformanceOptimizedGridItem({
     super.key,
     required this.file,
     required this.thumbnail,
@@ -186,15 +186,15 @@ class _MemoryOptimizedGridItem extends StatefulWidget {
   });
 
   @override
-  State<_MemoryOptimizedGridItem> createState() => _MemoryOptimizedGridItemState();
+  State<_PerformanceOptimizedGridItem> createState() => _PerformanceOptimizedGridItemState();
 }
 
-class _MemoryOptimizedGridItemState extends State<_MemoryOptimizedGridItem>
+class _PerformanceOptimizedGridItemState extends State<_PerformanceOptimizedGridItem>
     with AutomaticKeepAliveClientMixin {
 
-  // MEMORY OPTIMIZED: Disabled keep alive to reduce memory pressure
+  // PERFORMANCE OPTIMIZED: Enable keep alive to prevent micro stutters
   @override
-  bool get wantKeepAlive => false;
+  bool get wantKeepAlive => true;  // ← FIXED: Enable to prevent expensive rebuilds
 
   @override
   Widget build(BuildContext context) {
@@ -322,9 +322,9 @@ class _MemoryAwareImage extends StatefulWidget {
 class _MemoryAwareImageState extends State<_MemoryAwareImage>
     with AutomaticKeepAliveClientMixin {
 
-  // MEMORY OPTIMIZED: Disabled keep alive during memory crisis
+  // PERFORMANCE OPTIMIZED: Enable keep alive for smooth scrolling
   @override
-  bool get wantKeepAlive => false;
+  bool get wantKeepAlive => true;  // Keep image state for performance
 
   @override
   void initState() {

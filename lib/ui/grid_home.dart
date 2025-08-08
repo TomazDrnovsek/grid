@@ -59,11 +59,9 @@ class _GridHomePageState extends ConsumerState<GridHomePage>
   final ScrollController _scrollController = ScrollController();
   final ScrollOptimizationService _scrollOptimizer = ScrollOptimizationService();
 
-  // FIXED: Removed local _isAtTop state - now managed by Riverpod
-
-  // FIXED: Scroll listener throttling to prevent excessive calls
+  // FIXED: Scroll listener throttling synced to high refresh rate display
   DateTime _lastScrollListenerCall = DateTime.now();
-  static const _scrollListenerThrottleMs = 100; // INCREASED: Less frequent updates
+  static const _scrollListenerThrottleMs = 16; // FIXED: 60 FPS (16ms) synced to 120Hz display
 
   // Header username editing
   final TextEditingController _headerUsernameController = TextEditingController();
@@ -98,13 +96,13 @@ class _GridHomePageState extends ConsumerState<GridHomePage>
     _scrollController.addListener(_onScrollUltraLightweight);
   }
 
-  /// FIXED: Ultra-lightweight scroll listener that prevents all stutters
+  /// FIXED: Responsive scroll listener synced to 120Hz display
   void _onScrollUltraLightweight() {
     try {
       final now = DateTime.now();
       final timeSinceLastCall = now.difference(_lastScrollListenerCall).inMilliseconds;
 
-      // FIXED: Much less frequent calls (max 10 FPS for UI updates)
+      // FIXED: 60 FPS updates (16ms) - much more responsive for 120Hz display
       if (timeSinceLastCall < _scrollListenerThrottleMs) return;
 
       _lastScrollListenerCall = now;
@@ -250,7 +248,7 @@ class _GridHomePageState extends ConsumerState<GridHomePage>
   }
 }
 
-/// FIXED: Bottom navigation bar with Riverpod scroll state (no more stutters)
+/// FIXED: Bottom navigation bar with Riverpod scroll state (responsive at 60 FPS)
 class _OptimizedBottomNavigationBar extends ConsumerWidget {
   final bool isDark;
   final VoidCallback onScrollToTop;
@@ -266,7 +264,7 @@ class _OptimizedBottomNavigationBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // OPTIMIZATION: Only watch selection-related state
     final selectedIndexes = ref.watch(photoNotifierProvider.select((state) => state.selectedIndexes));
-    // FIXED: Watch scroll position from Riverpod (no more setState rebuilds)
+    // FIXED: Watch scroll position from Riverpod - now updates at 60 FPS for smooth UI
     final isAtTop = ref.watch(photoNotifierProvider.select((state) => state.isAtTop));
 
     final hasSelection = selectedIndexes.isNotEmpty;
@@ -339,7 +337,7 @@ class _OptimizedBottomNavigationBar extends ConsumerWidget {
             GestureDetector(
               onTap: onScrollToTop,
               child: SvgPicture.asset(
-                // FIXED: Icon change now managed by Riverpod (no more stutters)
+                // FIXED: Icon changes now update at 60 FPS - smooth and responsive
                 isAtTop ? 'assets/home_icon-fill.svg' : 'assets/home_icon-outline.svg',
                 width: 24,
                 height: 24,
