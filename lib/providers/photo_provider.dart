@@ -189,6 +189,9 @@ class PhotoNotifier extends _$PhotoNotifier {
     final criticalTypes = {
       BatchOperationType.deletePhotos,
       BatchOperationType.reorderPhotos,
+      // UX IMPROVEMENT: Selection operations are now critical for instant feedback
+      BatchOperationType.selectPhotos,
+      BatchOperationType.deselectPhotos,
     };
     if (_batchQueue.any((op) => criticalTypes.contains(op.type))) return true;
 
@@ -315,8 +318,17 @@ class PhotoNotifier extends _$PhotoNotifier {
     // Track what needs to be updated in final state
     PhotoState updatedState = state;
 
+    // UX IMPROVEMENT: Process selection operations first for instant feedback
+    final processingOrder = [
+      BatchOperationType.selectPhotos,    // PRIORITY: Instant visual feedback
+      BatchOperationType.deselectPhotos,  // PRIORITY: Instant visual feedback
+      BatchOperationType.deletePhotos,    // Then deletions
+      BatchOperationType.addPhotos,       // Then additions
+      BatchOperationType.reorderPhotos,   // Finally reordering
+    ];
+
     // Process each operation type
-    for (final type in _getOptimalProcessingOrder()) {
+    for (final type in processingOrder) {
       final operations = groupedOperations[type];
       if (operations == null || operations.isEmpty) continue;
 
@@ -346,17 +358,6 @@ class PhotoNotifier extends _$PhotoNotifier {
         debugPrint('📦 Batch: Applied single state update');
       }
     }
-  }
-
-  /// ENHANCED: Optimal processing order for batch operations
-  List<BatchOperationType> _getOptimalProcessingOrder() {
-    return [
-      BatchOperationType.deletePhotos,    // Process deletions first
-      BatchOperationType.addPhotos,       // Then additions
-      BatchOperationType.reorderPhotos,   // Then reordering
-      BatchOperationType.selectPhotos,    // Then selections
-      BatchOperationType.deselectPhotos,  // Finally deselections
-    ];
   }
 
   /// ENHANCED: Process batch add photos operations
@@ -725,7 +726,7 @@ class PhotoNotifier extends _$PhotoNotifier {
     }
   }
 
-  /// ENHANCED: Toggle selection state with batch processing for rapid selections
+  /// UX IMPROVEMENT: Instant toggle selection with immediate feedback
   void toggleSelection(int index) {
     // Validate index with error handling
     final validatedIndex = RepositoryErrorHandler.handleSyncOperation(
@@ -744,25 +745,28 @@ class PhotoNotifier extends _$PhotoNotifier {
       return;
     }
 
+    // UX IMPROVEMENT: Process selection operations immediately for instant feedback
     final currentSelection = Set<int>.from(state.selectedIndexes);
     if (currentSelection.contains(validatedIndex)) {
-      // ENHANCED: Use batch operation for deselection
-      _enqueueBatchOperation(BatchOperation.deselectPhotos([validatedIndex]));
+      // Immediate deselection
+      currentSelection.remove(validatedIndex);
+      state = state.copyWith(selectedIndexes: currentSelection);
     } else {
-      // ENHANCED: Use batch operation for selection
-      _enqueueBatchOperation(BatchOperation.selectPhotos([validatedIndex]));
+      // Immediate selection
+      currentSelection.add(validatedIndex);
+      state = state.copyWith(selectedIndexes: currentSelection);
     }
   }
 
   /// Clear all selections
   void clearSelection() {
     if (state.selectedIndexes.isNotEmpty) {
-      // ENHANCED: Use batch operation for clearing selections
-      _enqueueBatchOperation(BatchOperation.deselectPhotos(state.selectedIndexes.toList()));
+      // UX IMPROVEMENT: Immediate clear for instant feedback
+      state = state.copyWith(selectedIndexes: <int>{});
     }
   }
 
-  /// Show image preview modal for the given index with validation
+  /// UX IMPROVEMENT: Show image preview with auto-unselect for instant tap feedback
   void showImagePreview(int index) {
     final validIndex = RepositoryErrorHandler.handleSyncOperation(
           () {
@@ -776,7 +780,14 @@ class PhotoNotifier extends _$PhotoNotifier {
     );
 
     if (validIndex >= 0) {
+      // UX IMPROVEMENT: Immediate unselect if currently selected
+      final currentSelection = Set<int>.from(state.selectedIndexes);
+      if (currentSelection.contains(validIndex)) {
+        currentSelection.remove(validIndex);
+      }
+
       state = state.copyWith(
+        selectedIndexes: currentSelection,
         previewImageIndex: validIndex,
         showImagePreview: true,
       );

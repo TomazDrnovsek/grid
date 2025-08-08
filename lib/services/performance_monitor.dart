@@ -1,509 +1,88 @@
 // File: lib/services/performance_monitor.dart
-import 'dart:async';
-import 'dart:collection';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/scheduler.dart';
-import 'package:flutter/painting.dart';
-import '../core/app_config.dart';
 
-/// Comprehensive performance monitoring system for real-time metrics tracking
-/// Provides frame rate monitoring, memory tracking, and operation timing
-/// Optimized for both 60Hz and 120Hz displays with adaptive thresholds
+/// Lightweight no-op performance monitoring system
+/// Maintains the exact same API as the full version but with zero overhead
+/// Perfect for production builds where monitoring is not needed
 class PerformanceMonitor {
   static PerformanceMonitor? _instance;
   static PerformanceMonitor get instance => _instance ??= PerformanceMonitor._internal();
   PerformanceMonitor._internal();
 
-  // Monitoring state
-  bool _isMonitoring = false;
-  bool _isFrameMonitoringActive = false;
-
-  // Frame performance tracking
-  final List<void Function(FramePerformanceData)> _frameCallbacks = [];
-  final Queue<FramePerformanceData> _recentFrames = Queue();
-  static const int _maxRecentFrames = 100;
-
-  // Operation timing tracking
-  final Map<String, List<Duration>> _operationTimings = {};
-  final Map<String, DateTime> _activeOperations = {};
-
-  // Performance statistics
-  int _totalFrames = 0;
-  int _slowFrames = 0;
-  Duration _totalFrameTime = Duration.zero;
-  DateTime? _monitoringStartTime;
-
-  // Memory tracking
-  Timer? _memoryTimer;
-  final Queue<MemorySnapshot> _memoryHistory = Queue();
-  static const int _maxMemoryHistory = 50;
-
-  // Performance thresholds (adaptive based on refresh rate)
-  late double _targetFrameTimeMs;
-  late double _slowFrameThresholdMs;
-  late double _criticalFrameThresholdMs;
-
-  /// Initialize performance monitoring with device-specific thresholds
+  /// Initialize performance monitoring (no-op)
   void initialize() {
-    try {
-      // Get device-specific performance targets from AppConfig
-      final config = AppConfig();
-      if (!config.isReady) {
-        if (kDebugMode) {
-          debugPrint('⚠️ PerformanceMonitor: AppConfig not ready, using fallback thresholds');
-        }
-        _setFallbackThresholds();
-      } else {
-        _setOptimizedThresholds(config);
-      }
-
-      if (kDebugMode) {
-        debugPrint('PerformanceMonitor initialized:');
-        debugPrint('  Target frame time: ${_targetFrameTimeMs.toStringAsFixed(1)}ms');
-        debugPrint('  Slow frame threshold: ${_slowFrameThresholdMs.toStringAsFixed(1)}ms');
-        debugPrint('  Critical frame threshold: ${_criticalFrameThresholdMs.toStringAsFixed(1)}ms');
-      }
-
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error initializing PerformanceMonitor: $e');
-      }
-      _setFallbackThresholds();
-    }
+    // No-op: No initialization needed
   }
 
-  /// Set optimized thresholds based on device capabilities
-  void _setOptimizedThresholds(AppConfig config) {
-    _targetFrameTimeMs = config.frameTimeMs;
-    _slowFrameThresholdMs = _targetFrameTimeMs * 1.5; // 1.5x target
-    _criticalFrameThresholdMs = _targetFrameTimeMs * 2.0; // 2x target
-  }
-
-  /// Set fallback thresholds for 60Hz displays
-  void _setFallbackThresholds() {
-    _targetFrameTimeMs = 16.67; // 60Hz
-    _slowFrameThresholdMs = 25.0; // ~40fps
-    _criticalFrameThresholdMs = 33.33; // ~30fps
-  }
-
-  /// Start comprehensive performance monitoring
+  /// Start comprehensive performance monitoring (no-op)
   void startMonitoring() {
-    if (_isMonitoring) {
-      if (kDebugMode) {
-        debugPrint('PerformanceMonitor already running');
-      }
-      return;
-    }
-
-    try {
-      _isMonitoring = true;
-      _monitoringStartTime = DateTime.now();
-
-      // Start frame performance monitoring
-      _startFrameMonitoring();
-
-      // Start memory monitoring
-      _startMemoryMonitoring();
-
-      if (kDebugMode) {
-        debugPrint('🚀 PerformanceMonitor started');
-      }
-
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error starting PerformanceMonitor: $e');
-      }
-      _isMonitoring = false;
-    }
+    // No-op: No monitoring started
   }
 
-  /// Stop performance monitoring
+  /// Stop performance monitoring (no-op)
   void stopMonitoring() {
-    if (!_isMonitoring) return;
-
-    try {
-      _isMonitoring = false;
-
-      // Stop frame monitoring
-      if (_isFrameMonitoringActive) {
-        SchedulerBinding.instance.removeTimingsCallback(_onFrameTimings);
-        _isFrameMonitoringActive = false;
-      }
-
-      // Stop memory monitoring
-      _memoryTimer?.cancel();
-      _memoryTimer = null;
-
-      if (kDebugMode) {
-        debugPrint('🛑 PerformanceMonitor stopped');
-      }
-
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error stopping PerformanceMonitor: $e');
-      }
-    }
+    // No-op: No monitoring to stop
   }
 
-  /// Start frame performance monitoring with 120Hz awareness
-  void _startFrameMonitoring() {
-    if (_isFrameMonitoringActive) return;
-
-    try {
-      SchedulerBinding.instance.addTimingsCallback(_onFrameTimings);
-      _isFrameMonitoringActive = true;
-      if (kDebugMode) {
-        debugPrint('Frame monitoring active');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error starting frame monitoring: $e');
-      }
-    }
-  }
-
-  /// Handle frame timing data with adaptive thresholds
-  void _onFrameTimings(List<FrameTiming> timings) {
-    if (!_isMonitoring) return;
-
-    try {
-      for (final timing in timings) {
-        final frameData = _processFrameTiming(timing);
-
-        // Track frame statistics
-        _totalFrames++;
-        _totalFrameTime += frameData.totalDuration;
-
-        if (frameData.isSlow) {
-          _slowFrames++;
-        }
-
-        // Store recent frame data
-        _recentFrames.add(frameData);
-        if (_recentFrames.length > _maxRecentFrames) {
-          _recentFrames.removeFirst();
-        }
-
-        // Notify callbacks
-        for (final callback in _frameCallbacks) {
-          try {
-            callback(frameData);
-          } catch (e) {
-            if (kDebugMode) {
-              debugPrint('Error in frame callback: $e');
-            }
-          }
-        }
-
-        // Log performance issues
-        if (frameData.isCritical && kDebugMode) {
-          _logSlowFrame(frameData);
-        }
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error processing frame timings: $e');
-      }
-    }
-  }
-
-  /// Process individual frame timing data
-  FramePerformanceData _processFrameTiming(FrameTiming timing) {
-    final totalMs = timing.totalSpan.inMicroseconds / 1000.0;
-    final buildMs = timing.buildDuration.inMicroseconds / 1000.0;
-    final rasterMs = timing.rasterDuration.inMicroseconds / 1000.0;
-
-    return FramePerformanceData(
-      totalDuration: timing.totalSpan,
-      buildDuration: timing.buildDuration,
-      rasterDuration: timing.rasterDuration,
-      totalMs: totalMs,
-      buildMs: buildMs,
-      rasterMs: rasterMs,
-      isSlow: totalMs > _slowFrameThresholdMs,
-      isCritical: totalMs > _criticalFrameThresholdMs,
-      timestamp: DateTime.now(),
-    );
-  }
-
-  /// Log slow frame information for debugging
-  void _logSlowFrame(FramePerformanceData frame) {
-    if (!kDebugMode) return;
-
-    debugPrint('🐌 Slow frame detected (${frame.totalMs.toStringAsFixed(1)}ms):');
-    debugPrint('  Target: ${_targetFrameTimeMs.toStringAsFixed(1)}ms');
-    debugPrint('  Build: ${frame.buildMs.toStringAsFixed(1)}ms');
-    debugPrint('  Raster: ${frame.rasterMs.toStringAsFixed(1)}ms');
-    debugPrint('  Frames dropped: ${(frame.totalMs / _targetFrameTimeMs - 1).round()}');
-  }
-
-  /// Start memory monitoring with periodic snapshots
-  void _startMemoryMonitoring() {
-    _memoryTimer?.cancel();
-
-    // Take memory snapshots every 5 seconds
-    _memoryTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      _takeMemorySnapshot();
-    });
-
-    // Take initial snapshot
-    _takeMemorySnapshot();
-  }
-
-  /// Take memory snapshot and store in history
-  void _takeMemorySnapshot() {
-    try {
-      // Get memory info from various sources
-      final imageCache = PaintingBinding.instance.imageCache;
-      final vmMemory = _getVMMemoryUsage();
-
-      final snapshot = MemorySnapshot(
-        timestamp: DateTime.now(),
-        imageCacheSize: imageCache.currentSize,
-        imageCacheSizeBytes: imageCache.currentSizeBytes,
-        imageCacheMaxSize: imageCache.maximumSize,
-        imageCacheMaxSizeBytes: imageCache.maximumSizeBytes,
-        vmMemoryMB: vmMemory,
-      );
-
-      _memoryHistory.add(snapshot);
-      if (_memoryHistory.length > _maxMemoryHistory) {
-        _memoryHistory.removeFirst();
-      }
-
-      // Log memory warnings
-      if (snapshot.isImageCacheNearLimit && kDebugMode) {
-        debugPrint('⚠️ Image cache near limit: ${snapshot.imageCacheUsagePercent.toStringAsFixed(1)}%');
-      }
-
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error taking memory snapshot: $e');
-      }
-    }
-  }
-
-  /// Get VM memory usage (approximate)
-  double _getVMMemoryUsage() {
-    try {
-      // This is an approximation - exact memory tracking requires platform channels
-      return 0.0; // Would need platform-specific implementation
-    } catch (e) {
-      return 0.0;
-    }
-  }
-
-  /// Start timing an operation
+  /// Start timing an operation (no-op)
   void startOperation(String operationName) {
-    try {
-      _activeOperations[operationName] = DateTime.now();
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error starting operation timing: $e');
-      }
-    }
+    // No-op: No timing started
   }
 
-  /// End timing an operation and record duration
+  /// End timing an operation (no-op)
   void endOperation(String operationName) {
-    try {
-      final startTime = _activeOperations.remove(operationName);
-      if (startTime != null) {
-        final duration = DateTime.now().difference(startTime);
-
-        _operationTimings.putIfAbsent(operationName, () => []);
-        _operationTimings[operationName]!.add(duration);
-
-        // Keep only recent timings
-        if (_operationTimings[operationName]!.length > 50) {
-          _operationTimings[operationName]!.removeAt(0);
-        }
-
-        // Log slow operations
-        if (duration.inMilliseconds > 100 && kDebugMode) {
-          debugPrint('⏱️ Slow operation: $operationName took ${duration.inMilliseconds}ms');
-        }
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error ending operation timing: $e');
-      }
-    }
+    // No-op: No timing to end
   }
 
-  /// Add frame performance callback
+  /// Add frame performance callback (no-op)
   void addFrameCallback(void Function(FramePerformanceData) callback) {
-    _frameCallbacks.add(callback);
+    // No-op: No callbacks stored
   }
 
-  /// Remove frame performance callback
+  /// Remove frame performance callback (no-op)
   void removeFrameCallback(void Function(FramePerformanceData) callback) {
-    _frameCallbacks.remove(callback);
+    // No-op: No callbacks to remove
   }
 
-  /// Get current performance statistics
+  /// Get current performance statistics (returns default/empty data)
   PerformanceStatistics getStatistics() {
-    try {
-      final currentTime = DateTime.now();
-      final monitoringDuration = _monitoringStartTime != null
-          ? currentTime.difference(_monitoringStartTime!)
-          : Duration.zero;
-
-      final avgFrameTime = _totalFrames > 0
-          ? _totalFrameTime.inMicroseconds / _totalFrames / 1000.0
-          : 0.0;
-
-      final frameDropRate = _totalFrames > 0
-          ? _slowFrames / _totalFrames
-          : 0.0;
-
-      final currentFPS = avgFrameTime > 0
-          ? 1000.0 / avgFrameTime
-          : 0.0;
-
-      return PerformanceStatistics(
-        isMonitoring: _isMonitoring,
-        monitoringDuration: monitoringDuration,
-        totalFrames: _totalFrames,
-        slowFrames: _slowFrames,
-        avgFrameTimeMs: avgFrameTime,
-        currentFPS: currentFPS,
-        frameDropRate: frameDropRate,
-        targetFrameTimeMs: _targetFrameTimeMs,
-        recentFramesCount: _recentFrames.length,
-        memorySnapshotsCount: _memoryHistory.length,
-        activeOperationsCount: _activeOperations.length,
-        trackedOperationsCount: _operationTimings.length,
-      );
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error getting performance statistics: $e');
-      }
-      return PerformanceStatistics.empty();
-    }
+    return PerformanceStatistics.empty();
   }
 
-  /// Get operation timing statistics
+  /// Get operation timing statistics (returns empty map)
   Map<String, OperationStats> getOperationStats() {
-    try {
-      final stats = <String, OperationStats>{};
-
-      for (final entry in _operationTimings.entries) {
-        final durations = entry.value;
-        if (durations.isNotEmpty) {
-          durations.sort();
-
-          final avgMs = durations.map((d) => d.inMicroseconds).reduce((a, b) => a + b) / durations.length / 1000.0;
-          final medianMs = durations[durations.length ~/ 2].inMicroseconds / 1000.0;
-          final maxMs = durations.last.inMicroseconds / 1000.0;
-          final minMs = durations.first.inMicroseconds / 1000.0;
-
-          stats[entry.key] = OperationStats(
-            operationName: entry.key,
-            callCount: durations.length,
-            avgDurationMs: avgMs,
-            medianDurationMs: medianMs,
-            maxDurationMs: maxMs,
-            minDurationMs: minMs,
-          );
-        }
-      }
-
-      return stats;
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error getting operation stats: $e');
-      }
-      return {};
-    }
+    return {};
   }
 
-  /// Get recent memory snapshots
+  /// Get recent memory snapshots (returns empty list)
   List<MemorySnapshot> getRecentMemorySnapshots() {
-    return List.from(_memoryHistory);
+    return [];
   }
 
-  /// Get recent frame performance data
+  /// Get recent frame performance data (returns empty list)
   List<FramePerformanceData> getRecentFrames() {
-    return List.from(_recentFrames);
+    return [];
   }
 
-  /// Print comprehensive performance report
+  /// Print comprehensive performance report (no-op in release, minimal in debug)
   void printPerformanceReport() {
-    if (!kDebugMode) return;
-
-    try {
-      final stats = getStatistics();
-      final opStats = getOperationStats();
-
+    if (kDebugMode) {
       debugPrint('═══════════════════════════════════════');
-      debugPrint('         PERFORMANCE REPORT           ');
+      debugPrint('    LIGHTWEIGHT PERFORMANCE MONITOR    ');
       debugPrint('═══════════════════════════════════════');
-      debugPrint('Monitoring Duration: ${stats.monitoringDuration.inSeconds}s');
-      debugPrint('Target Frame Time: ${stats.targetFrameTimeMs.toStringAsFixed(1)}ms');
-      debugPrint('');
-      debugPrint('📊 FRAME PERFORMANCE:');
-      debugPrint('  Total Frames: ${stats.totalFrames}');
-      debugPrint('  Slow Frames: ${stats.slowFrames}');
-      debugPrint('  Frame Drop Rate: ${(stats.frameDropRate * 100).toStringAsFixed(1)}%');
-      debugPrint('  Average Frame Time: ${stats.avgFrameTimeMs.toStringAsFixed(1)}ms');
-      debugPrint('  Current FPS: ${stats.currentFPS.toStringAsFixed(1)}');
-      debugPrint('');
-
-      if (_memoryHistory.isNotEmpty) {
-        final latestMemory = _memoryHistory.last;
-        debugPrint('💾 MEMORY USAGE:');
-        debugPrint('  Image Cache: ${latestMemory.imageCacheSize}/${latestMemory.imageCacheMaxSize} images');
-        debugPrint('  Cache Memory: ${(latestMemory.imageCacheSizeBytes / 1024 / 1024).toStringAsFixed(1)}MB/${(latestMemory.imageCacheMaxSizeBytes / 1024 / 1024).toStringAsFixed(1)}MB');
-        debugPrint('  Cache Usage: ${latestMemory.imageCacheUsagePercent.toStringAsFixed(1)}%');
-        debugPrint('');
-      }
-
-      if (opStats.isNotEmpty) {
-        debugPrint('⏱️ OPERATION TIMINGS:');
-        for (final op in opStats.values) {
-          debugPrint('  ${op.operationName}:');
-          debugPrint('    Calls: ${op.callCount}');
-          debugPrint('    Avg: ${op.avgDurationMs.toStringAsFixed(1)}ms');
-          debugPrint('    Median: ${op.medianDurationMs.toStringAsFixed(1)}ms');
-          debugPrint('    Max: ${op.maxDurationMs.toStringAsFixed(1)}ms');
-        }
-        debugPrint('');
-      }
-
+      debugPrint('Status: Monitoring disabled for performance');
+      debugPrint('All monitoring calls are no-op for optimal performance');
       debugPrint('═══════════════════════════════════════');
-
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error printing performance report: $e');
-      }
     }
   }
 
-  /// Clear all performance data
+  /// Clear all performance data (no-op)
   void clearData() {
-    try {
-      _recentFrames.clear();
-      _memoryHistory.clear();
-      _operationTimings.clear();
-      _activeOperations.clear();
-      _totalFrames = 0;
-      _slowFrames = 0;
-      _totalFrameTime = Duration.zero;
-      _monitoringStartTime = DateTime.now();
-
-      if (kDebugMode) {
-        debugPrint('Performance data cleared');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error clearing performance data: $e');
-      }
-    }
+    // No-op: No data to clear
   }
 }
 
-/// Frame performance data structure
+/// Lightweight frame performance data structure
 class FramePerformanceData {
   final Duration totalDuration;
   final Duration buildDuration;
@@ -526,9 +105,22 @@ class FramePerformanceData {
     required this.isCritical,
     required this.timestamp,
   });
+
+  /// Create empty/default frame data
+  factory FramePerformanceData.empty() => FramePerformanceData(
+    totalDuration: Duration.zero,
+    buildDuration: Duration.zero,
+    rasterDuration: Duration.zero,
+    totalMs: 0.0,
+    buildMs: 0.0,
+    rasterMs: 0.0,
+    isSlow: false,
+    isCritical: false,
+    timestamp: DateTime.now(),
+  );
 }
 
-/// Memory snapshot data structure
+/// Lightweight memory snapshot data structure
 class MemorySnapshot {
   final DateTime timestamp;
   final int imageCacheSize;
@@ -546,13 +138,21 @@ class MemorySnapshot {
     required this.vmMemoryMB,
   });
 
-  double get imageCacheUsagePercent =>
-      imageCacheMaxSizeBytes > 0 ? (imageCacheSizeBytes / imageCacheMaxSizeBytes * 100) : 0.0;
+  double get imageCacheUsagePercent => 0.0;
+  bool get isImageCacheNearLimit => false;
 
-  bool get isImageCacheNearLimit => imageCacheUsagePercent > 80.0;
+  /// Create empty/default memory snapshot
+  factory MemorySnapshot.empty() => MemorySnapshot(
+    timestamp: DateTime.now(),
+    imageCacheSize: 0,
+    imageCacheSizeBytes: 0,
+    imageCacheMaxSize: 0,
+    imageCacheMaxSizeBytes: 0,
+    vmMemoryMB: 0.0,
+  );
 }
 
-/// Performance statistics summary
+/// Lightweight performance statistics summary
 class PerformanceStatistics {
   final bool isMonitoring;
   final Duration monitoringDuration;
@@ -582,6 +182,7 @@ class PerformanceStatistics {
     required this.trackedOperationsCount,
   });
 
+  /// Create empty/default performance statistics
   factory PerformanceStatistics.empty() => const PerformanceStatistics(
     isMonitoring: false,
     monitoringDuration: Duration.zero,
@@ -598,7 +199,7 @@ class PerformanceStatistics {
   );
 }
 
-/// Operation timing statistics
+/// Lightweight operation timing statistics
 class OperationStats {
   final String operationName;
   final int callCount;
@@ -615,4 +216,14 @@ class OperationStats {
     required this.maxDurationMs,
     required this.minDurationMs,
   });
+
+  /// Create empty/default operation stats
+  factory OperationStats.empty(String operationName) => OperationStats(
+    operationName: operationName,
+    callCount: 0,
+    avgDurationMs: 0.0,
+    medianDurationMs: 0.0,
+    maxDurationMs: 0.0,
+    minDurationMs: 0.0,
+  );
 }

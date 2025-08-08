@@ -1,5 +1,6 @@
 // File: lib/ui/photo_sliver_grid.dart
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:grid/app_theme.dart';
 import 'package:grid/widgets/error_boundary.dart';
@@ -196,6 +197,36 @@ class _PerformanceOptimizedGridItemState extends State<_PerformanceOptimizedGrid
   @override
   bool get wantKeepAlive => true;  // ← FIXED: Enable to prevent expensive rebuilds
 
+  // UX IMPROVEMENT: Custom instant tap detection
+  Timer? _doubleTapTimer;
+  bool _waitingForSecondTap = false;
+  static const Duration _doubleTapWindow = Duration(milliseconds: 300);
+
+  @override
+  void dispose() {
+    _doubleTapTimer?.cancel();
+    super.dispose();
+  }
+
+  /// UX IMPROVEMENT: Handle instant tap with custom double-tap detection
+  void _handleInstantTap() {
+    if (_waitingForSecondTap) {
+      // Second tap within window - trigger double tap (preview)
+      _doubleTapTimer?.cancel();
+      _waitingForSecondTap = false;
+      widget.onDoubleTap(widget.index);
+    } else {
+      // First tap - instant selection feedback
+      widget.onTap(widget.index);
+
+      // Start waiting for potential second tap
+      _waitingForSecondTap = true;
+      _doubleTapTimer = Timer(_doubleTapWindow, () {
+        _waitingForSecondTap = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
@@ -250,8 +281,8 @@ class _PerformanceOptimizedGridItemState extends State<_PerformanceOptimizedGrid
               final isTarget = candidateData.isNotEmpty;
 
               return GestureDetector(
-                onTap: () => widget.onTap(widget.index),
-                onDoubleTap: () => widget.onDoubleTap(widget.index),
+                // UX IMPROVEMENT: Custom instant tap handling
+                onTap: _handleInstantTap,
                 child: Container(
                   decoration: BoxDecoration(
                     border: isTarget
