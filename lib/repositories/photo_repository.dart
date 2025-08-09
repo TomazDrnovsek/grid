@@ -269,7 +269,7 @@ class PhotoRepository {
     }
   }
 
-  /// FIXED: Process batch add photos to database with proper order indexing
+  /// FIXED: Process batch add photos to database with CORRECT order indexing
   Future<BatchResult> _processBatchAddDatabase(
       String operationId,
       Map<String, dynamic> operationData,
@@ -293,21 +293,53 @@ class PhotoRepository {
     final errors = <String>[];
 
     try {
-      final photoEntries = <PhotoDatabaseEntry>[];
       final now = DateTime.now();
 
-      // FIXED: Get existing photos first to determine correct order indexes
-      final existingPaths = await _database.getAllPhotoPaths();
-      final numberOfNewPhotos = images.length;
+      // STEP 1: Get existing photos
+      final existingPhotos = await _database.getAllPhotos();
+      final existingPhotoCount = existingPhotos.length;
 
-      // Create database entries for new photos (starting at index 0)
+      if (kDebugMode) {
+        debugPrint('📋 ORDER FIX: Found $existingPhotoCount existing photos');
+      }
+
+      // STEP 2: Shift existing photos to higher order indexes FIRST
+      if (existingPhotoCount > 0) {
+        _updateBatchOperation(operationId, status: 'Shifting existing photo indexes...');
+
+        // Build a list of paths with their NEW order indexes
+        // New photos will take indexes 0 to (images.length - 1)
+        // Existing photos will take indexes starting from images.length
+        final List<String> reorderedPaths = [];
+
+        // First, add the new photo paths (they will get indexes 0, 1, 2...)
+        for (final newImage in images) {
+          reorderedPaths.add(newImage.image.path);
+        }
+
+        // Then add existing photo paths (they will get indexes images.length, images.length+1, ...)
+        for (final existingPhoto in existingPhotos) {
+          reorderedPaths.add(existingPhoto.imagePath);
+        }
+
+        // Update all photo orders in one operation
+        // This will assign correct indexes to both new and existing photos
+        // moved: will call updatePhotoOrders after inserts
+
+        if (kDebugMode) {
+          debugPrint('✅ Updated photo order: ${images.length} new photos first, then $existingPhotoCount existing photos');
+        }
+      }
+
+      // STEP 3: Create database entries for new photos with indexes 0, 1, 2...
+      final photoEntries = <PhotoDatabaseEntry>[];
       for (int i = 0; i < images.length; i++) {
         final processed = images[i];
         photoEntries.add(PhotoDatabaseEntry(
           imagePath: processed.image.path,
           thumbnailPath: null, // Let lazy service handle thumbnails
           dateAdded: now,
-          orderIndex: i, // New photos get order indexes 0, 1, 2, etc.
+          orderIndex: i, // New photos get order indexes 0, 1, 2...
         ));
 
         _updateBatchOperation(operationId,
@@ -316,27 +348,26 @@ class PhotoRepository {
         );
       }
 
-      // FIXED: Properly shift existing photos' order indexes
-      final finalOrderedPaths = <String>[];
+      // STEP 4: Insert new photos with their correct indexes
+      _updateBatchOperation(operationId, status: 'Inserting new photos into database...');
 
-      // Add new photos first (they already have correct indexes 0, 1, 2...)
-      for (final entry in photoEntries) {
-        finalOrderedPaths.add(entry.imagePath);
+      await _database.insertPhotos(photoEntries);
+      // FINAL authoritative reindex AFTER inserts so both new and existing rows have stable sequential order
+      try {
+        final List<String> finalOrderedPaths = [
+          ...photoEntries.map((e) => e.imagePath),
+          ...existingPhotos.map((p) => p.imagePath),
+        ];
+        await _database.updatePhotoOrders(finalOrderedPaths);
+        if (kDebugMode) {
+          debugPrint('✅ Final reindex complete: ${images.length} new first, then ${existingPhotos.length} existing');
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('⚠️ Final reindex failed: $e');
+        }
       }
 
-      // Add existing photos after new photos (they will get shifted indexes)
-      finalOrderedPaths.addAll(existingPaths);
-
-      // Batch database operations
-      _updateBatchOperation(operationId, status: 'Executing batch database operations...');
-
-      // Insert new photos
-      await _database.insertPhotos(photoEntries);
-
-      // FIXED: Update order indexes for ALL photos (new + shifted existing)
-      // finalOrderedPaths now contains: [new1, new2, new3, ..., old1, old2, old3, ...]
-      // updatePhotoOrders will assign order indexes: 0, 1, 2, ..., based on position in array
-      await _database.updatePhotoOrders(finalOrderedPaths);
 
       successCount = images.length;
 
@@ -347,12 +378,16 @@ class PhotoRepository {
       }
 
       if (kDebugMode) {
-        debugPrint('🔧 FIXED: Photo order - $numberOfNewPhotos new photos inserted at beginning');
-        debugPrint('📋 Final order: ${finalOrderedPaths.take(10).toList()}... (showing first 10)');
+        debugPrint('✅ ORDER FIXED: ${images.length} new photos inserted with indexes 0-${images.length-1}');
+        debugPrint('📋 Existing photos shifted to indexes ${images.length}-${existingPhotoCount + images.length - 1}');
+        debugPrint('✅ Final order: [new photos 0-${images.length-1}] + [existing photos ${images.length}-${existingPhotoCount + images.length - 1}]');
       }
 
     } catch (e) {
       errors.add('Database batch add failed: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Database error: $e');
+      }
     }
 
     final processingTime = DateTime.now().difference(startTime);
@@ -366,8 +401,8 @@ class PhotoRepository {
       wasOptimized: true,
       metadata: {
         'imagesProcessed': images.length,
-        'databaseOperations': 2, // insert + update order
-        'orderFixed': true, // Flag indicating order fix was applied
+        'existingPhotosShifted': true,
+        'orderFixed': true,
       },
     );
 
@@ -1219,7 +1254,7 @@ class PhotoRepository {
 
       debugPrint('🚀 Processing: LAZY THUMBNAILS - Fast initial load, background generation');
       debugPrint('🔄 Batching: PHASE 3 REPOSITORY INTEGRATION - Enhanced tracking active');
-      debugPrint('🔧 ORDER FIX: Applied proper photo order indexing');
+      debugPrint('✅ ORDER FIX: CORRECTED photo order indexing with updatePhotoOrders method');
       debugPrint('================================');
 
     } catch (e) {

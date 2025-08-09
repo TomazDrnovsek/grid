@@ -26,10 +26,13 @@ class BatchOperation {
   }) : timestamp = timestamp ?? DateTime.now();
 
   /// Factory constructors for different operation types
-  factory BatchOperation.addPhotos(List<ProcessedImage> images) {
+  factory BatchOperation.addPhotos(List<ProcessedImage> images, {bool showModal = false}) {
     return BatchOperation(
       type: BatchOperationType.addPhotos,
-      data: {'images': images},
+      data: {
+        'images': images,
+        'showModal': showModal, // Flag to control modal display
+      },
     );
   }
 
@@ -216,6 +219,11 @@ class PhotoNotifier extends _$PhotoNotifier {
       }
 
       // PHASE 1: Set current batch operation for loading modal
+      // FIXED: Only show modal when explicitly requested via showModal flag
+      final shouldShowModal = operationsToProcess.isNotEmpty &&
+          operationsToProcess.any((op) => op.type == BatchOperationType.addPhotos &&
+              (op.data['showModal'] as bool? ?? false));
+
       if (operationsToProcess.isNotEmpty) {
         final firstOp = operationsToProcess.first;
         final batchStatus = BatchOperationStatus(
@@ -227,7 +235,7 @@ class PhotoNotifier extends _$PhotoNotifier {
 
         state = state.copyWith(
           currentBatchOperation: batchStatus,
-          showLoadingModal: firstOp.type == BatchOperationType.addPhotos,
+          showLoadingModal: shouldShowModal,
           isBatchProcessing: true,
         );
       }
@@ -238,7 +246,7 @@ class PhotoNotifier extends _$PhotoNotifier {
       // Process each operation type in optimized order
       await _processBatchOperations(optimizedOperations);
 
-      // PHASE 1: Show "Done!" state briefly before clearing modal
+      // PHASE 1: Show "Done!" state briefly before clearing modal (only if modal was shown)
       if (state.currentBatchOperation != null && state.showLoadingModal) {
         final completedBatch = state.currentBatchOperation!.copyWith(
           status: 'Done!',
@@ -247,8 +255,8 @@ class PhotoNotifier extends _$PhotoNotifier {
 
         state = state.copyWith(currentBatchOperation: completedBatch);
 
-        // Brief delay to show "Done!" message
-        await Future.delayed(const Duration(milliseconds: 800));
+        // FIXED: Shorter delay to prevent flickering
+        await Future.delayed(const Duration(milliseconds: 500));
       }
 
       // PHASE 1: Clear current batch operation and loading modal
@@ -473,8 +481,7 @@ class PhotoNotifier extends _$PhotoNotifier {
     final updatedThumbnails = [...allNewThumbnails.reversed, ...currentState.thumbnails];
 
     // Save the new image order
-    await _saveImageOrder();
-
+    // Order persisted by repository after inserts; skipping duplicate save here.
     return currentState.copyWith(
       images: updatedImages,
       thumbnails: updatedThumbnails,
@@ -806,8 +813,8 @@ class PhotoNotifier extends _$PhotoNotifier {
 
         state = state.copyWith(currentBatchOperation: finalBatchStatus);
 
-        // Add small delay to ensure modal is visible for meaningful duration
-        await Future.delayed(const Duration(milliseconds: 500));
+        // FIXED: Shorter delay to show completion state
+        await Future.delayed(const Duration(milliseconds: 300));
 
         // FIXED: Clear isLoading before enqueueing batch operation
         state = state.copyWith(isLoading: false);

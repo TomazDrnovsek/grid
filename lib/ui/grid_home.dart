@@ -768,7 +768,7 @@ class DeleteConfirmModal extends StatelessWidget {
   }
 }
 
-// PHASE 1: Simplified loading modal matching design requirements
+// PHASE 1: FIXED loading modal with proper styling and timing
 class LoadingModal extends StatelessWidget {
   final BatchOperationStatus batchOperation;
   final bool isDark;
@@ -812,13 +812,13 @@ class LoadingModal extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Clean progress circle without percentage
+                  // FIXED: Smaller, thicker progress circle matching design
                   SizedBox(
-                    width: 64,
-                    height: 64,
+                    width: 44,
+                    height: 44,
                     child: CircularProgressIndicator(
                       value: progress,
-                      strokeWidth: 4,
+                      strokeWidth: 6,
                       backgroundColor: AppColors.textSecondary(isDark).withValues(alpha: 0.2),
                       valueColor: AlwaysStoppedAnimation<Color>(
                         AppColors.textPrimary(isDark),
@@ -826,11 +826,14 @@ class LoadingModal extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  // Main text using headlineSm style (same as "Tomaž Drnovšek")
+                  // FIXED: Use statValue style and remove any text decoration
                   Text(
                     displayText,
                     textAlign: TextAlign.center,
-                    style: AppTheme.headlineSm(isDark),
+                    style: AppTheme.statValue(isDark).copyWith(
+                      decoration: TextDecoration.none,
+                      decorationColor: Colors.transparent,
+                    ),
                   ),
                 ],
               ),
