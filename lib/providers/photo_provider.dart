@@ -1179,6 +1179,15 @@ class PhotoNotifier extends _$PhotoNotifier {
     state = state.copyWith(editingHeaderUsername: false);
   }
 
+  /// Toggle hue map overlay display
+  void toggleHueMap() {
+    state = state.copyWith(showHueMap: !state.showHueMap);
+
+    if (kDebugMode) {
+      debugPrint('Hue map toggled: ${state.showHueMap}');
+    }
+  }
+
   /// Force refresh/reload of all images with error handling
   Future<void> refreshImages() async {
     await RepositoryErrorHandler.handleAsyncOperation(

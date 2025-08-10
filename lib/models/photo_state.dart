@@ -48,6 +48,9 @@ class PhotoState with _$PhotoState {
     /// Whether arrays are in sync (safety check)
     @Default(true) bool arraysInSync,
 
+    /// PHASE 2: Hue map overlay toggle state
+    @Default(false) bool showHueMap,
+
     // ========================================================================
     // PHASE 2: ENHANCED BATCH OPERATION TRACKING
     // ========================================================================

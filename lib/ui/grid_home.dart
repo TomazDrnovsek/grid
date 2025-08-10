@@ -256,6 +256,7 @@ class _GridHomePageState extends ConsumerState<GridHomePage>
 }
 
 /// FIXED: Bottom navigation bar with Riverpod scroll state (responsive at 60 FPS)
+/// PHASE 2: Added Hue Map toggle button
 class _OptimizedBottomNavigationBar extends ConsumerWidget {
   final bool isDark;
   final VoidCallback onScrollToTop;
@@ -273,6 +274,8 @@ class _OptimizedBottomNavigationBar extends ConsumerWidget {
     final selectedIndexes = ref.watch(photoNotifierProvider.select((state) => state.selectedIndexes));
     // FIXED: Watch scroll position from Riverpod - now updates at 60 FPS for smooth UI
     final isAtTop = ref.watch(photoNotifierProvider.select((state) => state.isAtTop));
+    // PHASE 2: Watch hue map toggle state
+    final showHueMap = ref.watch(photoNotifierProvider.select((state) => state.showHueMap));
 
     final hasSelection = selectedIndexes.isNotEmpty;
     final hasSingleSelection = selectedIndexes.length == 1;
@@ -339,13 +342,27 @@ class _OptimizedBottomNavigationBar extends ConsumerWidget {
           ],
         )
             : Row(
-          mainAxisAlignment: MainAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            // Left side: Home button
             GestureDetector(
               onTap: onScrollToTop,
               child: SvgPicture.asset(
                 // FIXED: Icon changes now update at 60 FPS - smooth and responsive
                 isAtTop ? 'assets/home_icon-fill.svg' : 'assets/home_icon-outline.svg',
+                width: 24,
+                height: 24,
+                colorFilter: ColorFilter.mode(
+                  AppColors.textPrimary(isDark),
+                  BlendMode.srcIn,
+                ),
+              ),
+            ),
+            // PHASE 2: Right side: Hue Map toggle button
+            GestureDetector(
+              onTap: photoNotifier.toggleHueMap,
+              child: SvgPicture.asset(
+                showHueMap ? 'assets/colormap_icon-fill.svg' : 'assets/colormap_icon-outline.svg',
                 width: 24,
                 height: 24,
                 colorFilter: ColorFilter.mode(

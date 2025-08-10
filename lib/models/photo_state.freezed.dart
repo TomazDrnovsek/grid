@@ -54,7 +54,10 @@ mixin _$PhotoState {
   int get imageCount => throw _privateConstructorUsedError;
 
   /// Whether arrays are in sync (safety check)
-  bool get arraysInSync =>
+  bool get arraysInSync => throw _privateConstructorUsedError;
+
+  /// PHASE 2: Hue map overlay toggle state
+  bool get showHueMap =>
       throw _privateConstructorUsedError; // ========================================================================
   // PHASE 2: ENHANCED BATCH OPERATION TRACKING
   // ========================================================================
@@ -109,6 +112,7 @@ abstract class $PhotoStateCopyWith<$Res> {
     String headerUsername,
     int imageCount,
     bool arraysInSync,
+    bool showHueMap,
     BatchOperationStatus? currentBatchOperation,
     List<BatchOperationRecord> batchHistory,
     int totalBatchOperations,
@@ -151,6 +155,7 @@ class _$PhotoStateCopyWithImpl<$Res, $Val extends PhotoState>
     Object? headerUsername = null,
     Object? imageCount = null,
     Object? arraysInSync = null,
+    Object? showHueMap = null,
     Object? currentBatchOperation = freezed,
     Object? batchHistory = null,
     Object? totalBatchOperations = null,
@@ -212,6 +217,10 @@ class _$PhotoStateCopyWithImpl<$Res, $Val extends PhotoState>
             arraysInSync: null == arraysInSync
                 ? _value.arraysInSync
                 : arraysInSync // ignore: cast_nullable_to_non_nullable
+                      as bool,
+            showHueMap: null == showHueMap
+                ? _value.showHueMap
+                : showHueMap // ignore: cast_nullable_to_non_nullable
                       as bool,
             currentBatchOperation: freezed == currentBatchOperation
                 ? _value.currentBatchOperation
@@ -310,6 +319,7 @@ abstract class _$$PhotoStateImplCopyWith<$Res>
     String headerUsername,
     int imageCount,
     bool arraysInSync,
+    bool showHueMap,
     BatchOperationStatus? currentBatchOperation,
     List<BatchOperationRecord> batchHistory,
     int totalBatchOperations,
@@ -354,6 +364,7 @@ class __$$PhotoStateImplCopyWithImpl<$Res>
     Object? headerUsername = null,
     Object? imageCount = null,
     Object? arraysInSync = null,
+    Object? showHueMap = null,
     Object? currentBatchOperation = freezed,
     Object? batchHistory = null,
     Object? totalBatchOperations = null,
@@ -416,6 +427,10 @@ class __$$PhotoStateImplCopyWithImpl<$Res>
             ? _value.arraysInSync
             : arraysInSync // ignore: cast_nullable_to_non_nullable
                   as bool,
+        showHueMap: null == showHueMap
+            ? _value.showHueMap
+            : showHueMap // ignore: cast_nullable_to_non_nullable
+                  as bool,
         currentBatchOperation: freezed == currentBatchOperation
             ? _value.currentBatchOperation
             : currentBatchOperation // ignore: cast_nullable_to_non_nullable
@@ -466,6 +481,7 @@ class _$PhotoStateImpl extends _PhotoState {
     this.headerUsername = 'tomazdrnovsek',
     this.imageCount = 0,
     this.arraysInSync = true,
+    this.showHueMap = false,
     this.currentBatchOperation,
     final List<BatchOperationRecord> batchHistory = const [],
     this.totalBatchOperations = 0,
@@ -564,6 +580,11 @@ class _$PhotoStateImpl extends _PhotoState {
   @override
   @JsonKey()
   final bool arraysInSync;
+
+  /// PHASE 2: Hue map overlay toggle state
+  @override
+  @JsonKey()
+  final bool showHueMap;
   // ========================================================================
   // PHASE 2: ENHANCED BATCH OPERATION TRACKING
   // ========================================================================
@@ -609,7 +630,7 @@ class _$PhotoStateImpl extends _PhotoState {
 
   @override
   String toString() {
-    return 'PhotoState(images: $images, thumbnails: $thumbnails, selectedIndexes: $selectedIndexes, isLoading: $isLoading, showDeleteConfirm: $showDeleteConfirm, showLoadingModal: $showLoadingModal, showImagePreview: $showImagePreview, previewImageIndex: $previewImageIndex, isAtTop: $isAtTop, editingHeaderUsername: $editingHeaderUsername, headerUsername: $headerUsername, imageCount: $imageCount, arraysInSync: $arraysInSync, currentBatchOperation: $currentBatchOperation, batchHistory: $batchHistory, totalBatchOperations: $totalBatchOperations, queuedOperations: $queuedOperations, isBatchProcessing: $isBatchProcessing, lastBatchResult: $lastBatchResult, batchMetrics: $batchMetrics)';
+    return 'PhotoState(images: $images, thumbnails: $thumbnails, selectedIndexes: $selectedIndexes, isLoading: $isLoading, showDeleteConfirm: $showDeleteConfirm, showLoadingModal: $showLoadingModal, showImagePreview: $showImagePreview, previewImageIndex: $previewImageIndex, isAtTop: $isAtTop, editingHeaderUsername: $editingHeaderUsername, headerUsername: $headerUsername, imageCount: $imageCount, arraysInSync: $arraysInSync, showHueMap: $showHueMap, currentBatchOperation: $currentBatchOperation, batchHistory: $batchHistory, totalBatchOperations: $totalBatchOperations, queuedOperations: $queuedOperations, isBatchProcessing: $isBatchProcessing, lastBatchResult: $lastBatchResult, batchMetrics: $batchMetrics)';
   }
 
   @override
@@ -645,6 +666,8 @@ class _$PhotoStateImpl extends _PhotoState {
                 other.imageCount == imageCount) &&
             (identical(other.arraysInSync, arraysInSync) ||
                 other.arraysInSync == arraysInSync) &&
+            (identical(other.showHueMap, showHueMap) ||
+                other.showHueMap == showHueMap) &&
             (identical(other.currentBatchOperation, currentBatchOperation) ||
                 other.currentBatchOperation == currentBatchOperation) &&
             const DeepCollectionEquality().equals(
@@ -679,6 +702,7 @@ class _$PhotoStateImpl extends _PhotoState {
     headerUsername,
     imageCount,
     arraysInSync,
+    showHueMap,
     currentBatchOperation,
     const DeepCollectionEquality().hash(_batchHistory),
     totalBatchOperations,
@@ -712,6 +736,7 @@ abstract class _PhotoState extends PhotoState {
     final String headerUsername,
     final int imageCount,
     final bool arraysInSync,
+    final bool showHueMap,
     final BatchOperationStatus? currentBatchOperation,
     final List<BatchOperationRecord> batchHistory,
     final int totalBatchOperations,
@@ -772,7 +797,11 @@ abstract class _PhotoState extends PhotoState {
 
   /// Whether arrays are in sync (safety check)
   @override
-  bool get arraysInSync; // ========================================================================
+  bool get arraysInSync;
+
+  /// PHASE 2: Hue map overlay toggle state
+  @override
+  bool get showHueMap; // ========================================================================
   // PHASE 2: ENHANCED BATCH OPERATION TRACKING
   // ========================================================================
   /// Current batch operation in progress (null if none)
