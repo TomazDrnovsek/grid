@@ -2,10 +2,13 @@
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:grid/app_theme.dart';
 import 'package:grid/widgets/error_boundary.dart';
 import 'package:grid/services/scroll_optimization_service.dart';
 import 'package:grid/services/image_cache_service.dart';
+import 'package:grid/services/dominant_color_service.dart';
+import 'package:grid/providers/photo_provider.dart';
 
 class PhotoSliverGrid extends StatefulWidget {
   final List<File> images;
@@ -47,6 +50,9 @@ class _PhotoSliverGridState extends State<PhotoSliverGrid> {
 
     // Initialize scroll optimization service
     _scrollOptimizer.initialize();
+
+    // Initialize color service
+    DominantColorService().initialize();
 
     // FIXED: Lightweight scroll tracking
     if (widget.scrollController != null) {
@@ -115,50 +121,58 @@ class _PhotoSliverGridState extends State<PhotoSliverGrid> {
 
   @override
   Widget build(BuildContext context) {
-    return SliverGrid(
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        mainAxisSpacing: 2,
-        crossAxisSpacing: 2,
-        childAspectRatio: 3 / 4,
-      ),
-      delegate: SliverChildBuilderDelegate(
-            (context, index) {
-          // FIXED: Enhanced bounds checking to prevent index errors
-          if (index < 0 || index >= widget.images.length) {
-            return const SizedBox.shrink();
-          }
+    return Consumer(
+      builder: (context, ref, child) {
+        // PHASE 2: Watch hue map state
+        final showHueMap = ref.watch(photoNotifierProvider.select((state) => state.showHueMap));
 
-          // MEMORY OPTIMIZED: Use thumbnail with proper fallback
-          final thumbnail = (index < widget.thumbnails.length && index >= 0)
-              ? widget.thumbnails[index]
-              : widget.images[index];
+        return SliverGrid(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: 2,
+            crossAxisSpacing: 2,
+            childAspectRatio: 3 / 4,
+          ),
+          delegate: SliverChildBuilderDelegate(
+                (context, index) {
+              // FIXED: Enhanced bounds checking to prevent index errors
+              if (index < 0 || index >= widget.images.length) {
+                return const SizedBox.shrink();
+              }
 
-          // FIXED: Simplified error boundary with minimal overhead
-          return GridItemErrorBoundary(
-            onRetry: () {
-              // FIXED: Simple retry without heavy operations
-              debugPrint('Retrying grid item $index');
+              // MEMORY OPTIMIZED: Use thumbnail with proper fallback
+              final thumbnail = (index < widget.thumbnails.length && index >= 0)
+                  ? widget.thumbnails[index]
+                  : widget.images[index];
+
+              // FIXED: Simplified error boundary with minimal overhead
+              return GridItemErrorBoundary(
+                onRetry: () {
+                  // FIXED: Simple retry without heavy operations
+                  debugPrint('Retrying grid item $index');
+                },
+                child: _PerformanceOptimizedGridItem(
+                  key: ValueKey('photo_${index}_${widget.images[index].path.hashCode}'),
+                  file: widget.images[index],
+                  thumbnail: thumbnail,
+                  index: index,
+                  isSelected: widget.selectedIndexes.contains(index),
+                  showHueMap: showHueMap, // PHASE 2: Pass hue map state
+                  onTap: widget.onTap,
+                  onDoubleTap: widget.onDoubleTap,
+                  onReorder: widget.onReorder,
+                  cacheService: _cacheService,
+                ),
+              );
             },
-            child: _PerformanceOptimizedGridItem(
-              key: ValueKey('photo_${index}_${widget.images[index].path.hashCode}'),
-              file: widget.images[index],
-              thumbnail: thumbnail,
-              index: index,
-              isSelected: widget.selectedIndexes.contains(index),
-              onTap: widget.onTap,
-              onDoubleTap: widget.onDoubleTap,
-              onReorder: widget.onReorder,
-              cacheService: _cacheService,
-            ),
-          );
-        },
-        childCount: widget.images.length,
-        // PERFORMANCE OPTIMIZED: Enable keepAlive to prevent micro stutters
-        addAutomaticKeepAlives: true,       // ← FIXED: Enable to prevent expensive rebuilds
-        addRepaintBoundaries: true,        // Keep: Isolate repaints for better performance
-        addSemanticIndexes: false,         // Skip semantic indexing for performance
-      ),
+            childCount: widget.images.length,
+            // PERFORMANCE OPTIMIZED: Enable keepAlive to prevent micro stutters
+            addAutomaticKeepAlives: true,       // ← FIXED: Enable to prevent expensive rebuilds
+            addRepaintBoundaries: true,        // Keep: Isolate repaints for better performance
+            addSemanticIndexes: false,         // Skip semantic indexing for performance
+          ),
+        );
+      },
     );
   }
 }
@@ -169,6 +183,7 @@ class _PerformanceOptimizedGridItem extends StatefulWidget {
   final File thumbnail;
   final int index;
   final bool isSelected;
+  final bool showHueMap; // PHASE 2: Added
   final void Function(int) onTap;
   final void Function(int) onDoubleTap;
   final void Function(int oldIndex, int newIndex) onReorder;
@@ -180,6 +195,7 @@ class _PerformanceOptimizedGridItem extends StatefulWidget {
     required this.thumbnail,
     required this.index,
     required this.isSelected,
+    required this.showHueMap, // PHASE 2: Added
     required this.onTap,
     required this.onDoubleTap,
     required this.onReorder,
@@ -248,6 +264,7 @@ class _PerformanceOptimizedGridItemState extends State<_PerformanceOptimizedGrid
         thumbnailFile: widget.thumbnail,
         fullImageFile: widget.file,
         isSelected: widget.isSelected,
+        showHueMap: widget.showHueMap, // PHASE 2: Pass hue map state
         isDark: isDark,
         cacheService: widget.cacheService,
       ),
@@ -335,6 +352,7 @@ class _MemoryAwareImage extends StatefulWidget {
   final File thumbnailFile;
   final File fullImageFile;
   final bool isSelected;
+  final bool showHueMap; // PHASE 2: Added
   final bool isDark;
   final ImageCacheService cacheService;
 
@@ -342,6 +360,7 @@ class _MemoryAwareImage extends StatefulWidget {
     required this.thumbnailFile,
     required this.fullImageFile,
     required this.isSelected,
+    required this.showHueMap, // PHASE 2: Added
     required this.isDark,
     required this.cacheService,
   });
@@ -429,7 +448,22 @@ class _MemoryAwareImageState extends State<_MemoryAwareImage>
             ),
           ),
 
-          // FIXED: Simplified selection indicator
+          // PHASE 2: Conditional color overlay
+          if (widget.showHueMap)
+            FutureBuilder<Color>(
+              future: DominantColorService().getDominantColor(widget.thumbnailFile.path),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData || snapshot.data == Colors.transparent) {
+                  return const SizedBox.shrink();
+                }
+
+                return Container(
+                  color: snapshot.data!.withValues(alpha: 0.7), // 70% opacity
+                );
+              },
+            ),
+
+          // FIXED: Simplified selection indicator (must stay on top)
           if (widget.isSelected)
             ErrorBoundary(
               errorContext: 'Selection Indicator',
