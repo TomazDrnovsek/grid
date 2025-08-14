@@ -1,4 +1,3 @@
-// File: lib/ui/photo_sliver_grid.dart
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -8,7 +7,11 @@ import 'package:grid/widgets/error_boundary.dart';
 import 'package:grid/services/scroll_optimization_service.dart';
 import 'package:grid/services/image_cache_service.dart';
 import 'package:grid/services/dominant_color_service.dart';
+import 'package:grid/services/drag_scroll_service.dart';
 import 'package:grid/providers/photo_provider.dart';
+
+// Edge zone enum for drag-to-scroll
+enum EdgeZone { none, top, bottom }
 
 class PhotoSliverGrid extends StatefulWidget {
   final List<File> images;
@@ -40,77 +43,45 @@ class _PhotoSliverGridState extends State<PhotoSliverGrid> {
   final ScrollOptimizationService _scrollOptimizer = ScrollOptimizationService();
   final ImageCacheService _cacheService = ImageCacheService();
 
-  // FIXED: Scroll update throttling to prevent excessive calls
-  DateTime _lastScrollUpdate = DateTime.now();
-  static const _scrollThrottleMs = 32; // Max 30 FPS for scroll processing
+  // PHASE 3: Drag-to-edge scroll service
+  final DragScrollService _dragScrollService = DragScrollService();
+  Timer? _autoScrollTimer;
+
+  // Track drag state and position
+  bool _isDragging = false;
+  Offset? _currentDragPosition;
 
   @override
   void initState() {
     super.initState();
-
-    // Initialize scroll optimization service
     _scrollOptimizer.initialize();
 
-    // Initialize color service
-    DominantColorService().initialize();
-
-    // FIXED: Lightweight scroll tracking
-    if (widget.scrollController != null) {
-      widget.scrollController!.addListener(_onScrollUpdateThrottled);
-    }
+    // Listen to scroll events for optimization
+    widget.scrollController?.addListener(_onScroll);
   }
 
   @override
   void dispose() {
-    // Clean up scroll listener
-    if (widget.scrollController != null) {
-      widget.scrollController!.removeListener(_onScrollUpdateThrottled);
-    }
+    _autoScrollTimer?.cancel();
+    widget.scrollController?.removeListener(_onScroll);
+    _scrollOptimizer.dispose();
     super.dispose();
   }
 
-  /// FIXED: Throttled scroll updates to prevent performance bottlenecks
-  void _onScrollUpdateThrottled() {
+  void _onScroll() {
     try {
-      final now = DateTime.now();
-      final timeSinceLastUpdate = now.difference(_lastScrollUpdate).inMilliseconds;
+      final scrollOffset = widget.scrollController?.offset ?? 0.0;
+      final viewportHeight = MediaQuery.of(context).size.height;
 
-      // FIXED: Skip if called too frequently (max 30 FPS)
-      if (timeSinceLastUpdate < _scrollThrottleMs) return;
-
-      _lastScrollUpdate = now;
-
-      if (widget.scrollController != null) {
-        final offset = widget.scrollController!.offset;
-
-        // FIXED: Ultra-lightweight scroll tracking
-        _scrollOptimizer.onScrollUpdate(offset);
-
-        // FIXED: Minimal visible range calculation (only when scroll stabilizes)
-        if (!_scrollOptimizer.getStats().isScrolling) {
-          _updateVisibleRangeMinimal(offset);
-        }
-      }
-    } catch (e) {
-      // Silent error handling to prevent scroll interruption
-    }
-  }
-
-  /// FIXED: Minimal visible range calculation without heavy operations
-  void _updateVisibleRangeMinimal(double scrollOffset) {
-    try {
-      // FIXED: Simplified calculation without complex operations
-      const itemHeight = 140.0;
       const itemsPerRow = 3;
+      final itemHeight = MediaQuery.of(context).size.width / itemsPerRow * 4 / 3;
 
-      final viewportHeight = MediaQuery.maybeOf(context)?.size.height ?? 800;
       final visibleStartRow = (scrollOffset / itemHeight).floor().clamp(0, 999);
       final visibleEndRow = ((scrollOffset + viewportHeight) / itemHeight).ceil().clamp(0, 999);
 
       final visibleStart = (visibleStartRow * itemsPerRow).clamp(0, widget.images.length);
       final visibleEnd = (visibleEndRow * itemsPerRow).clamp(0, widget.images.length - 1);
 
-      // FIXED: Only update if range changed significantly (reduce unnecessary calls)
       final imagePaths = widget.images.map((f) => f.path).toList();
       _scrollOptimizer.updateVisibleRange(imagePaths, visibleStart, visibleEnd);
 
@@ -119,11 +90,176 @@ class _PhotoSliverGridState extends State<PhotoSliverGrid> {
     }
   }
 
+  // PHASE 3: Enhanced drag callbacks with position tracking
+  void _onDragStarted() {
+    _isDragging = true;
+    _dragScrollService.onDragStart();
+  }
+
+  void _onDragUpdate(DragUpdateDetails details) {
+    if (!_isDragging || widget.scrollController == null) return;
+
+    _currentDragPosition = details.globalPosition;
+
+    // Check if drag activation delay has passed (150ms)
+    if (!_dragScrollService.canActivateAutoScroll()) return;
+
+    // Get screen dimensions
+    final screenHeight = MediaQuery.of(context).size.height;
+    final dragY = details.globalPosition.dy;
+
+    // Determine edge zone using proper detection
+    EdgeZone zone = EdgeZone.none;
+
+    // Check if in top edge zone (80px from top)
+    if (dragY < 80.0) {
+      zone = EdgeZone.top;
+      // Debug: Print distance from edge
+      debugPrint('Drag in TOP zone - Distance from edge: $dragY px');
+    }
+    // Check if in bottom edge zone (80px from bottom)
+    else if (dragY > screenHeight - 80.0) {
+      zone = EdgeZone.bottom;
+      final distanceFromBottom = screenHeight - dragY;
+      debugPrint('Drag in BOTTOM zone - Distance from edge: $distanceFromBottom px');
+    }
+
+    // Start or stop auto-scroll based on zone
+    if (zone != EdgeZone.none && _autoScrollTimer == null) {
+      debugPrint('Starting auto-scroll in $zone zone');
+      _startAutoScroll(zone, dragY, screenHeight);
+    } else if (zone == EdgeZone.none && _autoScrollTimer != null) {
+      debugPrint('Stopping auto-scroll - out of edge zones');
+      _stopAutoScroll();
+    }
+  }
+
+  void _onDragEnded() {
+    _isDragging = false;
+    _currentDragPosition = null;
+    _stopAutoScroll();
+    _dragScrollService.onDragEnd();
+  }
+
+  void _startAutoScroll(EdgeZone zone, double dragY, double screenHeight) {
+    _autoScrollTimer?.cancel();
+
+    // Debug flag for velocity logging
+    int frameCount = 0;
+
+    // Start timer for smooth scrolling
+    _autoScrollTimer = Timer.periodic(
+      const Duration(milliseconds: 16), // 60 FPS
+          (timer) {
+        if (widget.scrollController == null || !widget.scrollController!.hasClients) {
+          timer.cancel();
+          _autoScrollTimer = null;
+          return;
+        }
+
+        // Get current drag position for dynamic speed calculation
+        final currentDragY = _currentDragPosition?.dy ?? dragY;
+
+        // Recalculate velocity on each frame based on current position
+        double velocity = 0.0;
+        EdgeZone currentZone = EdgeZone.none;
+        String speedZoneName = '';
+
+        if (currentDragY < 80.0) {
+          currentZone = EdgeZone.top;
+          // Distance from top edge
+          final distanceFromEdge = currentDragY;
+          if (distanceFromEdge < 20) {
+            velocity = 800.0; // Ultra fast zone (0-20px)
+            speedZoneName = 'ULTRA FAST';
+          } else if (distanceFromEdge < 40) {
+            velocity = 500.0; // Fast zone (20-40px)
+            speedZoneName = 'FAST';
+          } else if (distanceFromEdge < 60) {
+            velocity = 300.0; // Medium zone (40-60px)
+            speedZoneName = 'MEDIUM';
+          } else {
+            velocity = 150.0; // Slow zone (60-80px)
+            speedZoneName = 'SLOW';
+          }
+        } else if (currentDragY > screenHeight - 80.0) {
+          currentZone = EdgeZone.bottom;
+          // Distance from bottom edge
+          final distanceFromEdge = screenHeight - currentDragY;
+          if (distanceFromEdge < 20) {
+            velocity = 800.0; // Ultra fast zone (0-20px)
+            speedZoneName = 'ULTRA FAST';
+          } else if (distanceFromEdge < 40) {
+            velocity = 500.0; // Fast zone (20-40px)
+            speedZoneName = 'FAST';
+          } else if (distanceFromEdge < 60) {
+            velocity = 300.0; // Medium zone (40-60px)
+            speedZoneName = 'MEDIUM';
+          } else {
+            velocity = 150.0; // Slow zone (60-80px)
+            speedZoneName = 'SLOW';
+          }
+        }
+
+        // Log velocity every 10 frames (about 6 times per second)
+        if (frameCount % 10 == 0) {
+          final distFromEdge = currentZone == EdgeZone.top
+              ? currentDragY
+              : screenHeight - currentDragY;
+          debugPrint('Auto-scroll: $speedZoneName - Velocity: ${velocity.toStringAsFixed(0)}px/s - Distance from edge: ${distFromEdge.toStringAsFixed(0)}px');
+        }
+        frameCount++;
+
+        // Stop if no longer in edge zone
+        if (currentZone == EdgeZone.none) {
+          debugPrint('Auto-scroll stopped - left edge zone');
+          timer.cancel();
+          _autoScrollTimer = null;
+          return;
+        }
+
+        final currentOffset = widget.scrollController!.offset;
+        final minExtent = widget.scrollController!.position.minScrollExtent;
+        final maxExtent = widget.scrollController!.position.maxScrollExtent;
+
+        // Calculate frame delta with easing for smoother acceleration
+        final delta = velocity * 0.016; // 16ms = 0.016 seconds
+
+        // Calculate target offset
+        double targetOffset;
+        if (currentZone == EdgeZone.top) {
+          targetOffset = currentOffset - delta; // Scroll up
+        } else {
+          targetOffset = currentOffset + delta; // Scroll down
+        }
+
+        // Clamp to bounds
+        targetOffset = targetOffset.clamp(minExtent, maxExtent);
+
+        // Check if reached boundary
+        if ((currentZone == EdgeZone.top && targetOffset <= minExtent) ||
+            (currentZone == EdgeZone.bottom && targetOffset >= maxExtent)) {
+          debugPrint('Auto-scroll stopped - reached boundary');
+          timer.cancel();
+          _autoScrollTimer = null;
+          return;
+        }
+
+        // Animate to new position
+        widget.scrollController!.jumpTo(targetOffset);
+      },
+    );
+  }
+
+  void _stopAutoScroll() {
+    _autoScrollTimer?.cancel();
+    _autoScrollTimer = null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer(
       builder: (context, ref, child) {
-        // PHASE 2: Watch hue map state
         final showHueMap = ref.watch(photoNotifierProvider.select((state) => state.showHueMap));
 
         return SliverGrid(
@@ -135,20 +271,16 @@ class _PhotoSliverGridState extends State<PhotoSliverGrid> {
           ),
           delegate: SliverChildBuilderDelegate(
                 (context, index) {
-              // FIXED: Enhanced bounds checking to prevent index errors
               if (index < 0 || index >= widget.images.length) {
                 return const SizedBox.shrink();
               }
 
-              // MEMORY OPTIMIZED: Use thumbnail with proper fallback
               final thumbnail = (index < widget.thumbnails.length && index >= 0)
                   ? widget.thumbnails[index]
                   : widget.images[index];
 
-              // FIXED: Simplified error boundary with minimal overhead
               return GridItemErrorBoundary(
                 onRetry: () {
-                  // FIXED: Simple retry without heavy operations
                   debugPrint('Retrying grid item $index');
                 },
                 child: _PerformanceOptimizedGridItem(
@@ -157,19 +289,21 @@ class _PhotoSliverGridState extends State<PhotoSliverGrid> {
                   thumbnail: thumbnail,
                   index: index,
                   isSelected: widget.selectedIndexes.contains(index),
-                  showHueMap: showHueMap, // PHASE 2: Pass hue map state
+                  showHueMap: showHueMap,
                   onTap: widget.onTap,
                   onDoubleTap: widget.onDoubleTap,
                   onReorder: widget.onReorder,
                   cacheService: _cacheService,
+                  onDragStarted: _onDragStarted,
+                  onDragUpdate: _onDragUpdate,
+                  onDragEnded: _onDragEnded,
                 ),
               );
             },
             childCount: widget.images.length,
-            // PERFORMANCE OPTIMIZED: Enable keepAlive to prevent micro stutters
-            addAutomaticKeepAlives: true,       // ← FIXED: Enable to prevent expensive rebuilds
-            addRepaintBoundaries: true,        // Keep: Isolate repaints for better performance
-            addSemanticIndexes: false,         // Skip semantic indexing for performance
+            addAutomaticKeepAlives: true,
+            addRepaintBoundaries: true,
+            addSemanticIndexes: false,
           ),
         );
       },
@@ -177,17 +311,20 @@ class _PhotoSliverGridState extends State<PhotoSliverGrid> {
   }
 }
 
-/// PERFORMANCE OPTIMIZED: Grid item with smart memory management and keepAlive enabled
+/// Performance optimized grid item
 class _PerformanceOptimizedGridItem extends StatefulWidget {
   final File file;
   final File thumbnail;
   final int index;
   final bool isSelected;
-  final bool showHueMap; // PHASE 2: Added
+  final bool showHueMap;
   final void Function(int) onTap;
   final void Function(int) onDoubleTap;
   final void Function(int oldIndex, int newIndex) onReorder;
   final ImageCacheService cacheService;
+  final VoidCallback onDragStarted;
+  final void Function(DragUpdateDetails) onDragUpdate;
+  final VoidCallback onDragEnded;
 
   const _PerformanceOptimizedGridItem({
     super.key,
@@ -195,11 +332,14 @@ class _PerformanceOptimizedGridItem extends StatefulWidget {
     required this.thumbnail,
     required this.index,
     required this.isSelected,
-    required this.showHueMap, // PHASE 2: Added
+    required this.showHueMap,
     required this.onTap,
     required this.onDoubleTap,
     required this.onReorder,
     required this.cacheService,
+    required this.onDragStarted,
+    required this.onDragUpdate,
+    required this.onDragEnded,
   });
 
   @override
@@ -209,11 +349,9 @@ class _PerformanceOptimizedGridItem extends StatefulWidget {
 class _PerformanceOptimizedGridItemState extends State<_PerformanceOptimizedGridItem>
     with AutomaticKeepAliveClientMixin {
 
-  // PERFORMANCE OPTIMIZED: Enable keep alive to prevent micro stutters
   @override
-  bool get wantKeepAlive => true;  // ← FIXED: Enable to prevent expensive rebuilds
+  bool get wantKeepAlive => true;
 
-  // UX IMPROVEMENT: Custom instant tap detection
   Timer? _doubleTapTimer;
   bool _waitingForSecondTap = false;
   static const Duration _doubleTapWindow = Duration(milliseconds: 300);
@@ -224,18 +362,13 @@ class _PerformanceOptimizedGridItemState extends State<_PerformanceOptimizedGrid
     super.dispose();
   }
 
-  /// UX IMPROVEMENT: Handle instant tap with custom double-tap detection
   void _handleInstantTap() {
     if (_waitingForSecondTap) {
-      // Second tap within window - trigger double tap (preview)
       _doubleTapTimer?.cancel();
       _waitingForSecondTap = false;
       widget.onDoubleTap(widget.index);
     } else {
-      // First tap - instant selection feedback
       widget.onTap(widget.index);
-
-      // Start waiting for potential second tap
       _waitingForSecondTap = true;
       _doubleTapTimer = Timer(_doubleTapWindow, () {
         _waitingForSecondTap = false;
@@ -245,26 +378,22 @@ class _PerformanceOptimizedGridItemState extends State<_PerformanceOptimizedGrid
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    super.build(context);
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // MEMORY OPTIMIZED: Use thumbnail with proper memory tracking
     final optimizedImage = ImageErrorBoundary(
       imagePath: widget.thumbnail.path,
       onRetry: () {
-        // FIXED: Lightweight retry mechanism
         if (mounted) {
-          setState(() {
-            // This will cause the image to reload
-          });
+          setState(() {});
         }
       },
       child: _MemoryAwareImage(
         thumbnailFile: widget.thumbnail,
         fullImageFile: widget.file,
         isSelected: widget.isSelected,
-        showHueMap: widget.showHueMap, // PHASE 2: Pass hue map state
+        showHueMap: widget.showHueMap,
         isDark: isDark,
         cacheService: widget.cacheService,
       ),
@@ -276,7 +405,11 @@ class _PerformanceOptimizedGridItemState extends State<_PerformanceOptimizedGrid
 
         return LongPressDraggable<int>(
           data: widget.index,
+          onDragStarted: widget.onDragStarted,
+          onDragUpdate: widget.onDragUpdate, // Track drag position
+          onDragEnd: (details) => widget.onDragEnded(),
           feedback: _buildLightweightDragFeedback(itemSize, optimizedImage),
+          // FIX 1: Proper gray placeholder without the image
           childWhenDragging: Container(
             decoration: BoxDecoration(
               color: AppColors.gridDragPlaceholder(isDark),
@@ -287,23 +420,22 @@ class _PerformanceOptimizedGridItemState extends State<_PerformanceOptimizedGrid
               )
                   : null,
             ),
+            // REMOVED the optimizedImage child - now shows only gray placeholder
           ),
           child: DragTarget<int>(
             onWillAcceptWithDetails: (details) => details.data != widget.index,
             onAcceptWithDetails: (details) {
-              // FIXED: Immediate reorder processing (no batching for drag UX)
               widget.onReorder(details.data, widget.index);
             },
             builder: (context, candidateData, rejectedData) {
               final isTarget = candidateData.isNotEmpty;
 
               return GestureDetector(
-                // UX IMPROVEMENT: Custom instant tap handling
                 onTap: _handleInstantTap,
                 child: Container(
                   decoration: BoxDecoration(
                     border: isTarget
-                        ? Border.all(color: AppColors.gridDragTargetBorder, width: 2)
+                        ? Border.all(color: Theme.of(context).primaryColor, width: 2)
                         : widget.isSelected
                         ? Border.all(
                         color: AppColors.gridSelectionBorder(isDark),
@@ -321,20 +453,19 @@ class _PerformanceOptimizedGridItemState extends State<_PerformanceOptimizedGrid
     );
   }
 
-  /// FIXED: Lightweight drag feedback without heavy operations
   Widget _buildLightweightDragFeedback(Size size, Widget content) {
     return Material(
-      color: AppColors.pureTransparent,
+      color: Colors.transparent,
       child: Container(
         width: size.width,
         height: size.height,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           borderRadius: BorderRadius.zero,
           boxShadow: [
             BoxShadow(
-              color: AppColors.gridDragShadow,
+              color: Colors.black.withValues(alpha: 0.3),
               blurRadius: 8,
-              offset: Offset(0, 4),
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -347,12 +478,12 @@ class _PerformanceOptimizedGridItemState extends State<_PerformanceOptimizedGrid
   }
 }
 
-/// MEMORY OPTIMIZED: Image widget with aggressive memory management and cache tracking
+/// Memory optimized image widget
 class _MemoryAwareImage extends StatefulWidget {
   final File thumbnailFile;
   final File fullImageFile;
   final bool isSelected;
-  final bool showHueMap; // PHASE 2: Added
+  final bool showHueMap;
   final bool isDark;
   final ImageCacheService cacheService;
 
@@ -360,7 +491,7 @@ class _MemoryAwareImage extends StatefulWidget {
     required this.thumbnailFile,
     required this.fullImageFile,
     required this.isSelected,
-    required this.showHueMap, // PHASE 2: Added
+    required this.showHueMap,
     required this.isDark,
     required this.cacheService,
   });
@@ -372,14 +503,12 @@ class _MemoryAwareImage extends StatefulWidget {
 class _MemoryAwareImageState extends State<_MemoryAwareImage>
     with AutomaticKeepAliveClientMixin {
 
-  // PERFORMANCE OPTIMIZED: Enable keep alive for smooth scrolling
   @override
-  bool get wantKeepAlive => true;  // Keep image state for performance
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
-    // Track image access for cache management
     widget.cacheService.trackImageAccess(widget.thumbnailFile.path);
   }
 
@@ -394,18 +523,13 @@ class _MemoryAwareImageState extends State<_MemoryAwareImage>
     );
   }
 
-  /// FIXED: Proper image cropping without distortion
   Widget _buildMemoryOptimizedImageWidget(File imageFile) {
     return Image.file(
       imageFile,
       fit: BoxFit.cover,
-      gaplessPlayback: true, // Critical for preventing flicker during rebuilds
-      // FIXED: Only specify cacheWidth to maintain aspect ratio
-      cacheWidth: 360, // Maintains aspect ratio - no stretching!
-      // REMOVED: cacheHeight to prevent distortion
-      // MEMORY OPTIMIZED: Simplified frame builder
+      gaplessPlayback: true,
+      cacheWidth: 360,
       frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-        // Track cache hit/miss
         if (frame != null) {
           widget.cacheService.trackImageAccess(imageFile.path);
         } else {
@@ -416,13 +540,11 @@ class _MemoryAwareImageState extends State<_MemoryAwareImage>
           return child;
         }
 
-        // FIXED: Simple loading state without animations to reduce overhead
         return Container(
           color: AppColors.gridErrorBackground(widget.isDark).withValues(alpha: 0.1),
         );
       },
       errorBuilder: (context, error, stackTrace) {
-        // MEMORY OPTIMIZED: Track failed loads
         widget.cacheService.trackCacheMiss(imageFile.path);
         return _buildErrorWidget();
       },
@@ -431,24 +553,20 @@ class _MemoryAwareImageState extends State<_MemoryAwareImage>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    super.build(context);
 
     return RepaintBoundary(
-      // Keep: Isolate repaints for better performance
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // MEMORY OPTIMIZED: Hero animation with memory tracking
           ErrorBoundary(
             errorContext: 'Hero Animation',
             child: Hero(
               tag: 'image_${widget.fullImageFile.path}',
-              // CRITICAL: Always use thumbnail for grid display to reduce memory usage
               child: _buildMemoryOptimizedImageWidget(widget.thumbnailFile),
             ),
           ),
 
-          // PHASE 2: Conditional color overlay
           if (widget.showHueMap)
             FutureBuilder<Color>(
               future: DominantColorService().getDominantColor(widget.thumbnailFile.path),
@@ -458,30 +576,28 @@ class _MemoryAwareImageState extends State<_MemoryAwareImage>
                 }
 
                 return Container(
-                  color: snapshot.data!.withValues(alpha: 0.7), // 70% opacity
+                  decoration: BoxDecoration(
+                    color: snapshot.data!.withValues(alpha: 0.8),
+                  ),
                 );
               },
             ),
 
-          // FIXED: Simplified selection indicator (must stay on top)
           if (widget.isSelected)
-            ErrorBoundary(
-              errorContext: 'Selection Indicator',
-              child: Positioned(
-                bottom: 8,
-                right: 8,
-                child: Container(
-                  width: 24,
-                  height: 24,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.textPrimaryLight,
-                  ),
-                  child: const Icon(
-                    Icons.check,
-                    size: 16,
-                    color: AppColors.pureWhite,
-                  ),
+            Positioned(
+              top: 4,
+              right: 4,
+              child: Container(
+                width: 20,
+                height: 20,
+                decoration: const BoxDecoration(
+                  color: Colors.black,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check,
+                  color: Colors.white,
+                  size: 14,
                 ),
               ),
             ),

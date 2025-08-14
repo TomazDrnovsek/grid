@@ -8,6 +8,7 @@ import 'package:palette_generator/palette_generator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Service for extracting and caching dominant colors from images
+/// SUBTLE ENHANCEMENT: Original logic + tiny vibrancy boost for appeal
 /// Uses LRU cache with max 100 colors and SharedPreferences persistence
 class DominantColorService {
   static final DominantColorService _instance = DominantColorService._internal();
@@ -21,6 +22,10 @@ class DominantColorService {
   // Persistence keys
   static const String _cacheKey = 'dominant_colors_cache';
   static const String _cacheOrderKey = 'dominant_colors_order';
+
+  // SUBTLE: Tiny enhancement parameters
+  static const double _subtleSaturationBoost = 1.05; // TINY: +5% saturation only
+  static const double _targetLightness = 0.36;       // NORMALIZE: Target brightness (36% - darker for better contrast)
 
   bool _isInitialized = false;
   bool _isLoadingCache = false;
@@ -84,7 +89,7 @@ class DominantColorService {
     }
   }
 
-  /// Extract dominant color from image file
+  /// Extract dominant color from image file with subtle enhancement
   Future<Color> _extractDominantColor(String imagePath) async {
     try {
       final file = File(imagePath);
@@ -100,14 +105,14 @@ class DominantColorService {
       // Start timing for performance monitoring
       final startTime = DateTime.now();
 
-      // Generate palette from image
+      // IMPROVED: Better sampling while keeping original logic
       final paletteGenerator = await PaletteGenerator.fromImageProvider(
         FileImage(file),
-        size: const Size(100, 100), // Small size for faster processing
-        maximumColorCount: 5, // Limit colors for speed
+        size: const Size(200, 200), // Better sampling (was 100x100)
+        maximumColorCount: 16,      // More options (was 5)
       );
 
-      // Get dominant color
+      // ORIGINAL: Preserve original color selection priority
       Color dominantColor = Colors.transparent;
 
       if (paletteGenerator.dominantColor != null) {
@@ -118,6 +123,11 @@ class DominantColorService {
         dominantColor = paletteGenerator.mutedColor!.color;
       } else if (paletteGenerator.colors.isNotEmpty) {
         dominantColor = paletteGenerator.colors.first;
+      }
+
+      // SUBTLE: Apply tiny vibrancy boost
+      if (dominantColor != Colors.transparent) {
+        dominantColor = _applySubtleEnhancement(dominantColor);
       }
 
       final extractionTime = DateTime.now().difference(startTime);
@@ -134,6 +144,31 @@ class DominantColorService {
       }
       return Colors.transparent;
     }
+  }
+
+  /// SUBTLE: Apply tiny enhancement + brightness normalization for consistent visibility
+  Color _applySubtleEnhancement(Color original) {
+    final hsl = HSLColor.fromColor(original);
+
+    // TINY boost: Only +5% saturation
+    final enhancedSaturation = (hsl.saturation * _subtleSaturationBoost).clamp(0.0, 1.0);
+
+    // NORMALIZE: Set all colors to consistent brightness level
+    final normalizedLightness = _targetLightness;
+
+    // Create subtly enhanced and normalized color
+    final enhancedColor = hsl
+        .withSaturation(enhancedSaturation)
+        .withLightness(normalizedLightness)
+        .toColor();
+
+    if (kDebugMode) {
+      debugPrint('Color normalization:');
+      debugPrint('  Original: HSL(${hsl.hue.toStringAsFixed(0)}°, ${(hsl.saturation * 100).toStringAsFixed(0)}%, ${(hsl.lightness * 100).toStringAsFixed(0)}%)');
+      debugPrint('  Enhanced: HSL(${hsl.hue.toStringAsFixed(0)}°, ${(enhancedSaturation * 100).toStringAsFixed(0)}%, ${(normalizedLightness * 100).toStringAsFixed(0)}%)');
+    }
+
+    return enhancedColor;
   }
 
   /// Cache a color for an image path
@@ -272,6 +307,11 @@ class DominantColorService {
       'maxSize': _maxCacheSize,
       'isInitialized': _isInitialized,
       'cacheUtilization': '${(_colorCache.length / _maxCacheSize * 100).toStringAsFixed(1)}%',
+      'enhancementMode': 'Original + Subtle Enhancement + Brightness Normalization',
+      'saturationBoost': '${((_subtleSaturationBoost - 1) * 100).toStringAsFixed(0)}%',
+      'targetLightness': '${(_targetLightness * 100).toStringAsFixed(0)}%',
+      'sampleSize': '200x200px',
+      'maxColors': 16,
     };
   }
 

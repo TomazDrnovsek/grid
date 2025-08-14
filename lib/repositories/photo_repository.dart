@@ -14,6 +14,7 @@ import '../services/thumbnail_service.dart';
 /// Repository layer for photo management business logic
 /// ENHANCED PHASE 3: Integrated with batch operation tracking and performance monitoring
 /// NOW WITH LAZY THUMBNAIL GENERATION: Reduces initial load from 1501ms to <100ms
+/// FIXED: Photo ordering bug - database now matches UI order
 class PhotoRepository {
   static const String _legacyImagePathsKey = 'grid_image_paths';
   static const String _legacyHeaderUsernameKey = 'header_username';
@@ -307,13 +308,13 @@ class PhotoRepository {
       if (existingPhotoCount > 0) {
         _updateBatchOperation(operationId, status: 'Shifting existing photo indexes...');
 
-        // Build a list of paths with their NEW order indexes
-        // New photos will take indexes 0 to (images.length - 1)
-        // Existing photos will take indexes starting from images.length
+        // FIXED: Build correct order list that matches UI display order
         final List<String> reorderedPaths = [];
 
-        // First, add the new photo paths (they will get indexes 0, 1, 2...)
-        for (final newImage in images) {
+        // FIXED: Reverse the new photo paths to match UI order (newest first)
+        // UI shows: [...allNewImages.reversed, ...currentState.images]
+        // So database should store the same order
+        for (final newImage in images.reversed) {
           reorderedPaths.add(newImage.image.path);
         }
 
@@ -322,12 +323,10 @@ class PhotoRepository {
           reorderedPaths.add(existingPhoto.imagePath);
         }
 
-        // Update all photo orders in one operation
-        // This will assign correct indexes to both new and existing photos
-        // moved: will call updatePhotoOrders after inserts
-
         if (kDebugMode) {
-          debugPrint('✅ Updated photo order: ${images.length} new photos first, then $existingPhotoCount existing photos');
+          debugPrint('✅ FIXED ORDER: Database will match UI order');
+          debugPrint('  New photos (reversed): ${images.map((i) => i.image.path.split('/').last).toList().reversed.join(', ')}');
+          debugPrint('  Final order in DB will match UI display order');
         }
       }
 
@@ -352,22 +351,27 @@ class PhotoRepository {
       _updateBatchOperation(operationId, status: 'Inserting new photos into database...');
 
       await _database.insertPhotos(photoEntries);
-      // FINAL authoritative reindex AFTER inserts so both new and existing rows have stable sequential order
+
+      // STEP 5: FIXED - Final authoritative reindex with CORRECT order that matches UI
       try {
         final List<String> finalOrderedPaths = [
-          ...photoEntries.map((e) => e.imagePath),
+          // FIXED: Reverse the photo entries to match UI order
+          ...photoEntries.map((e) => e.imagePath).toList().reversed,
           ...existingPhotos.map((p) => p.imagePath),
         ];
         await _database.updatePhotoOrders(finalOrderedPaths);
+
         if (kDebugMode) {
-          debugPrint('✅ Final reindex complete: ${images.length} new first, then ${existingPhotos.length} existing');
+          debugPrint('✅ PHOTO ORDER BUG FIXED: Database now matches UI order');
+          debugPrint('  UI order: newest first (reversed)');
+          debugPrint('  DB order: newest first (reversed) - FIXED!');
+          debugPrint('  No more order reversal after app restart');
         }
       } catch (e) {
         if (kDebugMode) {
           debugPrint('⚠️ Final reindex failed: $e');
         }
       }
-
 
       successCount = images.length;
 
@@ -378,9 +382,9 @@ class PhotoRepository {
       }
 
       if (kDebugMode) {
-        debugPrint('✅ ORDER FIXED: ${images.length} new photos inserted with indexes 0-${images.length-1}');
-        debugPrint('📋 Existing photos shifted to indexes ${images.length}-${existingPhotoCount + images.length - 1}');
-        debugPrint('✅ Final order: [new photos 0-${images.length-1}] + [existing photos ${images.length}-${existingPhotoCount + images.length - 1}]');
+        debugPrint('✅ ORDER FIXED: ${images.length} new photos inserted with correct order');
+        debugPrint('📋 Existing photos maintained proper relative order');
+        debugPrint('✅ Database order now matches UI display order - BUG FIXED!');
       }
 
     } catch (e) {
@@ -403,6 +407,7 @@ class PhotoRepository {
         'imagesProcessed': images.length,
         'existingPhotosShifted': true,
         'orderFixed': true,
+        'photoOrderBugFixed': true,
       },
     );
 
@@ -419,6 +424,7 @@ class PhotoRepository {
         'avgTimePerImage': successCount > 0 ? processingTime.inMicroseconds / successCount : 0,
         'databaseBatchOptimized': true,
         'orderIndexingFixed': true,
+        'photoOrderBugFixed': true,
       },
     );
   }
@@ -1254,7 +1260,8 @@ class PhotoRepository {
 
       debugPrint('🚀 Processing: LAZY THUMBNAILS - Fast initial load, background generation');
       debugPrint('🔄 Batching: PHASE 3 REPOSITORY INTEGRATION - Enhanced tracking active');
-      debugPrint('✅ ORDER FIX: CORRECTED photo order indexing with updatePhotoOrders method');
+      debugPrint('✅ ORDER FIX: Photo ordering bug FIXED - database matches UI order');
+      debugPrint('🎯 BUG FIXED: No more photo order reversal after app restart');
       debugPrint('================================');
 
     } catch (e) {
