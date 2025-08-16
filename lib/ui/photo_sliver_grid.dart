@@ -170,16 +170,16 @@ class _PhotoSliverGridState extends State<PhotoSliverGrid> {
           // Distance from top edge
           final distanceFromEdge = currentDragY;
           if (distanceFromEdge < 20) {
-            velocity = 800.0; // Ultra fast zone (0-20px)
+            velocity = 1070.0; // Ultra fast zone (0-20px) - INCREASED FROM 800
             speedZoneName = 'ULTRA FAST';
           } else if (distanceFromEdge < 40) {
-            velocity = 500.0; // Fast zone (20-40px)
+            velocity = 665.0; // Fast zone (20-40px) - INCREASED FROM 500
             speedZoneName = 'FAST';
           } else if (distanceFromEdge < 60) {
-            velocity = 300.0; // Medium zone (40-60px)
+            velocity = 400.0; // Medium zone (40-60px) - INCREASED FROM 300
             speedZoneName = 'MEDIUM';
           } else {
-            velocity = 150.0; // Slow zone (60-80px)
+            velocity = 200.0; // Slow zone (60-80px) - INCREASED FROM 150
             speedZoneName = 'SLOW';
           }
         } else if (currentDragY > screenHeight - 80.0) {
@@ -187,16 +187,16 @@ class _PhotoSliverGridState extends State<PhotoSliverGrid> {
           // Distance from bottom edge
           final distanceFromEdge = screenHeight - currentDragY;
           if (distanceFromEdge < 20) {
-            velocity = 800.0; // Ultra fast zone (0-20px)
+            velocity = 1070.0; // Ultra fast zone (0-20px) - INCREASED FROM 800
             speedZoneName = 'ULTRA FAST';
           } else if (distanceFromEdge < 40) {
-            velocity = 500.0; // Fast zone (20-40px)
+            velocity = 665.0; // Fast zone (20-40px) - INCREASED FROM 500
             speedZoneName = 'FAST';
           } else if (distanceFromEdge < 60) {
-            velocity = 300.0; // Medium zone (40-60px)
+            velocity = 400.0; // Medium zone (40-60px) - INCREASED FROM 300
             speedZoneName = 'MEDIUM';
           } else {
-            velocity = 150.0; // Slow zone (60-80px)
+            velocity = 200.0; // Slow zone (60-80px) - INCREASED FROM 150
             speedZoneName = 'SLOW';
           }
         }
@@ -245,8 +245,15 @@ class _PhotoSliverGridState extends State<PhotoSliverGrid> {
           return;
         }
 
-        // Animate to new position
-        widget.scrollController!.jumpTo(targetOffset);
+        // *** FIX APPLIED HERE ***
+        // Replaced jumpTo() with animateTo() to eliminate stuttering.
+        // This creates a smooth micro-animation over 16ms instead of an instant jump.
+        // widget.scrollController!.jumpTo(targetOffset);
+        widget.scrollController!.animateTo(
+          targetOffset,
+          duration: const Duration(milliseconds: 16), // Match the timer's period
+          curve: Curves.linear, // Use a linear curve for consistent speed
+        );
       },
     );
   }
@@ -585,7 +592,7 @@ class _MemoryAwareImageState extends State<_MemoryAwareImage>
 
           if (widget.isSelected)
             Positioned(
-              top: 4,
+              bottom: 4,
               right: 4,
               child: Container(
                 width: 20,
