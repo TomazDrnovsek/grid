@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:grid/app_theme.dart';
 import 'package:grid/widgets/error_boundary.dart';
@@ -39,30 +41,33 @@ class PhotoSliverGrid extends StatefulWidget {
   State<PhotoSliverGrid> createState() => _PhotoSliverGridState();
 }
 
-class _PhotoSliverGridState extends State<PhotoSliverGrid> {
+class _PhotoSliverGridState extends State<PhotoSliverGrid>
+    with TickerProviderStateMixin {  // Changed from SingleTickerProviderStateMixin to TickerProviderStateMixin
   final ScrollOptimizationService _scrollOptimizer = ScrollOptimizationService();
   final ImageCacheService _cacheService = ImageCacheService();
-
-  // PHASE 3: Drag-to-edge scroll service
   final DragScrollService _dragScrollService = DragScrollService();
-  Timer? _autoScrollTimer;
+
+  // Ticker for smooth vsync-aligned scrolling
+  Ticker? _autoScrollTicker;
+  Duration _autoScrollLastTs = Duration.zero;
 
   // Track drag state and position
   bool _isDragging = false;
   Offset? _currentDragPosition;
 
+  // Track if auto-scroll has been activated before (eliminates delay on subsequent drags)
+  bool _hasActivatedAutoScrollBefore = false;
+
   @override
   void initState() {
     super.initState();
     _scrollOptimizer.initialize();
-
-    // Listen to scroll events for optimization
     widget.scrollController?.addListener(_onScroll);
   }
 
   @override
   void dispose() {
-    _autoScrollTimer?.cancel();
+    _autoScrollTicker?.dispose();
     widget.scrollController?.removeListener(_onScroll);
     _scrollOptimizer.dispose();
     super.dispose();
@@ -84,13 +89,11 @@ class _PhotoSliverGridState extends State<PhotoSliverGrid> {
 
       final imagePaths = widget.images.map((f) => f.path).toList();
       _scrollOptimizer.updateVisibleRange(imagePaths, visibleStart, visibleEnd);
-
     } catch (e) {
       // Silent error handling
     }
   }
 
-  // PHASE 3: Enhanced drag callbacks with position tracking
   void _onDragStarted() {
     _isDragging = true;
     _dragScrollService.onDragStart();
@@ -101,35 +104,40 @@ class _PhotoSliverGridState extends State<PhotoSliverGrid> {
 
     _currentDragPosition = details.globalPosition;
 
-    // Check if drag activation delay has passed (150ms)
-    if (!_dragScrollService.canActivateAutoScroll()) return;
+    // Check if drag activation delay has passed (150ms) - but allow immediate activation on subsequent drags
+    if (!_dragScrollService.canActivateAutoScroll() && !_hasActivatedAutoScrollBefore) return;
 
     // Get screen dimensions
     final screenHeight = MediaQuery.of(context).size.height;
     final dragY = details.globalPosition.dy;
 
-    // Determine edge zone using proper detection
+    // Determine edge zone
     EdgeZone zone = EdgeZone.none;
 
-    // Check if in top edge zone (80px from top)
     if (dragY < 80.0) {
       zone = EdgeZone.top;
-      // Debug: Print distance from edge
-      debugPrint('Drag in TOP zone - Distance from edge: $dragY px');
-    }
-    // Check if in bottom edge zone (80px from bottom)
-    else if (dragY > screenHeight - 80.0) {
+      if (kDebugMode) {
+        debugPrint('Drag in TOP zone - Distance from edge: $dragY px');
+      }
+    } else if (dragY > screenHeight - 80.0) {
       zone = EdgeZone.bottom;
       final distanceFromBottom = screenHeight - dragY;
-      debugPrint('Drag in BOTTOM zone - Distance from edge: $distanceFromBottom px');
+      if (kDebugMode) {
+        debugPrint('Drag in BOTTOM zone - Distance from edge: $distanceFromBottom px');
+      }
     }
 
     // Start or stop auto-scroll based on zone
-    if (zone != EdgeZone.none && _autoScrollTimer == null) {
-      debugPrint('Starting auto-scroll in $zone zone');
+    if (zone != EdgeZone.none && _autoScrollTicker == null) {
+      if (kDebugMode) {
+        debugPrint('Starting auto-scroll in $zone zone');
+      }
+      _hasActivatedAutoScrollBefore = true;
       _startAutoScroll(zone, dragY, screenHeight);
-    } else if (zone == EdgeZone.none && _autoScrollTimer != null) {
-      debugPrint('Stopping auto-scroll - out of edge zones');
+    } else if (zone == EdgeZone.none && _autoScrollTicker != null) {
+      if (kDebugMode) {
+        debugPrint('Stopping auto-scroll - out of edge zones');
+      }
       _stopAutoScroll();
     }
   }
@@ -141,126 +149,80 @@ class _PhotoSliverGridState extends State<PhotoSliverGrid> {
     _dragScrollService.onDragEnd();
   }
 
-  void _startAutoScroll(EdgeZone zone, double dragY, double screenHeight) {
-    _autoScrollTimer?.cancel();
+  void _startAutoScroll(EdgeZone initialZone, double initialDragY, double screenHeight) {
+    _autoScrollTicker?.dispose();
+    _autoScrollLastTs = Duration.zero;
 
-    // Debug flag for velocity logging
     int frameCount = 0;
+    final cachedScreenHeight = screenHeight;
 
-    // Start timer for smooth scrolling
-    _autoScrollTimer = Timer.periodic(
-      const Duration(milliseconds: 16), // 60 FPS
-          (timer) {
-        if (widget.scrollController == null || !widget.scrollController!.hasClients) {
-          timer.cancel();
-          _autoScrollTimer = null;
-          return;
-        }
+    _autoScrollTicker = createTicker((elapsed) {
+      // Calculate actual delta time
+      final dt = _autoScrollLastTs == Duration.zero
+          ? 0.0  // First frame: no movement
+          : (elapsed - _autoScrollLastTs).inMicroseconds / 1e6;
+      _autoScrollLastTs = elapsed;
 
-        // Get current drag position for dynamic speed calculation
-        final currentDragY = _currentDragPosition?.dy ?? dragY;
+      final controller = widget.scrollController;
+      if (controller == null || !controller.hasClients) {
+        _stopAutoScroll();
+        return;
+      }
 
-        // Recalculate velocity on each frame based on current position
-        double velocity = 0.0;
-        EdgeZone currentZone = EdgeZone.none;
-        String speedZoneName = '';
+      final dragY = _currentDragPosition?.dy ?? initialDragY;
 
-        if (currentDragY < 80.0) {
-          currentZone = EdgeZone.top;
-          // Distance from top edge
-          final distanceFromEdge = currentDragY;
-          if (distanceFromEdge < 20) {
-            velocity = 1070.0; // Ultra fast zone (0-20px) - INCREASED FROM 800
-            speedZoneName = 'ULTRA FAST';
-          } else if (distanceFromEdge < 40) {
-            velocity = 665.0; // Fast zone (20-40px) - INCREASED FROM 500
-            speedZoneName = 'FAST';
-          } else if (distanceFromEdge < 60) {
-            velocity = 400.0; // Medium zone (40-60px) - INCREASED FROM 300
-            speedZoneName = 'MEDIUM';
-          } else {
-            velocity = 200.0; // Slow zone (60-80px) - INCREASED FROM 150
-            speedZoneName = 'SLOW';
-          }
-        } else if (currentDragY > screenHeight - 80.0) {
-          currentZone = EdgeZone.bottom;
-          // Distance from bottom edge
-          final distanceFromEdge = screenHeight - currentDragY;
-          if (distanceFromEdge < 20) {
-            velocity = 1070.0; // Ultra fast zone (0-20px) - INCREASED FROM 800
-            speedZoneName = 'ULTRA FAST';
-          } else if (distanceFromEdge < 40) {
-            velocity = 665.0; // Fast zone (20-40px) - INCREASED FROM 500
-            speedZoneName = 'FAST';
-          } else if (distanceFromEdge < 60) {
-            velocity = 400.0; // Medium zone (40-60px) - INCREASED FROM 300
-            speedZoneName = 'MEDIUM';
-          } else {
-            velocity = 200.0; // Slow zone (60-80px) - INCREASED FROM 150
-            speedZoneName = 'SLOW';
-          }
-        }
+      // Calculate zone and velocity
+      EdgeZone zone = EdgeZone.none;
+      double v = 0.0;
+      if (dragY < 80.0) {
+        zone = EdgeZone.top;
+        final d = dragY;
+        v = d < 20 ? 1070.0 : d < 40 ? 665.0 : d < 60 ? 400.0 : 200.0;
+      } else if (dragY > cachedScreenHeight - 80.0) {
+        zone = EdgeZone.bottom;
+        final d = cachedScreenHeight - dragY;
+        v = d < 20 ? 1070.0 : d < 40 ? 665.0 : d < 60 ? 400.0 : 200.0;
+      }
 
-        // Log velocity every 10 frames (about 6 times per second)
-        if (frameCount % 10 == 0) {
-          final distFromEdge = currentZone == EdgeZone.top
-              ? currentDragY
-              : screenHeight - currentDragY;
-          debugPrint('Auto-scroll: $speedZoneName - Velocity: ${velocity.toStringAsFixed(0)}px/s - Distance from edge: ${distFromEdge.toStringAsFixed(0)}px');
-        }
-        frameCount++;
+      if (zone == EdgeZone.none) {
+        _stopAutoScroll();
+        return;
+      }
 
-        // Stop if no longer in edge zone
-        if (currentZone == EdgeZone.none) {
-          debugPrint('Auto-scroll stopped - left edge zone');
-          timer.cancel();
-          _autoScrollTimer = null;
-          return;
-        }
+      // Log velocity periodically
+      if (kDebugMode && frameCount % 10 == 0) {
+        final distFromEdge = zone == EdgeZone.top
+            ? dragY
+            : cachedScreenHeight - dragY;
+        debugPrint('Auto-scroll: Velocity: ${v.toStringAsFixed(0)}px/s - Distance from edge: ${distFromEdge.toStringAsFixed(0)}px');
+      }
+      frameCount++;
 
-        final currentOffset = widget.scrollController!.offset;
-        final minExtent = widget.scrollController!.position.minScrollExtent;
-        final maxExtent = widget.scrollController!.position.maxScrollExtent;
+      final min = controller.position.minScrollExtent;
+      final max = controller.position.maxScrollExtent;
+      final current = controller.offset;
 
-        // Calculate frame delta with easing for smoother acceleration
-        final delta = velocity * 0.016; // 16ms = 0.016 seconds
+      final delta = v * dt;
+      double target = zone == EdgeZone.top ? current - delta : current + delta;
+      target = target.clamp(min, max);
 
-        // Calculate target offset
-        double targetOffset;
-        if (currentZone == EdgeZone.top) {
-          targetOffset = currentOffset - delta; // Scroll up
-        } else {
-          targetOffset = currentOffset + delta; // Scroll down
-        }
+      if ((zone == EdgeZone.top && target <= min) ||
+          (zone == EdgeZone.bottom && target >= max)) {
+        _stopAutoScroll();
+        return;
+      }
 
-        // Clamp to bounds
-        targetOffset = targetOffset.clamp(minExtent, maxExtent);
+      controller.jumpTo(target);
+    });
 
-        // Check if reached boundary
-        if ((currentZone == EdgeZone.top && targetOffset <= minExtent) ||
-            (currentZone == EdgeZone.bottom && targetOffset >= maxExtent)) {
-          debugPrint('Auto-scroll stopped - reached boundary');
-          timer.cancel();
-          _autoScrollTimer = null;
-          return;
-        }
-
-        // *** FIX APPLIED HERE ***
-        // Replaced jumpTo() with animateTo() to eliminate stuttering.
-        // This creates a smooth micro-animation over 16ms instead of an instant jump.
-        // widget.scrollController!.jumpTo(targetOffset);
-        widget.scrollController!.animateTo(
-          targetOffset,
-          duration: const Duration(milliseconds: 16), // Match the timer's period
-          curve: Curves.linear, // Use a linear curve for consistent speed
-        );
-      },
-    );
+    _autoScrollTicker!.start();
   }
 
   void _stopAutoScroll() {
-    _autoScrollTimer?.cancel();
-    _autoScrollTimer = null;
+    _autoScrollTicker?.stop();
+    _autoScrollTicker?.dispose();
+    _autoScrollTicker = null;
+    _autoScrollLastTs = Duration.zero;
   }
 
   @override
@@ -288,7 +250,9 @@ class _PhotoSliverGridState extends State<PhotoSliverGrid> {
 
               return GridItemErrorBoundary(
                 onRetry: () {
-                  debugPrint('Retrying grid item $index');
+                  if (kDebugMode) {
+                    debugPrint('Retrying grid item $index');
+                  }
                 },
                 child: _PerformanceOptimizedGridItem(
                   key: ValueKey('photo_${index}_${widget.images[index].path.hashCode}'),
@@ -413,10 +377,9 @@ class _PerformanceOptimizedGridItemState extends State<_PerformanceOptimizedGrid
         return LongPressDraggable<int>(
           data: widget.index,
           onDragStarted: widget.onDragStarted,
-          onDragUpdate: widget.onDragUpdate, // Track drag position
+          onDragUpdate: widget.onDragUpdate,
           onDragEnd: (details) => widget.onDragEnded(),
-          feedback: _buildLightweightDragFeedback(itemSize, optimizedImage),
-          // FIX 1: Proper gray placeholder without the image
+          feedback: _buildLightweightDragFeedback(itemSize, isDark),
           childWhenDragging: Container(
             decoration: BoxDecoration(
               color: AppColors.gridDragPlaceholder(isDark),
@@ -427,7 +390,6 @@ class _PerformanceOptimizedGridItemState extends State<_PerformanceOptimizedGrid
               )
                   : null,
             ),
-            // REMOVED the optimizedImage child - now shows only gray placeholder
           ),
           child: DragTarget<int>(
             onWillAcceptWithDetails: (details) => details.data != widget.index,
@@ -460,25 +422,85 @@ class _PerformanceOptimizedGridItemState extends State<_PerformanceOptimizedGrid
     );
   }
 
-  Widget _buildLightweightDragFeedback(Size size, Widget content) {
+  Widget _buildLightweightDragFeedback(Size size, bool isDark) {
     return Material(
       color: Colors.transparent,
-      child: Container(
+      child: SizedBox(
         width: size.width,
         height: size.height,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.zero,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.zero,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.zero,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Simple thumbnail image - NO Hero, NO ErrorBoundary
+                Image.file(
+                  widget.thumbnail,
+                  fit: BoxFit.cover,
+                  gaplessPlayback: true,
+                  cacheWidth: 360,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: AppColors.gridErrorBackground(isDark),
+                      child: Icon(
+                        Icons.error_outline,
+                        color: AppColors.gridErrorIcon(isDark),
+                        size: 24,
+                      ),
+                    );
+                  },
+                ),
+
+                // Hue map overlay if enabled
+                if (widget.showHueMap)
+                  FutureBuilder<Color>(
+                    future: DominantColorService().getDominantColor(widget.thumbnail.path),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData || snapshot.data == Colors.transparent) {
+                        return const SizedBox.shrink();
+                      }
+
+                      return Container(
+                        decoration: BoxDecoration(
+                          color: snapshot.data!.withValues(alpha: 0.8),
+                        ),
+                      );
+                    },
+                  ),
+
+                // Selection checkmark if selected
+                if (widget.isSelected)
+                  Positioned(
+                    bottom: 4,
+                    right: 4,
+                    child: Container(
+                      width: 20,
+                      height: 20,
+                      decoration: const BoxDecoration(
+                        color: Colors.black,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.check,
+                        color: Colors.white,
+                        size: 14,
+                      ),
+                    ),
+                  ),
+              ],
             ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.zero,
-          child: content,
+          ),
         ),
       ),
     );
