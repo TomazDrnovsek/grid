@@ -23,6 +23,9 @@ mixin _$PhotoState {
   /// List of thumbnail files corresponding to images
   List<File> get thumbnails => throw _privateConstructorUsedError;
 
+  /// PHASE 2: List of photo UUIDs corresponding to images (for backup/restore order preservation)
+  List<String> get imageUuids => throw _privateConstructorUsedError;
+
   /// Set of selected image indexes
   Set<int> get selectedIndexes => throw _privateConstructorUsedError;
 
@@ -101,6 +104,7 @@ abstract class $PhotoStateCopyWith<$Res> {
   $Res call({
     List<File> images,
     List<File> thumbnails,
+    List<String> imageUuids,
     Set<int> selectedIndexes,
     bool isLoading,
     bool showDeleteConfirm,
@@ -144,6 +148,7 @@ class _$PhotoStateCopyWithImpl<$Res, $Val extends PhotoState>
   $Res call({
     Object? images = null,
     Object? thumbnails = null,
+    Object? imageUuids = null,
     Object? selectedIndexes = null,
     Object? isLoading = null,
     Object? showDeleteConfirm = null,
@@ -174,6 +179,10 @@ class _$PhotoStateCopyWithImpl<$Res, $Val extends PhotoState>
                 ? _value.thumbnails
                 : thumbnails // ignore: cast_nullable_to_non_nullable
                       as List<File>,
+            imageUuids: null == imageUuids
+                ? _value.imageUuids
+                : imageUuids // ignore: cast_nullable_to_non_nullable
+                      as List<String>,
             selectedIndexes: null == selectedIndexes
                 ? _value.selectedIndexes
                 : selectedIndexes // ignore: cast_nullable_to_non_nullable
@@ -308,6 +317,7 @@ abstract class _$$PhotoStateImplCopyWith<$Res>
   $Res call({
     List<File> images,
     List<File> thumbnails,
+    List<String> imageUuids,
     Set<int> selectedIndexes,
     bool isLoading,
     bool showDeleteConfirm,
@@ -353,6 +363,7 @@ class __$$PhotoStateImplCopyWithImpl<$Res>
   $Res call({
     Object? images = null,
     Object? thumbnails = null,
+    Object? imageUuids = null,
     Object? selectedIndexes = null,
     Object? isLoading = null,
     Object? showDeleteConfirm = null,
@@ -383,6 +394,10 @@ class __$$PhotoStateImplCopyWithImpl<$Res>
             ? _value._thumbnails
             : thumbnails // ignore: cast_nullable_to_non_nullable
                   as List<File>,
+        imageUuids: null == imageUuids
+            ? _value._imageUuids
+            : imageUuids // ignore: cast_nullable_to_non_nullable
+                  as List<String>,
         selectedIndexes: null == selectedIndexes
             ? _value._selectedIndexes
             : selectedIndexes // ignore: cast_nullable_to_non_nullable
@@ -470,6 +485,7 @@ class _$PhotoStateImpl extends _PhotoState {
   const _$PhotoStateImpl({
     final List<File> images = const [],
     final List<File> thumbnails = const [],
+    final List<String> imageUuids = const <String>[],
     final Set<int> selectedIndexes = const {},
     this.isLoading = false,
     this.showDeleteConfirm = false,
@@ -491,6 +507,7 @@ class _$PhotoStateImpl extends _PhotoState {
     this.batchMetrics = const BatchMetrics(),
   }) : _images = images,
        _thumbnails = thumbnails,
+       _imageUuids = imageUuids,
        _selectedIndexes = selectedIndexes,
        _batchHistory = batchHistory,
        super._();
@@ -517,6 +534,18 @@ class _$PhotoStateImpl extends _PhotoState {
     if (_thumbnails is EqualUnmodifiableListView) return _thumbnails;
     // ignore: implicit_dynamic_type
     return EqualUnmodifiableListView(_thumbnails);
+  }
+
+  /// PHASE 2: List of photo UUIDs corresponding to images (for backup/restore order preservation)
+  final List<String> _imageUuids;
+
+  /// PHASE 2: List of photo UUIDs corresponding to images (for backup/restore order preservation)
+  @override
+  @JsonKey()
+  List<String> get imageUuids {
+    if (_imageUuids is EqualUnmodifiableListView) return _imageUuids;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_imageUuids);
   }
 
   /// Set of selected image indexes
@@ -630,7 +659,7 @@ class _$PhotoStateImpl extends _PhotoState {
 
   @override
   String toString() {
-    return 'PhotoState(images: $images, thumbnails: $thumbnails, selectedIndexes: $selectedIndexes, isLoading: $isLoading, showDeleteConfirm: $showDeleteConfirm, showLoadingModal: $showLoadingModal, showImagePreview: $showImagePreview, previewImageIndex: $previewImageIndex, isAtTop: $isAtTop, editingHeaderUsername: $editingHeaderUsername, headerUsername: $headerUsername, imageCount: $imageCount, arraysInSync: $arraysInSync, showHueMap: $showHueMap, currentBatchOperation: $currentBatchOperation, batchHistory: $batchHistory, totalBatchOperations: $totalBatchOperations, queuedOperations: $queuedOperations, isBatchProcessing: $isBatchProcessing, lastBatchResult: $lastBatchResult, batchMetrics: $batchMetrics)';
+    return 'PhotoState(images: $images, thumbnails: $thumbnails, imageUuids: $imageUuids, selectedIndexes: $selectedIndexes, isLoading: $isLoading, showDeleteConfirm: $showDeleteConfirm, showLoadingModal: $showLoadingModal, showImagePreview: $showImagePreview, previewImageIndex: $previewImageIndex, isAtTop: $isAtTop, editingHeaderUsername: $editingHeaderUsername, headerUsername: $headerUsername, imageCount: $imageCount, arraysInSync: $arraysInSync, showHueMap: $showHueMap, currentBatchOperation: $currentBatchOperation, batchHistory: $batchHistory, totalBatchOperations: $totalBatchOperations, queuedOperations: $queuedOperations, isBatchProcessing: $isBatchProcessing, lastBatchResult: $lastBatchResult, batchMetrics: $batchMetrics)';
   }
 
   @override
@@ -642,6 +671,10 @@ class _$PhotoStateImpl extends _PhotoState {
             const DeepCollectionEquality().equals(
               other._thumbnails,
               _thumbnails,
+            ) &&
+            const DeepCollectionEquality().equals(
+              other._imageUuids,
+              _imageUuids,
             ) &&
             const DeepCollectionEquality().equals(
               other._selectedIndexes,
@@ -691,6 +724,7 @@ class _$PhotoStateImpl extends _PhotoState {
     runtimeType,
     const DeepCollectionEquality().hash(_images),
     const DeepCollectionEquality().hash(_thumbnails),
+    const DeepCollectionEquality().hash(_imageUuids),
     const DeepCollectionEquality().hash(_selectedIndexes),
     isLoading,
     showDeleteConfirm,
@@ -725,6 +759,7 @@ abstract class _PhotoState extends PhotoState {
   const factory _PhotoState({
     final List<File> images,
     final List<File> thumbnails,
+    final List<String> imageUuids,
     final Set<int> selectedIndexes,
     final bool isLoading,
     final bool showDeleteConfirm,
@@ -754,6 +789,10 @@ abstract class _PhotoState extends PhotoState {
   /// List of thumbnail files corresponding to images
   @override
   List<File> get thumbnails;
+
+  /// PHASE 2: List of photo UUIDs corresponding to images (for backup/restore order preservation)
+  @override
+  List<String> get imageUuids;
 
   /// Set of selected image indexes
   @override

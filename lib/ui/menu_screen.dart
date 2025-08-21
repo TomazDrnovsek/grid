@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../app_theme.dart';
+import '../core/app_config.dart';
+import 'backup_settings_screen.dart';
 
 class MenuScreen extends StatelessWidget {
   final ThemeNotifier themeNotifier;
@@ -73,7 +75,19 @@ class MenuScreen extends StatelessWidget {
                         ],
                       ),
 
-                      // Future menu items will go here
+                      // âœ… NEW: Cloud Backup settings entry (with feature flag check)
+                      if (AppConfig.enableCloudBackup) ...[
+                        const SizedBox(height: 24),
+                        _MenuTile(
+                          title: 'Cloud Backup',
+                          subtitle: 'Backup photos to your cloud storage',
+                          icon: Icons.cloud_outlined,
+                          isDark: isDark,
+                          onTap: () => _navigateToBackupSettings(context),
+                        ),
+                      ],
+
+                      // Future menu items can be added here
                     ],
                   ),
                 ),
@@ -92,6 +106,105 @@ class MenuScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  /// Navigate to backup settings screen with proper animation
+  void _navigateToBackupSettings(BuildContext context) {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            BackupSettingsScreen(themeNotifier: themeNotifier),
+        transitionDuration: AppConfig().animationDuration,
+        reverseTransitionDuration: AppConfig().animationDuration,
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeInOutCubic, // Smooth curve optimized for high refresh rate
+            ),
+            child: child,
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Reusable menu tile widget for consistent styling
+class _MenuTile extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool isDark;
+
+  const _MenuTile({
+    required this.title,
+    this.subtitle,
+    required this.icon,
+    required this.onTap,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+        child: Row(
+          children: [
+            // Icon
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: AppColors.textSecondary(isDark).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                icon,
+                size: 18,
+                color: AppColors.textPrimary(isDark),
+              ),
+            ),
+            const SizedBox(width: 16),
+
+            // Text content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: AppTheme.body(isDark).copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle!,
+                      style: AppTheme.body(isDark).copyWith(
+                        fontSize: 12,
+                        color: AppColors.textSecondary(isDark),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            // Arrow indicator
+            Icon(
+              Icons.chevron_right,
+              size: 20,
+              color: AppColors.textSecondary(isDark),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

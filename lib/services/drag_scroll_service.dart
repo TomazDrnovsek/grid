@@ -289,9 +289,9 @@ class DragScrollService {
   String getScrollIndicator(EdgeZone zone) {
     switch (zone) {
       case EdgeZone.top:
-        return '↑↑↑';
+        return 'â†‘â†‘â†‘';
       case EdgeZone.bottom:
-        return '↓↓↓';
+        return 'â†“â†“â†“';
       case EdgeZone.none:
         return '';
     }

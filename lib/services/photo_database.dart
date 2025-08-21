@@ -1,66 +1,63 @@
 // File: lib/services/photo_database.dart
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
-import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
 
-/// SQLite database service for photo metadata storage
-/// Replaces SharedPreferences for scalable, structured data management
+/// Database service for managing photo metadata and app settings
+/// PHASE 2 IMPLEMENTATION: Added stable photo IDs for order preservation across devices
 class PhotoDatabase {
-  static final PhotoDatabase _instance = PhotoDatabase._internal();
-  factory PhotoDatabase() => _instance;
-  PhotoDatabase._internal();
+  static const String _databaseName = 'photos.db';
+  static const int _databaseVersion = 2; // UPDATED: Incremented for UUID migration
 
-  static const String _databaseName = 'grid_photos.db';
-  static const int _databaseVersion = 1;
-
-  // Table definitions
-  static const String _photosTable = 'photos';
-  static const String _settingsTable = 'settings';
+  // Table names (single source of truth)
+  static const String photosTable = 'photos';
+  static const String settingsTable = 'settings';
 
   Database? _database;
 
-  /// Get database instance, creating if necessary
+  /// Get database instance (singleton pattern)
   Future<Database> get database async {
-    if (_database != null && _database!.isOpen) {
-      return _database!;
-    }
-
-    _database = await _initDatabase();
+    _database ??= await _initDatabase();
     return _database!;
   }
 
-  /// Initialize database with tables
+  /// Initialize database connection and create tables
   Future<Database> _initDatabase() async {
     try {
       final documentsDirectory = await getDatabasesPath();
       final path = join(documentsDirectory, _databaseName);
 
-      debugPrint('Initializing database at: $path');
+      debugPrint('Opening database at: $path');
 
-      return await openDatabase(
+      final database = await openDatabase(
         path,
         version: _databaseVersion,
         onCreate: _createTables,
         onUpgrade: _upgradeTables,
-        onOpen: (db) {
-          debugPrint('Database opened successfully');
-        },
+        onOpen: (db) => debugPrint('Database opened successfully'),
       );
+
+      return database;
+
     } catch (e) {
       debugPrint('Error initializing database: $e');
       rethrow;
     }
   }
 
-  /// Create database tables
+  /// Create database tables for fresh installation
   Future<void> _createTables(Database db, int version) async {
     try {
-      // Photos table for image metadata
+      debugPrint('Creating database tables...');
+
+      // Create photos table with UUID support
       await db.execute('''
-        CREATE TABLE $_photosTable (
+        CREATE TABLE $photosTable (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
-          image_path TEXT NOT NULL UNIQUE,
+          uuid TEXT NOT NULL UNIQUE,
+          image_path TEXT NOT NULL,
           thumbnail_path TEXT,
           original_name TEXT,
           file_size INTEGER,
@@ -68,18 +65,19 @@ class PhotoDatabase {
           height INTEGER,
           date_added INTEGER NOT NULL,
           date_modified INTEGER,
-          order_index INTEGER NOT NULL,
-          is_favorite INTEGER DEFAULT 0,
-          tags TEXT,
+          order_index INTEGER NOT NULL DEFAULT 0,
+          is_favorite INTEGER NOT NULL DEFAULT 0,
+          tags TEXT DEFAULT '',
           created_at INTEGER NOT NULL,
           updated_at INTEGER NOT NULL
         )
       ''');
 
-      // Settings table for app preferences
+      // Create settings table
       await db.execute('''
-        CREATE TABLE $_settingsTable (
-          key TEXT PRIMARY KEY,
+        CREATE TABLE $settingsTable (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          key TEXT NOT NULL UNIQUE,
           value TEXT NOT NULL,
           type TEXT NOT NULL DEFAULT 'string',
           created_at INTEGER NOT NULL,
@@ -88,9 +86,10 @@ class PhotoDatabase {
       ''');
 
       // Create indexes for better performance
-      await db.execute('CREATE INDEX idx_photos_order ON $_photosTable(order_index)');
-      await db.execute('CREATE INDEX idx_photos_date_added ON $_photosTable(date_added DESC)');
-      await db.execute('CREATE INDEX idx_photos_path ON $_photosTable(image_path)');
+      await db.execute('CREATE INDEX idx_photos_order ON $photosTable(order_index)');
+      await db.execute('CREATE INDEX idx_photos_date_added ON $photosTable(date_added DESC)');
+      await db.execute('CREATE INDEX idx_photos_path ON $photosTable(image_path)');
+      await db.execute('CREATE UNIQUE INDEX idx_photos_uuid ON $photosTable(uuid)'); // NEW: UUID index
 
       debugPrint('Database tables created successfully');
 
@@ -104,13 +103,96 @@ class PhotoDatabase {
   Future<void> _upgradeTables(Database db, int oldVersion, int newVersion) async {
     debugPrint('Upgrading database from version $oldVersion to $newVersion');
 
-    // Future version upgrades will be handled here
-    // For now, just recreate tables (data loss acceptable during development)
-    if (oldVersion < newVersion) {
-      await db.execute('DROP TABLE IF EXISTS $_photosTable');
-      await db.execute('DROP TABLE IF EXISTS $_settingsTable');
-      await _createTables(db, newVersion);
+    try {
+      // PHASE 2: Add UUID column migration (v1 -> v2)
+      if (oldVersion < 2 && newVersion >= 2) {
+        debugPrint('Migrating to version 2: Adding UUID support');
+
+        // Add uuid column to existing photos table
+        await db.execute('ALTER TABLE $photosTable ADD COLUMN uuid TEXT');
+
+        // Generate UUIDs for existing photos
+        final existingPhotos = await db.query(photosTable, columns: ['id']);
+        debugPrint('Backfilling UUIDs for ${existingPhotos.length} existing photos');
+
+        for (final photo in existingPhotos) {
+          final photoId = photo['id'] as int;
+          final uuid = _generatePhotoId();
+          await db.update(
+            photosTable,
+            {'uuid': uuid},
+            where: 'id = ?',
+            whereArgs: [photoId],
+          );
+        }
+
+        // Now make uuid column NOT NULL and add unique constraint
+        // SQLite doesn't support ALTER COLUMN, so we need to recreate the table
+        await db.execute('BEGIN TRANSACTION');
+
+        try {
+          // Create new table with proper schema
+          await db.execute('''
+            CREATE TABLE ${photosTable}_new (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              uuid TEXT NOT NULL UNIQUE,
+              image_path TEXT NOT NULL,
+              thumbnail_path TEXT,
+              original_name TEXT,
+              file_size INTEGER,
+              width INTEGER,
+              height INTEGER,
+              date_added INTEGER NOT NULL,
+              date_modified INTEGER,
+              order_index INTEGER NOT NULL DEFAULT 0,
+              is_favorite INTEGER NOT NULL DEFAULT 0,
+              tags TEXT DEFAULT '',
+              created_at INTEGER NOT NULL,
+              updated_at INTEGER NOT NULL
+            )
+          ''');
+
+          // Copy data from old table to new table
+          await db.execute('''
+            INSERT INTO ${photosTable}_new 
+            SELECT * FROM $photosTable
+          ''');
+
+          // Drop old table and rename new table
+          await db.execute('DROP TABLE $photosTable');
+          await db.execute('ALTER TABLE ${photosTable}_new RENAME TO $photosTable');
+
+          // Recreate indexes
+          await db.execute('CREATE INDEX idx_photos_order ON $photosTable(order_index)');
+          await db.execute('CREATE INDEX idx_photos_date_added ON $photosTable(date_added DESC)');
+          await db.execute('CREATE INDEX idx_photos_path ON $photosTable(image_path)');
+          await db.execute('CREATE UNIQUE INDEX idx_photos_uuid ON $photosTable(uuid)');
+
+          await db.execute('COMMIT');
+          debugPrint('UUID migration completed successfully');
+
+        } catch (e) {
+          await db.execute('ROLLBACK');
+          debugPrint('UUID migration failed, rolling back: $e');
+          rethrow;
+        }
+      }
+
+      // Future version upgrades will be handled here
+
+    } catch (e) {
+      debugPrint('Error during database upgrade: $e');
+      rethrow;
     }
+  }
+
+  /// Generate a unique photo ID using secure random
+  String _generatePhotoId() {
+    final random = Random.secure();
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final randomBytes = List<int>.generate(8, (i) => random.nextInt(256));
+    final randomHex = randomBytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return 'photo_${timestamp}_$randomHex';
   }
 
   /// Insert a new photo entry
@@ -119,17 +201,21 @@ class PhotoDatabase {
       final db = await database;
       final now = DateTime.now().millisecondsSinceEpoch;
 
+      // Generate UUID if not provided
+      final uuid = photo.uuid ?? _generatePhotoId();
+
       final result = await db.insert(
-        _photosTable,
+        photosTable,
         {
           ...photo.toMap(),
+          'uuid': uuid,
           'created_at': now,
           'updated_at': now,
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
 
-      debugPrint('Inserted photo: ${photo.imagePath} with ID: $result');
+      debugPrint('Inserted photo with ID: $result, UUID: $uuid');
       return result;
 
     } catch (e) {
@@ -138,47 +224,16 @@ class PhotoDatabase {
     }
   }
 
-  /// Insert multiple photos in a batch transaction
-  Future<List<int>> insertPhotos(List<PhotoDatabaseEntry> photos) async {
-    try {
-      final db = await database;
-      final now = DateTime.now().millisecondsSinceEpoch;
-      final results = <int>[];
-
-      await db.transaction((txn) async {
-        for (final photo in photos) {
-          final result = await txn.insert(
-            _photosTable,
-            {
-              ...photo.toMap(),
-              'created_at': now,
-              'updated_at': now,
-            },
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
-          results.add(result);
-        }
-      });
-
-      debugPrint('Batch inserted ${photos.length} photos');
-      return results;
-
-    } catch (e) {
-      debugPrint('Error batch inserting photos: $e');
-      rethrow;
-    }
-  }
-
   /// Get all photos ordered by index
   Future<List<PhotoDatabaseEntry>> getAllPhotos() async {
     try {
       final db = await database;
-      final List<Map<String, dynamic>> maps = await db.query(
-        _photosTable,
+      final result = await db.query(
+        photosTable,
         orderBy: 'order_index ASC',
       );
 
-      return maps.map((map) => PhotoDatabaseEntry.fromMap(map)).toList();
+      return result.map((map) => PhotoDatabaseEntry.fromMap(map)).toList();
 
     } catch (e) {
       debugPrint('Error getting all photos: $e');
@@ -186,46 +241,130 @@ class PhotoDatabase {
     }
   }
 
-  /// Get photos with pagination
-  Future<List<PhotoDatabaseEntry>> getPhotos({int? limit, int? offset}) async {
+  /// Get photo by UUID
+  Future<PhotoDatabaseEntry?> getPhotoByUuid(String uuid) async {
     try {
       final db = await database;
-      final List<Map<String, dynamic>> maps = await db.query(
-        _photosTable,
-        orderBy: 'order_index ASC',
-        limit: limit,
-        offset: offset,
+      final result = await db.query(
+        photosTable,
+        where: 'uuid = ?',
+        whereArgs: [uuid],
+        limit: 1,
       );
 
-      return maps.map((map) => PhotoDatabaseEntry.fromMap(map)).toList();
+      if (result.isEmpty) return null;
+      return PhotoDatabaseEntry.fromMap(result.first);
 
     } catch (e) {
-      debugPrint('Error getting photos with pagination: $e');
-      return <PhotoDatabaseEntry>[];
+      debugPrint('Error getting photo by UUID: $e');
+      return null;
     }
   }
 
-  /// Update photo order indexes (for reordering)
-  Future<void> updatePhotoOrders(List<String> orderedPaths) async {
+  /// Get photo by path (legacy support)
+  Future<PhotoDatabaseEntry?> getPhotoByPath(String imagePath) async {
+    try {
+      final db = await database;
+      final result = await db.query(
+        photosTable,
+        where: 'image_path = ?',
+        whereArgs: [imagePath],
+        limit: 1,
+      );
+
+      if (result.isEmpty) return null;
+      return PhotoDatabaseEntry.fromMap(result.first);
+
+    } catch (e) {
+      debugPrint('Error getting photo by path: $e');
+      return null;
+    }
+  }
+
+  /// Update photo entry
+  Future<int> updatePhoto(PhotoDatabaseEntry photo) async {
     try {
       final db = await database;
       final now = DateTime.now().millisecondsSinceEpoch;
 
-      await db.transaction((txn) async {
-        for (int i = 0; i < orderedPaths.length; i++) {
-          await txn.update(
-            _photosTable,
-            {
-              'order_index': i,
-              'updated_at': now,
-            },
-            where: 'image_path = ?',
-            whereArgs: [orderedPaths[i]],
-          );
-        }
-      });
+      final result = await db.update(
+        photosTable,
+        {
+          ...photo.toMap(),
+          'updated_at': now,
+        },
+        where: 'uuid = ?',
+        whereArgs: [photo.uuid],
+      );
 
-      debugPrint('Updated order for ${orderedPaths.length} photos');
+      debugPrint('Updated photo: ${photo.uuid}');
+      return result;
+
+    } catch (e) {
+      debugPrint('Error updating photo: $e');
+      rethrow;
+    }
+  }
+
+  /// Delete photo by UUID
+  Future<int> deletePhotoByUuid(String uuid) async {
+    try {
+      final db = await database;
+      final result = await db.delete(
+        photosTable,
+        where: 'uuid = ?',
+        whereArgs: [uuid],
+      );
+
+      debugPrint('Deleted photo: $uuid');
+      return result;
+
+    } catch (e) {
+      debugPrint('Error deleting photo: $e');
+      rethrow;
+    }
+  }
+
+  /// Delete photo by path (legacy support)
+  Future<int> deletePhotoByPath(String imagePath) async {
+    try {
+      final db = await database;
+      final result = await db.delete(
+        photosTable,
+        where: 'image_path = ?',
+        whereArgs: [imagePath],
+      );
+
+      debugPrint('Deleted photo by path: $imagePath');
+      return result;
+
+    } catch (e) {
+      debugPrint('Error deleting photo by path: $e');
+      rethrow;
+    }
+  }
+
+  /// Update multiple photo order indices efficiently
+  Future<void> updatePhotoOrders(List<({String uuid, int orderIndex})> updates) async {
+    try {
+      final db = await database;
+      final batch = db.batch();
+      final now = DateTime.now().millisecondsSinceEpoch;
+
+      for (final update in updates) {
+        batch.update(
+          photosTable,
+          {
+            'order_index': update.orderIndex,
+            'updated_at': now,
+          },
+          where: 'uuid = ?',
+          whereArgs: [update.uuid],
+        );
+      }
+
+      await batch.commit(noResult: true);
+      debugPrint('Updated order for ${updates.length} photos');
 
     } catch (e) {
       debugPrint('Error updating photo orders: $e');
@@ -233,37 +372,40 @@ class PhotoDatabase {
     }
   }
 
-  /// Delete photos by paths
-  Future<int> deletePhotosByPaths(List<String> imagePaths) async {
+  /// ðŸ”§ NEW: Update order by image paths (authoritative 0..n; 0 = top/newest)
+  /// This is used by the repository to persist the exact UI order
+  /// when we only have paths (e.g., right after adding new images).
+  Future<void> updatePhotoOrdersByPaths(List<String> orderedPaths) async {
     try {
       final db = await database;
-      int deletedCount = 0;
+      final batch = db.batch();
+      final now = DateTime.now().millisecondsSinceEpoch;
 
-      await db.transaction((txn) async {
-        for (final path in imagePaths) {
-          final result = await txn.delete(
-            _photosTable,
-            where: 'image_path = ?',
-            whereArgs: [path],
-          );
-          deletedCount += result;
-        }
-      });
+      for (int i = 0; i < orderedPaths.length; i++) {
+        batch.update(
+          photosTable,
+          {
+            'order_index': i,
+            'updated_at': now,
+          },
+          where: 'image_path = ?',
+          whereArgs: [orderedPaths[i]],
+        );
+      }
 
-      debugPrint('Deleted $deletedCount photos from database');
-      return deletedCount;
-
+      await batch.commit(noResult: true);
+      debugPrint('Updated order (by paths) for ${orderedPaths.length} photos');
     } catch (e) {
-      debugPrint('Error deleting photos: $e');
-      return 0;
+      debugPrint('Error updating photo orders by paths: $e');
+      rethrow;
     }
   }
 
-  /// Get photo count
+  /// Get total photo count
   Future<int> getPhotoCount() async {
     try {
       final db = await database;
-      final result = await db.rawQuery('SELECT COUNT(*) as count FROM $_photosTable');
+      final result = await db.rawQuery('SELECT COUNT(*) FROM $photosTable');
       return Sqflite.firstIntValue(result) ?? 0;
     } catch (e) {
       debugPrint('Error getting photo count: $e');
@@ -271,12 +413,29 @@ class PhotoDatabase {
     }
   }
 
-  /// Check if photo exists by path
+  /// Check if photo exists by UUID
+  Future<bool> photoExistsByUuid(String uuid) async {
+    try {
+      final db = await database;
+      final result = await db.query(
+        photosTable,
+        where: 'uuid = ?',
+        whereArgs: [uuid],
+        limit: 1,
+      );
+      return result.isNotEmpty;
+    } catch (e) {
+      debugPrint('Error checking photo existence by UUID: $e');
+      return false;
+    }
+  }
+
+  /// Check if photo exists by path (legacy support)
   Future<bool> photoExists(String imagePath) async {
     try {
       final db = await database;
       final result = await db.query(
-        _photosTable,
+        photosTable,
         where: 'image_path = ?',
         whereArgs: [imagePath],
         limit: 1,
@@ -318,7 +477,7 @@ class PhotoDatabase {
       }
 
       await db.insert(
-        _settingsTable,
+        settingsTable,
         {
           'key': key,
           'value': valueStr,
@@ -340,7 +499,7 @@ class PhotoDatabase {
     try {
       final db = await database;
       final result = await db.query(
-        _settingsTable,
+        settingsTable,
         where: 'key = ?',
         whereArgs: [key],
         limit: 1,
@@ -378,7 +537,7 @@ class PhotoDatabase {
     try {
       final db = await database;
       final result = await db.query(
-        _photosTable,
+        photosTable,
         columns: ['image_path'],
         orderBy: 'order_index ASC',
       );
@@ -391,12 +550,30 @@ class PhotoDatabase {
     }
   }
 
+  /// Get all photo UUIDs in order
+  Future<List<String>> getAllPhotoUuids() async {
+    try {
+      final db = await database;
+      final result = await db.query(
+        photosTable,
+        columns: ['uuid'],
+        orderBy: 'order_index ASC',
+      );
+
+      return result.map((row) => row['uuid'] as String).toList();
+
+    } catch (e) {
+      debugPrint('Error getting all photo UUIDs: $e');
+      return <String>[];
+    }
+  }
+
   /// Clear all data (for testing/reset)
   Future<void> clearAllData() async {
     try {
       final db = await database;
-      await db.delete(_photosTable);
-      await db.delete(_settingsTable);
+      await db.delete(photosTable);
+      await db.delete(settingsTable);
       debugPrint('Cleared all database data');
     } catch (e) {
       debugPrint('Error clearing database: $e');
@@ -420,7 +597,7 @@ class PhotoDatabase {
 
       final photoCount = await getPhotoCount();
       final settingsCount = Sqflite.firstIntValue(
-          await db.rawQuery('SELECT COUNT(*) FROM $_settingsTable')
+          await db.rawQuery('SELECT COUNT(*) FROM $settingsTable')
       ) ?? 0;
 
       // Get database file size
@@ -448,8 +625,10 @@ class PhotoDatabase {
 }
 
 /// Data model for photo database entries
+/// PHASE 2: Added UUID field for stable photo identification
 class PhotoDatabaseEntry {
   final int? id;
+  final String? uuid; // NEW: Stable photo identifier
   final String imagePath;
   final String? thumbnailPath;
   final String? originalName;
@@ -464,6 +643,7 @@ class PhotoDatabaseEntry {
 
   PhotoDatabaseEntry({
     this.id,
+    this.uuid,
     required this.imagePath,
     this.thumbnailPath,
     this.originalName,
@@ -480,6 +660,7 @@ class PhotoDatabaseEntry {
   Map<String, dynamic> toMap() {
     return {
       if (id != null) 'id': id,
+      if (uuid != null) 'uuid': uuid,
       'image_path': imagePath,
       'thumbnail_path': thumbnailPath,
       'original_name': originalName,
@@ -497,6 +678,7 @@ class PhotoDatabaseEntry {
   factory PhotoDatabaseEntry.fromMap(Map<String, dynamic> map) {
     return PhotoDatabaseEntry(
       id: map['id']?.toInt(),
+      uuid: map['uuid'], // NEW: UUID field
       imagePath: map['image_path'] ?? '',
       thumbnailPath: map['thumbnail_path'],
       originalName: map['original_name'],
@@ -511,12 +693,50 @@ class PhotoDatabaseEntry {
       isFavorite: (map['is_favorite'] ?? 0) == 1,
       tags: map['tags'] != null && map['tags'].toString().isNotEmpty
           ? map['tags'].toString().split(',')
-          : [],
+          : <String>[],
     );
+  }
+
+  /// Create a copy with updated fields
+  PhotoDatabaseEntry copyWith({
+    int? id,
+    String? uuid,
+    String? imagePath,
+    String? thumbnailPath,
+    String? originalName,
+    int? fileSize,
+    int? width,
+    int? height,
+    DateTime? dateAdded,
+    DateTime? dateModified,
+    int? orderIndex,
+    bool? isFavorite,
+    List<String>? tags,
+  }) {
+    return PhotoDatabaseEntry(
+      id: id ?? this.id,
+      uuid: uuid ?? this.uuid,
+      imagePath: imagePath ?? this.imagePath,
+      thumbnailPath: thumbnailPath ?? this.thumbnailPath,
+      originalName: originalName ?? this.originalName,
+      fileSize: fileSize ?? this.fileSize,
+      width: width ?? this.width,
+      height: height ?? this.height,
+      dateAdded: dateAdded ?? this.dateAdded,
+      dateModified: dateModified ?? this.dateModified,
+      orderIndex: orderIndex ?? this.orderIndex,
+      isFavorite: isFavorite ?? this.isFavorite,
+      tags: tags ?? this.tags,
+    );
+  }
+
+  @override
+  String toString() {
+    return 'PhotoDatabaseEntry{id: $id, uuid: $uuid, imagePath: $imagePath, orderIndex: $orderIndex}';
   }
 }
 
-/// Database statistics
+/// Database statistics model
 class DatabaseStatistics {
   final int photoCount;
   final int settingsCount;
@@ -530,10 +750,10 @@ class DatabaseStatistics {
     required this.databasePath,
   });
 
-  String get formattedSize {
-    if (databaseSizeBytes < 0) return 'Unknown';
-    if (databaseSizeBytes < 1024) return '${databaseSizeBytes}B';
-    if (databaseSizeBytes < 1024 * 1024) return '${(databaseSizeBytes / 1024).toStringAsFixed(1)}KB';
-    return '${(databaseSizeBytes / 1024 / 1024).toStringAsFixed(1)}MB';
+  double get databaseSizeMB => databaseSizeBytes / (1024 * 1024);
+
+  @override
+  String toString() {
+    return 'DatabaseStatistics{photos: $photoCount, settings: $settingsCount, size: ${databaseSizeMB.toStringAsFixed(2)}MB}';
   }
 }

@@ -32,6 +32,9 @@ class AppConfig {
   late final int imageCacheSizeBytes;
   late final int thumbnailCacheWidth;
 
+  // âœ… NEW: Feature flags
+  static const bool enableCloudBackup = true;  // Feature flag for cloud backup functionality
+
   bool _isInitialized = false;
 
   /// Initialize all performance configuration based on device capabilities
@@ -156,6 +159,7 @@ class AppConfig {
     debugPrint('Spring Physics: mass=$springMass, stiffness=$springStiffness, ratio=$springRatio');
     debugPrint('Image Cache: $imageCacheSize images, ${(imageCacheSizeBytes / 1024 / 1024).toStringAsFixed(0)}MB');
     debugPrint('Thumbnail Cache Width: ${thumbnailCacheWidth}px');
+    debugPrint('ðŸ†• Cloud Backup Enabled: $enableCloudBackup');
     debugPrint('=====================================');
   }
 
@@ -182,6 +186,7 @@ class AppConfig {
       'thumbnailCacheWidth': thumbnailCacheWidth,
       'imageCacheSize': imageCacheSize,
       'imageCacheMB': (imageCacheSizeBytes / 1024 / 1024).round(),
+      'enableCloudBackup': enableCloudBackup,
     };
   }
 

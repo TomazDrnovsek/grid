@@ -1,12 +1,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-	
-	<uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-	<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+
+    <!-- âœ… FIXED: Updated permissions for Android 14+ compatibility -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+
+    <!-- âœ… FIXED: Legacy permission with proper SDK versioning -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+    <!-- âœ… REMOVED: MANAGE_DOCUMENTS permission (only for system apps, not needed for SAF) -->
 
     <application
-        android:label="grid"
-        android:name="${applicationName}"
+        android:label="Grid"
         android:icon="@mipmap/ic_launcher">
+        <!-- âœ… FIXED: Removed ${applicationName} which was causing "Unresolved class" error -->
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -21,9 +29,9 @@
                  while the Flutter UI initializes. After that, this theme continues
                  to determine the Window background behind the Flutter UI. -->
             <meta-data
-              android:name="io.flutter.embedding.android.NormalTheme"
-              android:resource="@style/NormalTheme"
-              />
+                android:name="io.flutter.embedding.android.NormalTheme"
+                android:resource="@style/NormalTheme"
+                />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -35,6 +43,7 @@
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
+
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
          https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
@@ -44,6 +53,11 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+
+        <!-- âœ… Allow querying for document providers (cloud storage) -->
+        <intent>
+            <action android:name="android.intent.action.OPEN_DOCUMENT_TREE" />
         </intent>
     </queries>
 </manifest>

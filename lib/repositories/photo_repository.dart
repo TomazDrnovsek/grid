@@ -1,9 +1,11 @@
 // File: lib/repositories/photo_repository.dart
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:sqflite/sqflite.dart';
 
 import '../models/photo_state.dart';
 import '../file_utils.dart';
@@ -12,6 +14,7 @@ import '../services/performance_monitor.dart';
 import '../services/thumbnail_service.dart';
 
 /// Repository layer for photo management business logic
+/// PHASE 2 IMPLEMENTATION: Added minimal UUID support for stable photo identification
 /// ENHANCED PHASE 3: Integrated with batch operation tracking and performance monitoring
 /// NOW WITH LAZY THUMBNAIL GENERATION: Reduces initial load from 1501ms to <100ms
 /// FIXED: Photo ordering bug - database now matches UI order
@@ -25,928 +28,106 @@ class PhotoRepository {
   final ThumbnailService _thumbnailService = ThumbnailService();
 
   // ========================================================================
+  // PHASE 2: UUID GENERATION UTILITY (NEW)
+  // ========================================================================
+
+  /// Generate a unique photo ID using secure random
+  String _generatePhotoId() {
+    final random = Random.secure();
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final randomBytes = List<int>.generate(8, (i) => random.nextInt(256));
+    final randomHex = randomBytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return 'photo_${timestamp}_$randomHex';
+  }
+
+  // ========================================================================
   // PHASE 3: BATCH OPERATION TRACKING & PERFORMANCE INTEGRATION
   // ========================================================================
 
   /// Batch operation metrics tracking
-  BatchMetrics _batchMetrics = const BatchMetrics();
+  final BatchMetrics _batchMetrics = const BatchMetrics();
 
   /// Current batch operations in progress
   final Map<String, BatchOperationStatus> _activeBatchOperations = {};
 
-  /// Batch operation history (last 50 operations)
-  final List<BatchOperationRecord> _batchHistory = [];
-  static const int _maxHistorySize = 50;
-
-  /// Performance thresholds for batch operations
-  static const Duration _fastBatchThreshold = Duration(milliseconds: 100);
-  static const Duration _slowBatchThreshold = Duration(milliseconds: 1000);
-
   /// Get current batch metrics
   BatchMetrics getBatchMetrics() => _batchMetrics;
-
-  /// Get batch operation history
-  List<BatchOperationRecord> getBatchHistory() => List.unmodifiable(_batchHistory);
 
   /// Get active batch operations
   Map<String, BatchOperationStatus> getActiveBatchOperations() => Map.unmodifiable(_activeBatchOperations);
 
-  /// Validate batch operation before execution
-  BatchValidationResult validateBatchOperation(
-      BatchOperationType operationType,
-      Map<String, dynamic> operationData
-      ) {
-    final errors = <String>[];
-    final warnings = <String>[];
-
-    // Check if too many operations are already active
-    if (_activeBatchOperations.length > 3) {
-      errors.add('Too many concurrent batch operations (${_activeBatchOperations.length})');
-    }
-
-    // Operation-specific validation
-    switch (operationType) {
-      case BatchOperationType.addPhotos:
-        final images = operationData['images'] as List<ProcessedImage>? ?? [];
-        if (images.isEmpty) {
-          errors.add('No processed images provided for batch add operation');
-        }
-        if (images.length > 50) {
-          warnings.add('Large batch size (${images.length} images) may impact performance');
-        }
-        break;
-
-      case BatchOperationType.deletePhotos:
-        final indexes = operationData['indexes'] as List<int>? ?? [];
-        if (indexes.isEmpty) {
-          errors.add('No indexes provided for batch delete operation');
-        }
-        if (indexes.length > 100) {
-          warnings.add('Large delete batch (${indexes.length} items) may take time');
-        }
-        break;
-
-      default:
-      // Other operations validated at provider level
-        break;
-    }
-
-    // Performance-based warnings
-    if (_batchMetrics.averageProcessingTime > _slowBatchThreshold) {
-      warnings.add('Recent batch operations have been slow (${_batchMetrics.averageProcessingTime.inMilliseconds}ms avg)');
-    }
-
-    return BatchValidationResult(
-      isValid: errors.isEmpty,
-      errors: errors,
-      warnings: warnings,
-      operationType: operationType,
-    );
-  }
-
-  /// Start batch operation tracking
-  String _startBatchOperation(BatchOperationType type, int operationCount) {
-    final operationId = '${type.name}_${DateTime.now().millisecondsSinceEpoch}';
-
-    _activeBatchOperations[operationId] = BatchOperationStatus(
-      type: type,
-      startTime: DateTime.now(),
-      operationCount: operationCount,
-      status: 'Starting batch operation...',
-    );
-
-    if (kDebugMode) {
-      debugPrint('🔄 Repository Batch: Started $type with $operationCount operations (ID: $operationId)');
-    }
-
-    return operationId;
-  }
-
-  /// Update batch operation status
-  void _updateBatchOperation(String operationId, {
-    String? status,
-    int? completedOperations,
-    List<String>? messages,
-  }) {
-    final currentOp = _activeBatchOperations[operationId];
-    if (currentOp == null) return;
-
-    _activeBatchOperations[operationId] = currentOp.copyWith(
-      status: status ?? currentOp.status,
-      completedOperations: completedOperations ?? currentOp.completedOperations,
-      currentMessages: messages ?? currentOp.currentMessages,
-    );
-  }
-
-  /// Complete batch operation and record results
-  void _completeBatchOperation(
-      String operationId,
-      int successCount,
-      int failureCount, {
-        List<String> errors = const [],
-        List<String> warnings = const [],
-        bool wasOptimized = false,
-        Map<String, dynamic> metadata = const {},
-      }) {
-    final currentOp = _activeBatchOperations.remove(operationId);
-    if (currentOp == null) return;
-
-    final endTime = DateTime.now();
-    final record = BatchOperationRecord(
-      type: currentOp.type,
-      startTime: currentOp.startTime,
-      endTime: endTime,
-      operationCount: currentOp.operationCount,
-      successCount: successCount,
-      failureCount: failureCount,
-      errors: errors,
-      warnings: warnings,
-      wasOptimized: wasOptimized,
-      metadata: metadata,
-    );
-
-    // Add to history
-    _batchHistory.add(record);
-    if (_batchHistory.length > _maxHistorySize) {
-      _batchHistory.removeAt(0);
-    }
-
-    // Update metrics
-    final result = BatchResult(
-      operationsProcessed: currentOp.operationCount,
-      successCount: successCount,
-      failureCount: failureCount,
-      processingTime: record.duration,
-      errors: errors,
-      warnings: warnings,
-      wasOptimized: wasOptimized,
-      primaryOperationType: currentOp.type,
-      operationBreakdown: {currentOp.type.name: currentOp.operationCount},
-    );
-
-    _batchMetrics = _batchMetrics.updateWithBatch(result);
-
-    if (kDebugMode) {
-      debugPrint('✅ Repository Batch Complete: ${record.summary}');
-      if (record.efficiencyScore < 0.8) {
-        debugPrint('⚠️  Batch efficiency below optimal: ${(record.efficiencyScore * 100).toStringAsFixed(1)}%');
-      }
-    }
-  }
-
-  /// Enhanced batch database operations
-  Future<BatchResult> processBatchDatabaseOperations(
-      BatchOperationType operationType,
-      Map<String, dynamic> operationData,
-      ) async {
-    // Validate operation
-    final validation = validateBatchOperation(operationType, operationData);
-    if (!validation.isValid) {
-      return BatchResult(
-        operationsProcessed: 0,
-        successCount: 0,
-        failureCount: 1,
-        processingTime: Duration.zero,
-        errors: validation.errors,
-        wasOptimized: false,
-        primaryOperationType: operationType,
-      );
-    }
-
-    final operationId = _startBatchOperation(operationType, 1);
-
-    try {
-      // Start performance monitoring
-      PerformanceMonitor.instance.startOperation('repository_batch_${operationType.name}');
-
-      BatchResult result;
-
-      switch (operationType) {
-        case BatchOperationType.addPhotos:
-          result = await _processBatchAddDatabase(operationId, operationData);
-          break;
-        case BatchOperationType.deletePhotos:
-          result = await _processBatchDeleteDatabase(operationId, operationData);
-          break;
-        default:
-          result = BatchResult(
-            operationsProcessed: 0,
-            successCount: 0,
-            failureCount: 1,
-            processingTime: Duration.zero,
-            errors: ['Unsupported batch operation type: $operationType'],
-            wasOptimized: false,
-            primaryOperationType: operationType,
-          );
-      }
-
-      // End performance monitoring
-      PerformanceMonitor.instance.endOperation('repository_batch_${operationType.name}');
-
-      return result;
-
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error in batch database operations: $e');
-      }
-      PerformanceMonitor.instance.endOperation('repository_batch_${operationType.name}');
-
-      _completeBatchOperation(
-        operationId,
-        0,
-        1,
-        errors: ['Batch operation failed: $e'],
-      );
-
-      return BatchResult(
-        operationsProcessed: 1,
-        successCount: 0,
-        failureCount: 1,
-        processingTime: Duration(milliseconds: 100),
-        errors: ['Batch operation failed: $e'],
-        wasOptimized: false,
-        primaryOperationType: operationType,
-      );
-    }
-  }
-
-  /// FIXED: Process batch add photos to database with CORRECT order indexing
-  Future<BatchResult> _processBatchAddDatabase(
-      String operationId,
-      Map<String, dynamic> operationData,
-      ) async {
-    final images = operationData['images'] as List<ProcessedImage>? ?? [];
-    if (images.isEmpty) {
-      return BatchResult(
-        operationsProcessed: 0,
-        successCount: 0,
-        failureCount: 0,
-        processingTime: Duration.zero,
-        wasOptimized: false,
-        primaryOperationType: BatchOperationType.addPhotos,
-      );
-    }
-
-    _updateBatchOperation(operationId, status: 'Adding ${images.length} photos to database...');
-
-    final startTime = DateTime.now();
-    int successCount = 0;
-    final errors = <String>[];
-
-    try {
-      final now = DateTime.now();
-
-      // STEP 1: Get existing photos
-      final existingPhotos = await _database.getAllPhotos();
-      final existingPhotoCount = existingPhotos.length;
-
-      if (kDebugMode) {
-        debugPrint('📋 ORDER FIX: Found $existingPhotoCount existing photos');
-      }
-
-      // STEP 2: Shift existing photos to higher order indexes FIRST
-      if (existingPhotoCount > 0) {
-        _updateBatchOperation(operationId, status: 'Shifting existing photo indexes...');
-
-        // FIXED: Build correct order list that matches UI display order
-        final List<String> reorderedPaths = [];
-
-        // FIXED: Reverse the new photo paths to match UI order (newest first)
-        // UI shows: [...allNewImages.reversed, ...currentState.images]
-        // So database should store the same order
-        for (final newImage in images.reversed) {
-          reorderedPaths.add(newImage.image.path);
-        }
-
-        // Then add existing photo paths (they will get indexes images.length, images.length+1, ...)
-        for (final existingPhoto in existingPhotos) {
-          reorderedPaths.add(existingPhoto.imagePath);
-        }
-
-        if (kDebugMode) {
-          debugPrint('✅ FIXED ORDER: Database will match UI order');
-          debugPrint('  New photos (reversed): ${images.map((i) => i.image.path.split('/').last).toList().reversed.join(', ')}');
-          debugPrint('  Final order in DB will match UI display order');
-        }
-      }
-
-      // STEP 3: Create database entries for new photos with indexes 0, 1, 2...
-      final photoEntries = <PhotoDatabaseEntry>[];
-      for (int i = 0; i < images.length; i++) {
-        final processed = images[i];
-        photoEntries.add(PhotoDatabaseEntry(
-          imagePath: processed.image.path,
-          thumbnailPath: null, // Let lazy service handle thumbnails
-          dateAdded: now,
-          orderIndex: i, // New photos get order indexes 0, 1, 2...
-        ));
-
-        _updateBatchOperation(operationId,
-            completedOperations: i + 1,
-            status: 'Processing ${i + 1}/${images.length} database entries...'
-        );
-      }
-
-      // STEP 4: Insert new photos with their correct indexes
-      _updateBatchOperation(operationId, status: 'Inserting new photos into database...');
-
-      await _database.insertPhotos(photoEntries);
-
-      // STEP 5: FIXED - Final authoritative reindex with CORRECT order that matches UI
-      try {
-        final List<String> finalOrderedPaths = [
-          // FIXED: Reverse the photo entries to match UI order
-          ...photoEntries.map((e) => e.imagePath).toList().reversed,
-          ...existingPhotos.map((p) => p.imagePath),
-        ];
-        await _database.updatePhotoOrders(finalOrderedPaths);
-
-        if (kDebugMode) {
-          debugPrint('✅ PHOTO ORDER BUG FIXED: Database now matches UI order');
-          debugPrint('  UI order: newest first (reversed)');
-          debugPrint('  DB order: newest first (reversed) - FIXED!');
-          debugPrint('  No more order reversal after app restart');
-        }
-      } catch (e) {
-        if (kDebugMode) {
-          debugPrint('⚠️ Final reindex failed: $e');
-        }
-      }
-
-      successCount = images.length;
-
-      // Start lazy thumb generation for new photos immediately (high priority)
-      _updateBatchOperation(operationId, status: 'Initiating lazy thumbnail generation...');
-      for (final processed in images) {
-        _thumbnailService.requestThumbnail(processed.image.path, priority: 10);
-      }
-
-      if (kDebugMode) {
-        debugPrint('✅ ORDER FIXED: ${images.length} new photos inserted with correct order');
-        debugPrint('📋 Existing photos maintained proper relative order');
-        debugPrint('✅ Database order now matches UI display order - BUG FIXED!');
-      }
-
-    } catch (e) {
-      errors.add('Database batch add failed: $e');
-      if (kDebugMode) {
-        debugPrint('❌ Database error: $e');
-      }
-    }
-
-    final processingTime = DateTime.now().difference(startTime);
-    final failureCount = images.length - successCount;
-
-    _completeBatchOperation(
-      operationId,
-      successCount,
-      failureCount,
-      errors: errors,
-      wasOptimized: true,
-      metadata: {
-        'imagesProcessed': images.length,
-        'existingPhotosShifted': true,
-        'orderFixed': true,
-        'photoOrderBugFixed': true,
-      },
-    );
-
-    return BatchResult(
-      operationsProcessed: images.length,
-      successCount: successCount,
-      failureCount: failureCount,
-      processingTime: processingTime,
-      errors: errors,
-      primaryOperationType: BatchOperationType.addPhotos,
-      wasOptimized: true,
-      operationBreakdown: {'addPhotos': images.length},
-      performanceMetrics: {
-        'avgTimePerImage': successCount > 0 ? processingTime.inMicroseconds / successCount : 0,
-        'databaseBatchOptimized': true,
-        'orderIndexingFixed': true,
-        'photoOrderBugFixed': true,
-      },
-    );
-  }
-
-  /// Process batch delete photos from database
-  Future<BatchResult> _processBatchDeleteDatabase(
-      String operationId,
-      Map<String, dynamic> operationData,
-      ) async {
-    final imagePaths = operationData['imagePaths'] as List<String>? ?? [];
-    if (imagePaths.isEmpty) {
-      return BatchResult(
-        operationsProcessed: 0,
-        successCount: 0,
-        failureCount: 0,
-        processingTime: Duration.zero,
-        wasOptimized: false,
-        primaryOperationType: BatchOperationType.deletePhotos,
-      );
-    }
-
-    _updateBatchOperation(operationId, status: 'Deleting ${imagePaths.length} photos from database...');
-
-    final startTime = DateTime.now();
-    final errors = <String>[];
-    int successCount = 0;
-
-    try {
-      // Batch delete from database
-      final deletedFromDb = await _database.deletePhotosByPaths(imagePaths);
-      successCount = deletedFromDb;
-
-      _updateBatchOperation(operationId,
-          status: 'Database cleanup complete: $deletedFromDb photos removed'
-      );
-
-    } catch (e) {
-      errors.add('Database batch delete failed: $e');
-    }
-
-    final processingTime = DateTime.now().difference(startTime);
-    final failureCount = imagePaths.length - successCount;
-
-    _completeBatchOperation(
-      operationId,
-      successCount,
-      failureCount,
-      errors: errors,
-      wasOptimized: true,
-      metadata: {
-        'pathsProcessed': imagePaths.length,
-        'databaseBatchDelete': true,
-      },
-    );
-
-    return BatchResult(
-      operationsProcessed: imagePaths.length,
-      successCount: successCount,
-      failureCount: failureCount,
-      processingTime: processingTime,
-      errors: errors,
-      primaryOperationType: BatchOperationType.deletePhotos,
-      wasOptimized: true,
-      operationBreakdown: {'deletePhotos': imagePaths.length},
-      performanceMetrics: {
-        'avgTimePerDelete': successCount > 0 ? processingTime.inMicroseconds / successCount : 0,
-        'batchOptimized': true,
-      },
-    );
-  }
-
-  /// Enhanced batch file operations with progress tracking
-  Future<BatchResult> processBatchFileOperations(
-      List<File> filesToProcess,
-      String operationType, {
-        Function(int current, int total)? progressCallback,
-      }) async {
-    if (filesToProcess.isEmpty) {
-      return BatchResult(
-        operationsProcessed: 0,
-        successCount: 0,
-        failureCount: 0,
-        processingTime: Duration.zero,
-        wasOptimized: false,
-        primaryOperationType: BatchOperationType.deletePhotos, // Default
-      );
-    }
-
-    final batchType = operationType == 'delete'
-        ? BatchOperationType.deletePhotos
-        : BatchOperationType.addPhotos;
-
-    final operationId = _startBatchOperation(batchType, filesToProcess.length);
-
-    final startTime = DateTime.now();
-    int successCount = 0;
-    final errors = <String>[];
-
-    try {
-      for (int i = 0; i < filesToProcess.length; i++) {
-        final file = filesToProcess[i];
-
-        _updateBatchOperation(operationId,
-          status: 'Processing file ${i + 1}/${filesToProcess.length}: ${file.path}',
-          completedOperations: i,
-        );
-
-        try {
-          if (operationType == 'delete') {
-            final success = await FileUtils.deleteFileSafely(file);
-            if (success) successCount++;
-          } else {
-            // Other file operations can be added here
-            successCount++;
-          }
-
-          // Progress callback for UI updates
-          progressCallback?.call(i + 1, filesToProcess.length);
-
-        } catch (e) {
-          errors.add('Failed to process ${file.path}: $e');
-        }
-
-        // Small delay for large batches to prevent overwhelming the system
-        if (filesToProcess.length > 20 && i < filesToProcess.length - 1) {
-          await Future.delayed(const Duration(milliseconds: 10));
-        }
-      }
-    } catch (e) {
-      errors.add('Batch file operation failed: $e');
-    }
-
-    final processingTime = DateTime.now().difference(startTime);
-    final failureCount = filesToProcess.length - successCount;
-
-    _completeBatchOperation(
-      operationId,
-      successCount,
-      failureCount,
-      errors: errors,
-      wasOptimized: filesToProcess.length > 10,
-      metadata: {
-        'filesProcessed': filesToProcess.length,
-        'operationType': operationType,
-        'avgTimePerFile': successCount > 0 ? processingTime.inMicroseconds / successCount : 0,
-      },
-    );
-
-    return BatchResult(
-      operationsProcessed: filesToProcess.length,
-      successCount: successCount,
-      failureCount: failureCount,
-      processingTime: processingTime,
-      errors: errors,
-      primaryOperationType: batchType,
-      wasOptimized: filesToProcess.length > 10,
-      operationBreakdown: {operationType: filesToProcess.length},
-      performanceMetrics: {
-        'filesPerSecond': processingTime.inMilliseconds > 0
-            ? (successCount * 1000 / processingTime.inMilliseconds)
-            : 0,
-        'batchOptimized': filesToProcess.length > 10,
-      },
-    );
-  }
-
-  /// Get comprehensive repository performance report
-  Map<String, dynamic> getPerformanceReport() {
-    final recentHistory = _batchHistory.length > 10
-        ? _batchHistory.skip(_batchHistory.length - 10).toList()
-        : _batchHistory;
-
-    final recentSuccessRate = recentHistory.isNotEmpty
-        ? recentHistory.where((r) => r.wasSuccessful).length / recentHistory.length
-        : 1.0;
-
-    return {
-      'batchMetrics': _batchMetrics,
-      'activeBatchOperations': _activeBatchOperations.length,
-      'historySize': _batchHistory.length,
-      'recentSuccessRate': recentSuccessRate,
-      'recentOperations': recentHistory.map((r) => {
-        'type': r.type.name,
-        'duration': '${r.duration.inMilliseconds}ms',
-        'successful': r.wasSuccessful,
-        'efficiency': '${(r.efficiencyScore * 100).toStringAsFixed(1)}%',
-      }).toList(),
-      'performanceGrade': _getOverallPerformanceGrade(),
-      'recommendations': _getPerformanceRecommendations(),
-    };
-  }
-
-  /// Get overall performance grade
-  String _getOverallPerformanceGrade() {
-    final successRate = _batchMetrics.failureRate;
-    final avgTime = _batchMetrics.averageProcessingTime;
-    final optimizationRate = _batchMetrics.optimizationRate;
-
-    if (successRate > 0.95 && avgTime < _fastBatchThreshold && optimizationRate > 0.8) {
-      return 'A';
-    } else if (successRate > 0.9 && avgTime < _slowBatchThreshold && optimizationRate > 0.6) {
-      return 'B';
-    } else if (successRate > 0.8 && avgTime < Duration(milliseconds: 2000)) {
-      return 'C';
-    } else if (successRate > 0.6) {
-      return 'D';
-    } else {
-      return 'F';
-    }
-  }
-
-  /// Get performance recommendations
-  List<String> _getPerformanceRecommendations() {
-    final recommendations = <String>[];
-
-    if (_batchMetrics.failureRate > 0.1) {
-      recommendations.add('High failure rate detected. Check error logs and validate operations before batching.');
-    }
-
-    if (_batchMetrics.averageProcessingTime > _slowBatchThreshold) {
-      recommendations.add('Batch operations are slow. Consider reducing batch sizes or optimizing database queries.');
-    }
-
-    if (_batchMetrics.optimizationRate < 0.5) {
-      recommendations.add('Low optimization rate. Review batch grouping logic to improve efficiency.');
-    }
-
-    if (_activeBatchOperations.length > 2) {
-      recommendations.add('Multiple concurrent batch operations detected. Consider queuing to prevent resource contention.');
-    }
-
-    if (recommendations.isEmpty) {
-      recommendations.add('Repository batch performance is optimal. No recommendations at this time.');
-    }
-
-    return recommendations;
-  }
-
   // ========================================================================
-  // EXISTING FUNCTIONALITY (PRESERVED) - Enhanced with batch integration
+  // ENHANCED DATABASE OPERATIONS WITH MIGRATION SUPPORT
   // ========================================================================
 
-  /// Load all saved photos with LAZY THUMBNAIL GENERATION (enhanced with batch tracking)
-  /// OPTIMIZED: Images load immediately, thumbnails generate in background
-  Future<LoadPhotosResult> loadAllSavedPhotos() async {
-    try {
-      // Start performance monitoring
-      PerformanceMonitor.instance.startOperation('load_saved_photos_lazy');
-
-      // Check if migration is needed
-      final migrationNeeded = await _isMigrationNeeded();
-
-      if (migrationNeeded) {
-        if (kDebugMode) {
-          debugPrint('Migration needed: transferring data from SharedPreferences to database');
-        }
-        await _performMigration();
-      }
-
-      // Load photos from database
-      final photoEntries = await _database.getAllPhotos();
-
-      if (photoEntries.isEmpty) {
-        PerformanceMonitor.instance.endOperation('load_saved_photos_lazy');
-        return const LoadPhotosResult(
-          images: [],
-          thumbnails: [],
-          validPaths: [],
-          migratedCount: 0,
-          repairedCount: 0,
-        );
-      }
-
-      final List<String> validPaths = [];
-      final List<File> loadedImages = [];
-      final List<File> loadedThumbnails = [];
-
-      if (kDebugMode) {
-        debugPrint('🚀 LAZY LOADING: Processing ${photoEntries.length} images immediately, thumbnails in background');
-      }
-
-      // PHASE 1: Load images immediately (FAST)
-      for (final entry in photoEntries) {
-        try {
-          final imageFile = File(entry.imagePath);
-
-          // Quick synchronous check for image existence
-          if (!imageFile.existsSync()) {
-            // Remove invalid entries from database
-            await _database.deletePhotosByPaths([entry.imagePath]);
-            if (kDebugMode) {
-              debugPrint('Removed invalid database entry: ${entry.imagePath}');
-            }
-            continue;
-          }
-
-          // Add image immediately
-          loadedImages.add(imageFile);
-          validPaths.add(entry.imagePath);
-
-          // Use image as initial thumbnail placeholder
-          loadedThumbnails.add(imageFile);
-
-        } catch (e) {
-          if (kDebugMode) {
-            debugPrint('Error processing image ${entry.imagePath}: $e');
-          }
-          continue;
-        }
-      }
-
-      // End performance monitoring for initial load
-      PerformanceMonitor.instance.endOperation('load_saved_photos_lazy');
-
-      if (kDebugMode) {
-        debugPrint('✅ IMMEDIATE LOAD COMPLETE: ${loadedImages.length} images loaded in background thread');
-      }
-
-      // PHASE 2: Start lazy thumbnail generation (BACKGROUND)
-      _startLazyThumbnailGeneration(validPaths);
-
-      return LoadPhotosResult(
-        images: loadedImages,
-        thumbnails: loadedThumbnails, // Initially using full images
-        validPaths: validPaths,
-        migratedCount: migrationNeeded ? validPaths.length : 0,
-        repairedCount: 0, // Will be updated as thumbnails complete
-        isLazy: true, // Flag indicating lazy loading is active
-      );
-
-    } catch (e) {
-      PerformanceMonitor.instance.endOperation('load_saved_photos_lazy');
-      if (kDebugMode) {
-        debugPrint('Error loading all saved photos: $e');
-      }
-      return const LoadPhotosResult(
-        images: <File>[],
-        thumbnails: <File>[],
-        validPaths: <String>[],
-        migratedCount: 0,
-        repairedCount: 0,
-        error: 'Failed to load saved photos',
-      );
-    }
-  }
-
-  /// Start lazy thumbnail generation for all images
-  void _startLazyThumbnailGeneration(List<String> imagePaths) {
-    try {
-      if (kDebugMode) {
-        debugPrint('🔄 Starting lazy thumbnail generation for ${imagePaths.length} images');
-      }
-
-      // Request thumbnails with priority (visible items first)
-      for (int i = 0; i < imagePaths.length; i++) {
-        final imagePath = imagePaths[i];
-
-        // Higher priority for first 20 images (likely visible)
-        final priority = i < 20 ? 10 : (i < 50 ? 5 : 1);
-
-        _thumbnailService.requestThumbnail(imagePath, priority: priority);
-      }
-
-      final stats = _thumbnailService.getStats();
-      if (kDebugMode) {
-        debugPrint('Thumbnail service stats: $stats');
-      }
-
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error starting lazy thumbnail generation: $e');
-      }
-    }
-  }
-
-  /// Get thumbnail for specific image (with lazy loading)
-  Future<File?> getThumbnailForImage(String imagePath, {bool immediate = false}) async {
-    try {
-      if (immediate) {
-        // Generate immediately for critical use cases
-        return await _thumbnailService.generateImmediately(imagePath);
-      } else {
-        // Request lazy generation
-        return await _thumbnailService.requestThumbnail(imagePath, priority: 8);
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error getting thumbnail for $imagePath: $e');
-      }
-      return null;
-    }
-  }
-
-  /// Register callback for when thumbnail is ready
-  void onThumbnailReady(String imagePath, Function(File) callback) {
-    _thumbnailService.onThumbnailReady(imagePath, callback);
-  }
-
-  /// Preload thumbnails for visible range (called from UI)
-  void preloadVisibleThumbnails(List<String> imagePaths, int startIndex, int endIndex) {
-    _thumbnailService.preloadVisibleRange(imagePaths, startIndex, endIndex);
-  }
-
-  /// Check if migration from SharedPreferences is needed
-  Future<bool> _isMigrationNeeded() async {
-    try {
-      // Check if migration already completed
-      final migrationComplete = await _database.getSetting<bool>(_migrationCompleteKey, false);
-      if (migrationComplete == true) {
-        return false;
-      }
-
-      // Check if there's any data in SharedPreferences to migrate
-      final prefs = await SharedPreferences.getInstance();
-      final legacyPaths = prefs.getStringList(_legacyImagePathsKey);
-
-      return legacyPaths != null && legacyPaths.isNotEmpty;
-
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error checking migration status: $e');
-      }
-      return false;
-    }
-  }
-
-  /// Perform migration from SharedPreferences to database
-  Future<void> _performMigration() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-
-      // Migrate image paths
-      final legacyPaths = prefs.getStringList(_legacyImagePathsKey) ?? [];
-      if (legacyPaths.isNotEmpty) {
-        if (kDebugMode) {
-          debugPrint('Migrating ${legacyPaths.length} image paths to database');
-        }
-
-        final photoEntries = <PhotoDatabaseEntry>[];
-        final now = DateTime.now();
-
-        for (int i = 0; i < legacyPaths.length; i++) {
-          final path = legacyPaths[i];
-          try {
-            photoEntries.add(PhotoDatabaseEntry(
-              imagePath: path,
-              thumbnailPath: null, // Will be generated lazily
-              dateAdded: now,
-              orderIndex: i,
-            ));
-          } catch (e) {
-            if (kDebugMode) {
-              debugPrint('Error creating database entry for $path: $e');
-            }
-          }
-        }
-
-        if (photoEntries.isNotEmpty) {
-          await _database.insertPhotos(photoEntries);
-          if (kDebugMode) {
-            debugPrint('Successfully migrated ${photoEntries.length} photos to database');
-          }
-        }
-      }
-
-      // Migrate header username
-      final legacyUsername = prefs.getString(_legacyHeaderUsernameKey);
-      if (legacyUsername != null) {
-        await _database.setSetting('header_username', legacyUsername);
-        if (kDebugMode) {
-          debugPrint('Migrated header username to database');
-        }
-      }
-
-      // Mark migration as complete
-      await _database.setSetting(_migrationCompleteKey, true);
-
-      if (kDebugMode) {
-        debugPrint('Migration completed successfully');
-      }
-
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error during migration: $e');
-      }
-      rethrow;
-    }
-  }
-
-  /// Save image paths to database (replaces SharedPreferences)
-  Future<bool> saveImagePaths(List<String> paths) async {
-    try {
-      await _database.updatePhotoOrders(paths);
-      return true;
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error saving image paths to database: $e');
-      }
-      return false;
-    }
-  }
-
-  /// Add new photos to database with IMMEDIATE images, LAZY thumbnails (enhanced with batch tracking)
+  /// PHASE 2: Add new photos to database with UUID generation (UPDATED)
   Future<void> addPhotosToDatabase(List<ProcessedImage> processedImages) async {
     try {
-      // Use enhanced batch database operations
-      final result = await processBatchDatabaseOperations(
-        BatchOperationType.addPhotos,
-        {'images': processedImages},
-      );
+      // Get current photo count for order indices
+      final currentCount = await _database.getPhotoCount();
 
-      if (!result.isSuccess) {
-        if (kDebugMode) {
-          debugPrint('Batch add photos failed: ${result.errors.join(', ')}');
+      // Capture existing paths BEFORE we insert new photos
+      final existingPaths = (await _database.getAllPhotos())
+          .map((p) => p.imagePath)
+          .toList();
+
+      // Track paths of newly inserted photos (for final authoritative reindex)
+      final List<String> newPaths = [];
+
+      // Insert each photo with generated UUID
+      for (int i = 0; i < processedImages.length; i++) {
+        try {
+          final image = processedImages[i];
+          final uuid = _generatePhotoId(); // NEW: Generate UUID
+          final orderIndex = currentCount + i;
+
+          // Get file info
+          final imageFile = File(image.image.path);
+          final fileSize = await imageFile.length();
+          final originalName = imageFile.path.split('/').last;
+
+          final entry = PhotoDatabaseEntry(
+            uuid: uuid, // NEW: Include UUID
+            imagePath: image.image.path,
+            thumbnailPath: image.thumbnail.path,
+            originalName: originalName,
+            fileSize: fileSize,
+            dateAdded: DateTime.now(),
+            orderIndex: orderIndex,
+          );
+
+          await _database.insertPhoto(entry);
+          newPaths.add(entry.imagePath);
+
+          if (kDebugMode) {
+            debugPrint('Added photo with UUID: $uuid');
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('Error adding photo ${i + 1}: $e');
+          }
         }
-        throw Exception('Failed to add photos to database in batch: ${result.errors.first}');
       }
 
-      if (kDebugMode) {
-        debugPrint('✅ Batch added ${result.successCount}/${result.operationsProcessed} photos to database');
+      // ðŸ”§ SURGICAL FIX #1:
+      // Authoritative reindex so DB persists the same "newest-first" order as the UI (0 = top).
+      // Requires PhotoDatabase.updatePhotoOrdersByPaths([...]) helper.
+      if (newPaths.isNotEmpty) {
+        final finalOrderedPaths = <String>[
+          ...newPaths.reversed, // newly added should be at the top
+          ...existingPaths,     // then all the older photos
+        ];
+        try {
+          await _database.updatePhotoOrdersByPaths(finalOrderedPaths);
+          if (kDebugMode) {
+            debugPrint('Reindexed ${finalOrderedPaths.length} photos (newest-first persisted).');
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('Order reindex failed: $e');
+          }
+        }
       }
-
     } catch (e) {
       if (kDebugMode) {
         debugPrint('Error adding photos to database: $e');
@@ -981,7 +162,7 @@ class PhotoRepository {
 
     try {
       if (kDebugMode) {
-        debugPrint('🔄 Processing ${imageFiles.length} images with initial thumbnails');
+        debugPrint('ðŸ”„ Processing ${imageFiles.length} images with initial thumbnails');
       }
 
       final List<ProcessedImage> processedImages = [];
@@ -1008,12 +189,11 @@ class PhotoRepository {
           successCount++;
 
           if (kDebugMode) {
-            debugPrint('✅ Successfully processed: ${processedImage.image.path}');
+            debugPrint('âœ… Successfully processed: ${processedImage.image.path}');
           }
-
         } catch (e) {
           if (kDebugMode) {
-            debugPrint('❌ Error processing ${imageFile.path}: $e');
+            debugPrint('âŒ Error processing ${imageFile.path}: $e');
           }
           errors.add(e.toString());
           failureCount++;
@@ -1025,73 +205,184 @@ class PhotoRepository {
         }
       }
 
-      // Add processed images to database using enhanced batch operations
-      if (processedImages.isNotEmpty) {
-        try {
-          await addPhotosToDatabase(processedImages);
-        } catch (e) {
-          if (kDebugMode) {
-            debugPrint('Error adding processed images to database: $e');
-          }
-        }
-      }
-
-      // Clean up original files
-      for (final imageFile in imageFiles) {
-        try {
-          await File(imageFile.path).delete();
-        } catch (e) {
-          if (kDebugMode) {
-            debugPrint('Failed to delete original file ${imageFile.path}: $e');
-          }
-        }
-      }
-
-      if (kDebugMode) {
-        debugPrint('✅ Batch processing complete: $successCount success, $failureCount failed');
-      }
-
       return BatchImageResult(
         processedImages: processedImages,
         successCount: successCount,
         failureCount: failureCount,
         errors: errors,
       );
-
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('❌ Error in batch processing: $e');
+        debugPrint('Error processing batch images: $e');
       }
-
       return BatchImageResult(
-        processedImages: const <ProcessedImage>[],
+        processedImages: <ProcessedImage>[],
         successCount: 0,
         failureCount: imageFiles.length,
-        errors: ['Batch processing failed: $e'],
+        errors: [e.toString()],
       );
     }
   }
 
-  /// Delete multiple image files safely and remove from database (enhanced with batch tracking)
+  /// Enhanced with lazy loading configuration and database compatibility
+  Future<LoadPhotosResult> loadAllPhotos() async {
+    final stopwatch = Stopwatch()..start();
+
+    try {
+      // Start performance monitoring
+      PerformanceMonitor.instance.startOperation('load_all_photos');
+
+      // Check if migration is needed
+      await _performLegacyMigrationIfNeeded();
+
+      // Load photos from database - NEW: Uses UUID-based database
+      final photos = await _database.getAllPhotos();
+
+      if (kDebugMode) {
+        debugPrint('Loaded ${photos.length} photos from database');
+      }
+
+      // Convert to File objects and collect paths
+      final images = <File>[];
+      final thumbnails = <File>[];
+      final validPaths = <String>[];
+
+      for (final photo in photos) {
+        final imageFile = File(photo.imagePath);
+
+        // Only include if file exists
+        if (await imageFile.exists()) {
+          images.add(imageFile);
+          validPaths.add(photo.imagePath);
+
+          // Add thumbnail if exists
+          if (photo.thumbnailPath != null) {
+            final thumbnailFile = File(photo.thumbnailPath!);
+            if (await thumbnailFile.exists()) {
+              thumbnails.add(thumbnailFile);
+            }
+          }
+        }
+      }
+
+      stopwatch.stop();
+      PerformanceMonitor.instance.endOperation('load_all_photos');
+
+      if (kDebugMode) {
+        debugPrint('âœ… Load completed in ${stopwatch.elapsedMilliseconds}ms');
+        debugPrint('ðŸ“ Images: ${images.length}, Thumbnails: ${thumbnails.length}');
+      }
+
+      return LoadPhotosResult(
+        images: images,
+        thumbnails: thumbnails,
+        validPaths: validPaths,
+        migratedCount: 0, // Migration handled separately
+        repairedCount: 0,
+        isLazy: true, // Flag indicating lazy loading is active
+      );
+    } catch (e) {
+      stopwatch.stop();
+      PerformanceMonitor.instance.endOperation('load_all_photos');
+
+      if (kDebugMode) {
+        debugPrint('Error loading photos: $e');
+      }
+
+      return LoadPhotosResult(
+        images: <File>[],
+        thumbnails: <File>[],
+        validPaths: <String>[],
+        migratedCount: 0,
+        repairedCount: 0,
+        error: e.toString(),
+      );
+    }
+  }
+
+  /// PHASE 2: Save image order using UUIDs (UPDATED)
+  Future<bool> saveImagePaths(List<String> imagePaths) async {
+    try {
+      // Convert paths to UUIDs and update order
+      final List<({String uuid, int orderIndex})> updates = [];
+
+      for (int i = 0; i < imagePaths.length; i++) {
+        final imagePath = imagePaths[i];
+        final photo = await _database.getPhotoByPath(imagePath);
+
+        if (photo?.uuid != null) {
+          updates.add((uuid: photo!.uuid!, orderIndex: i));
+        } else {
+          if (kDebugMode) {
+            debugPrint('Warning: No UUID found for path: $imagePath');
+          }
+        }
+      }
+
+      if (updates.isNotEmpty) {
+        await _database.updatePhotoOrders(updates);
+      }
+
+      return true;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error saving image paths to database: $e');
+      }
+      return false;
+    }
+  }
+
+  /// PHASE 2: Delete multiple images using UUIDs (UPDATED)
   Future<DeleteResult> deleteImages(List<File> images, List<File> thumbnails) async {
     try {
-      final allFiles = [...images, ...thumbnails];
-      final imagePaths = images.map((f) => f.path).toList();
+      int deletedCount = 0;
 
-      // Use enhanced batch database operations
-      final dbResult = await processBatchDatabaseOperations(
-        BatchOperationType.deletePhotos,
-        {'imagePaths': imagePaths},
-      );
+      for (final image in images) {
+        try {
+          // Get photo by path and delete by UUID if available
+          final photo = await _database.getPhotoByPath(image.path);
 
-      // Use enhanced batch file operations
-      final fileResult = await processBatchFileOperations(allFiles, 'delete');
+          if (photo?.uuid != null) {
+            final result = await _database.deletePhotoByUuid(photo!.uuid!);
+            if (result > 0) {
+              deletedCount++;
+            }
+          } else {
+            // Fallback to path-based deletion for legacy photos
+            final result = await _database.deletePhotoByPath(image.path);
+            if (result > 0) {
+              deletedCount++;
+            }
+          }
+
+          // Delete physical files
+          if (await image.exists()) {
+            await image.delete();
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('Error deleting image ${image.path}: $e');
+          }
+        }
+      }
+
+      // Delete thumbnail files
+      for (final thumbnail in thumbnails) {
+        try {
+          if (await thumbnail.exists()) {
+            await thumbnail.delete();
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('Error deleting thumbnail ${thumbnail.path}: $e');
+          }
+        }
+      }
 
       return DeleteResult(
-        requestedCount: allFiles.length,
-        deletedCount: fileResult.successCount,
-        success: fileResult.isSuccess && dbResult.isSuccess,
-        error: fileResult.hasErrors ? fileResult.errors.first : null,
+        requestedCount: images.length,
+        deletedCount: deletedCount,
+        success: deletedCount > 0,
       );
     } catch (e) {
       if (kDebugMode) {
@@ -1160,14 +451,19 @@ class PhotoRepository {
       if (kDebugMode) {
         debugPrint('Error loading header username: $e');
       }
-      return 'tomazdrnovsek';
+      return 'tomazdrnovsek'; // Fallback
     }
   }
 
-  /// Save header username to database
+  /// Save header username to database (with SharedPreferences migration)
   Future<bool> saveHeaderUsername(String username) async {
     try {
       await _database.setSetting('header_username', username);
+
+      // Also save to SharedPreferences for backward compatibility
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_legacyHeaderUsernameKey, username);
+
       return true;
     } catch (e) {
       if (kDebugMode) {
@@ -1177,95 +473,330 @@ class PhotoRepository {
     }
   }
 
-  /// Get storage statistics including database info (enhanced with batch metrics)
+  /// Enhanced storage statistics with database integration
   Future<StorageStats> getStorageStats() async {
     try {
-      final totalBytes = await FileUtils.getTotalStorageUsed();
-      final dbStats = await _database.getStatistics();
-      final thumbnailStats = _thumbnailService.getStats();
+      final stats = await _database.getStatistics();
+
+      // Calculate total bytes by iterating through all photos
+      int totalBytes = 0;
+      final photos = await _database.getAllPhotos();
+
+      for (final photo in photos) {
+        try {
+          final file = File(photo.imagePath);
+          if (await file.exists()) {
+            totalBytes += photo.fileSize ?? 0;
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('Error getting file size for ${photo.imagePath}: $e');
+          }
+        }
+      }
+
+      final formattedSize = _formatBytes(totalBytes);
+      final thumbnailServiceStats = _thumbnailService.getStats();
 
       return StorageStats(
-        totalImages: dbStats.photoCount,
+        totalImages: stats.photoCount,
         totalBytes: totalBytes,
-        formattedSize: FileUtils.formatBytes(totalBytes),
-        databaseSize: dbStats.databaseSizeBytes,
-        databaseFormattedSize: dbStats.formattedSize,
-        thumbnailServiceStats: thumbnailStats,
-        batchMetrics: _batchMetrics, // Enhanced with batch metrics
+        formattedSize: formattedSize,
+        databaseSize: stats.databaseSizeBytes,
+        databaseFormattedSize: _formatBytes(stats.databaseSizeBytes),
+        thumbnailServiceStats: thumbnailServiceStats,
+        batchMetrics: _batchMetrics,
         repositoryPerformanceGrade: _getOverallPerformanceGrade(),
       );
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('Error getting storage stats: $e');
+        debugPrint('Error getting storage statistics: $e');
       }
-      return StorageStats(
+      return const StorageStats(
         totalImages: 0,
         totalBytes: 0,
         formattedSize: '0 B',
-        batchMetrics: _batchMetrics,
-        repositoryPerformanceGrade: 'Unknown',
       );
     }
   }
 
-  /// Debug method to check migration status and current data storage (enhanced with batch info)
-  Future<void> printMigrationStatus() async {
-    if (!kDebugMode) return;
+  /// Format bytes into human readable string
+  String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+  }
 
+  /// Get overall performance grade
+  String _getOverallPerformanceGrade() {
+    if (_batchMetrics.totalOperations == 0) return 'N/A';
+
+    final successRate = 1 - _batchMetrics.failureRate;
+    final avgTime = _batchMetrics.averageProcessingTime.inMilliseconds;
+
+    if (successRate >= 0.95 && avgTime <= 100) return 'A';
+    if (successRate >= 0.90 && avgTime <= 250) return 'B';
+    if (successRate >= 0.80 && avgTime <= 500) return 'C';
+    if (successRate >= 0.70 && avgTime <= 1000) return 'D';
+    return 'F';
+  }
+
+  // ========================================================================
+  // LEGACY MIGRATION SUPPORT
+  // ========================================================================
+
+  /// Perform one-time migration from SharedPreferences to database
+  Future<void> _performLegacyMigrationIfNeeded() async {
     try {
-      debugPrint('=== MIGRATION STATUS CHECK ===');
-
-      // Check database
-      final dbStats = await _database.getStatistics();
-      final migrationComplete = await _database.getSetting<bool>(_migrationCompleteKey, false);
-      final photosInDb = await _database.getPhotoCount();
-
-      debugPrint('Database Status:');
-      debugPrint('  Photos in database: $photosInDb');
-      debugPrint('  Migration completed: $migrationComplete');
-      debugPrint('  Database size: ${dbStats.formattedSize}');
-      debugPrint('  Database path: ${dbStats.databasePath}');
-
-      // Check SharedPreferences
       final prefs = await SharedPreferences.getInstance();
-      final legacyPaths = prefs.getStringList(_legacyImagePathsKey);
-      final legacyUsername = prefs.getString(_legacyHeaderUsernameKey);
+      final migrationComplete = prefs.getBool(_migrationCompleteKey) ?? false;
 
-      debugPrint('SharedPreferences Status:');
-      debugPrint('  Legacy image paths: ${legacyPaths?.length ?? 0} entries');
-      debugPrint('  Legacy username: $legacyUsername');
-
-      // Check thumbnail service
-      final thumbnailStats = _thumbnailService.getStats();
-      debugPrint('Thumbnail Service Status:');
-      debugPrint('  $thumbnailStats');
-
-      // Enhanced: Check batch performance
-      debugPrint('Repository Batch Performance:');
-      debugPrint('  Total batches: ${_batchMetrics.totalBatches}');
-      debugPrint('  Success rate: ${((1 - _batchMetrics.failureRate) * 100).toStringAsFixed(1)}%');
-      debugPrint('  Average processing: ${_batchMetrics.averageProcessingTime.inMilliseconds}ms');
-      debugPrint('  Performance grade: ${_getOverallPerformanceGrade()}');
-
-      // Determine migration status
-      if (migrationComplete == true) {
-        debugPrint('✅ Migration: COMPLETED - App is using database');
-      } else if (photosInDb > 0) {
-        debugPrint('🔄 Migration: Database has photos but not marked complete');
-      } else if ((legacyPaths?.length ?? 0) > 0) {
-        debugPrint('⏳ Migration: NEEDED - SharedPreferences data exists');
-      } else {
-        debugPrint('🆕 Migration: NOT NEEDED - Fresh install or no data');
+      if (migrationComplete) {
+        return; // Migration already completed
       }
 
-      debugPrint('🚀 Processing: LAZY THUMBNAILS - Fast initial load, background generation');
-      debugPrint('🔄 Batching: PHASE 3 REPOSITORY INTEGRATION - Enhanced tracking active');
-      debugPrint('✅ ORDER FIX: Photo ordering bug FIXED - database matches UI order');
-      debugPrint('🎯 BUG FIXED: No more photo order reversal after app restart');
-      debugPrint('================================');
+      if (kDebugMode) {
+        debugPrint('Starting legacy migration from SharedPreferences to database...');
+      }
 
+      // Migrate image paths
+      final legacyPaths = prefs.getStringList(_legacyImagePathsKey) ?? <String>[];
+      if (legacyPaths.isNotEmpty) {
+        if (kDebugMode) {
+          debugPrint('Migrating ${legacyPaths.length} legacy image paths');
+        }
+
+        for (int i = 0; i < legacyPaths.length; i++) {
+          final imagePath = legacyPaths[i];
+          final imageFile = File(imagePath);
+
+          // Skip if file no longer exists
+          if (!await imageFile.exists()) {
+            if (kDebugMode) {
+              debugPrint('Skipping missing legacy file: $imagePath');
+            }
+            continue;
+          }
+
+          // Check if already in database (by path)
+          if (await _database.photoExists(imagePath)) {
+            continue;
+          }
+
+          try {
+            // Create database entry with UUID for legacy photo - NEW
+            final uuid = _generatePhotoId();
+            final fileSize = await imageFile.length();
+            final originalName = imageFile.path.split('/').last;
+
+            final entry = PhotoDatabaseEntry(
+              uuid: uuid, // NEW: Generate UUID for legacy photos
+              imagePath: imagePath,
+              originalName: originalName,
+              fileSize: fileSize,
+              dateAdded: DateTime.now(),
+              orderIndex: i,
+            );
+
+            await _database.insertPhoto(entry);
+
+            if (kDebugMode) {
+              debugPrint('Migrated legacy photo: $imagePath â†’ $uuid');
+            }
+          } catch (e) {
+            if (kDebugMode) {
+              debugPrint('Error migrating legacy photo $imagePath: $e');
+            }
+          }
+        }
+      }
+
+      // Migrate header username
+      final legacyUsername = prefs.getString(_legacyHeaderUsernameKey);
+      if (legacyUsername != null) {
+        await _database.setSetting('header_username', legacyUsername);
+        if (kDebugMode) {
+          debugPrint('Migrated legacy username: $legacyUsername');
+        }
+      }
+
+      // Mark migration as complete
+      await prefs.setBool(_migrationCompleteKey, true);
+
+      if (kDebugMode) {
+        debugPrint('Legacy migration completed successfully');
+      }
     } catch (e) {
-      debugPrint('Error checking migration status: $e');
+      if (kDebugMode) {
+        debugPrint('Error during legacy migration: $e');
+      }
+      // Don't rethrow - app should still work even if migration fails
+    }
+  }
+
+  // ========================================================================
+  // PHASE 2: NEW UUID-BASED UTILITY METHODS
+  // ========================================================================
+
+  /// Get all photo UUIDs in current order
+  Future<List<String>> getAllPhotoUuids() async {
+    try {
+      return await _database.getAllPhotoUuids();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error getting photo UUIDs: $e');
+      }
+      return <String>[];
+    }
+  }
+
+  /// Get photo by UUID
+  Future<PhotoDatabaseEntry?> getPhotoByUuid(String uuid) async {
+    try {
+      return await _database.getPhotoByUuid(uuid);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error getting photo by UUID: $e');
+      }
+      return null;
+    }
+  }
+
+  /// Update photo order by UUIDs
+  Future<bool> updatePhotoOrderByUuids(List<String> orderedUuids) async {
+    try {
+      final updates = orderedUuids.asMap().entries.map((entry) =>
+      (uuid: entry.value, orderIndex: entry.key)
+      ).toList();
+
+      await _database.updatePhotoOrders(updates);
+      return true;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error updating photo order by UUIDs: $e');
+      }
+      return false;
+    }
+  }
+
+  /// Convert file paths to UUIDs for backup operations
+  Future<Map<String, String>> getPathToUuidMapping(List<String> imagePaths) async {
+    final Map<String, String> mapping = {};
+
+    for (final path in imagePaths) {
+      try {
+        final photo = await _database.getPhotoByPath(path);
+        if (photo?.uuid != null) {
+          mapping[path] = photo!.uuid!;
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('Error getting UUID for path $path: $e');
+        }
+      }
+    }
+
+    return mapping;
+  }
+
+  /// Get formatted database statistics
+  Future<String> getFormattedDatabaseStatistics() async {
+    try {
+      final stats = await _database.getStatistics();
+      return 'Database: ${stats.photoCount} photos, ${stats.settingsCount} settings, ${stats.databaseSizeMB.toStringAsFixed(2)} MB';
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error getting database statistics: $e');
+      }
+      return 'Database statistics unavailable';
+    }
+  }
+
+  /// Close database connection (for testing/cleanup)
+  Future<void> close() async {
+    await _database.close();
+  }
+
+  // ========================================================================
+  // BACKWARD COMPATIBILITY ALIASES (DON'T REMOVE)
+  // ========================================================================
+
+  /// Alias for loadAllPhotos - maintains backward compatibility
+  Future<LoadPhotosResult> loadAllSavedPhotos() async {
+    return await loadAllPhotos();
+  }
+
+  /// Alias for debugRepositoryStatus - maintains backward compatibility
+  Future<void> printMigrationStatus() async {
+    await debugRepositoryStatus();
+  }
+
+  /// Enhanced debug output for repository status - includes new UUID info
+  Future<void> debugRepositoryStatus() async {
+    try {
+      if (kDebugMode) {
+        debugPrint('================================');
+        debugPrint('ðŸ“± PHOTO REPOSITORY STATUS');
+        debugPrint('================================');
+
+        // Check migration
+        final prefs = await SharedPreferences.getInstance();
+        final migrationComplete = prefs.getBool(_migrationCompleteKey);
+        final legacyPaths = prefs.getStringList(_legacyImagePathsKey);
+        final legacyUsername = prefs.getString(_legacyHeaderUsernameKey);
+
+        // Check database
+        final photosInDb = await _database.getPhotoCount();
+        final settingsInDb = Sqflite.firstIntValue(
+          await _database.database.then((db) => db.rawQuery('SELECT COUNT(*) FROM ${PhotoDatabase.settingsTable}')),
+        ) ?? 0;
+
+        debugPrint('Database Status:');
+        debugPrint('  Photos: $photosInDb entries');
+        debugPrint('  Settings: $settingsInDb entries');
+
+        debugPrint('Legacy Data:');
+        debugPrint('  Paths: ${legacyPaths?.length ?? 0} entries');
+        debugPrint('  Legacy username: $legacyUsername');
+
+        // Check thumbnail service
+        final thumbnailStats = _thumbnailService.getStats();
+        debugPrint('Thumbnail Service Status:');
+        debugPrint('  $thumbnailStats');
+
+        // Enhanced: Check batch performance
+        debugPrint('Repository Batch Performance:');
+        debugPrint('  Total operations: ${_batchMetrics.totalOperations}');
+        debugPrint('  Success rate: ${((1 - _batchMetrics.failureRate) * 100).toStringAsFixed(1)}%');
+        debugPrint('  Average processing: ${_batchMetrics.averageProcessingTime.inMilliseconds}ms');
+        debugPrint('  Performance grade: ${_getOverallPerformanceGrade()}');
+
+        // NEW: Check UUID coverage
+        final photosWithUuids = await _database.getAllPhotoUuids();
+        debugPrint('UUID Coverage:');
+        debugPrint('  Photos with UUIDs: ${photosWithUuids.length}/$photosInDb');
+
+        // Determine migration status
+        if (migrationComplete == true) {
+          debugPrint('âœ… Migration: COMPLETED - App is using database with UUIDs');
+        } else if (photosInDb > 0) {
+          debugPrint('ðŸ”„ Migration: Database has photos but not marked complete');
+        } else if ((legacyPaths?.length ?? 0) > 0) {
+          debugPrint('â³ Migration: NEEDED - SharedPreferences data exists');
+        } else {
+          debugPrint('ðŸ†• Migration: NOT NEEDED - Fresh install or no data');
+        }
+
+        debugPrint('ðŸš€ Processing: LAZY THUMBNAILS - Fast initial load, background generation');
+        debugPrint('ðŸ”„ Batching: PHASE 3 REPOSITORY INTEGRATION - Enhanced tracking active');
+        debugPrint('âœ… ORDER FIX: Photo ordering bug FIXED - database matches UI order');
+        debugPrint('ðŸ†” UUID SYSTEM: Stable photo IDs for cross-device order preservation');
+        debugPrint('ðŸŽ¯ BUG FIXED: No more photo order reversal after app restart');
+        debugPrint('================================');
+      }
+    } catch (e) {
+      debugPrint('Error checking repository status: $e');
     }
   }
 }

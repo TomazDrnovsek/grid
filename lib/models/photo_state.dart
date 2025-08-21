@@ -5,6 +5,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'photo_state.freezed.dart';
 
 /// Immutable state class for photo management using Freezed
+/// PHASE 2 IMPLEMENTATION: Added UUID support for stable photo identification
 /// Replaces the current setState-based state management in grid_home.dart
 @freezed
 class PhotoState with _$PhotoState {
@@ -14,6 +15,9 @@ class PhotoState with _$PhotoState {
 
     /// List of thumbnail files corresponding to images
     @Default([]) List<File> thumbnails,
+
+    /// PHASE 2: List of photo UUIDs corresponding to images (for backup/restore order preservation)
+    @Default(<String>[]) List<String> imageUuids,
 
     /// Set of selected image indexes
     @Default({}) Set<int> selectedIndexes,
@@ -77,7 +81,7 @@ class PhotoState with _$PhotoState {
     @Default(BatchMetrics()) BatchMetrics batchMetrics,
   }) = _PhotoState;
 
-  /// Empty state factory for initial state
+  // CRITICAL: Required constructor for Freezed when using getters
   const PhotoState._();
 
   /// Convenience getter for checking if any images are selected
@@ -101,81 +105,60 @@ class PhotoState with _$PhotoState {
   /// Convenience getter for first selected index (for single selection operations)
   int get firstSelectedIndex => selectedIndexes.isEmpty ? -1 : selectedIndexes.first;
 
-  /// Safety check to ensure arrays are properly synchronized
-  bool get isArraysSynchronized => images.length == thumbnails.length;
-
-  /// Get valid selected indexes (within bounds)
-  Set<int> get validSelectedIndexes {
-    if (images.isEmpty) return {};
-    final maxIndex = images.length - 1;
-    return selectedIndexes.where((index) => index >= 0 && index <= maxIndex).toSet();
+  /// Check if all arrays (images, thumbnails) are in sync
+  bool get arraysInSyncBasic {
+    return images.length == thumbnails.length;
   }
 
-  // ========================================================================
-  // PHASE 2: ENHANCED BATCH VALIDATION & DEBUGGING HELPERS
-  // ========================================================================
+  /// Check if currently displaying the image preview modal
+  bool get isShowingPreview => showImagePreview && previewImageIndex >= 0;
 
-  /// Validate that state is ready for batch operations
-  BatchValidationResult validateForBatchOperation(BatchOperationType operationType) {
-    final errors = <String>[];
-    final warnings = <String>[];
+  /// Check if header is in editing mode
+  bool get isEditingHeader => editingHeaderUsername;
 
-    // Check if already processing
-    if (isBatchProcessing) {
-      errors.add('Batch operation already in progress');
-    }
+  /// Get a debug description of the current state
+  String get debugInfo {
+    return 'PhotoState(images: ${images.length}, thumbnails: ${thumbnails.length}, '
+        'uuids: ${imageUuids.length}, selected: $selectedCount, loading: $isLoading)';
+  }
+}
 
-    // Check arrays synchronization
-    if (!isArraysSynchronized) {
-      errors.add('Images and thumbnails arrays are out of sync');
-    }
+/// PHASE 2: Extension for UUID-related helper methods
+/// Moved to extension to avoid Freezed constructor conflicts
+extension PhotoStateX on PhotoState {
+  /// Check if UUID array is in sync with images array
+  bool get uuidsInSync => images.length == imageUuids.length;
 
-    // Operation-specific validation
-    switch (operationType) {
-      case BatchOperationType.deletePhotos:
-        if (selectedIndexes.isEmpty) {
-          errors.add('No images selected for deletion');
-        }
-        if (selectedIndexes.any((index) => index >= images.length)) {
-          errors.add('Selected indexes out of bounds for deletion');
-        }
-        break;
-
-      case BatchOperationType.addPhotos:
-        if (isLoading) {
-          warnings.add('Adding photos while loading in progress');
-        }
-        break;
-
-      case BatchOperationType.selectPhotos:
-      case BatchOperationType.deselectPhotos:
-        if (images.isEmpty) {
-          errors.add('No images available for selection operations');
-        }
-        break;
-
-      case BatchOperationType.reorderPhotos:
-        if (images.isEmpty) {
-          errors.add('No images available for reorder operations');
-        }
-        break;
-    }
-
-    // Performance warnings
-    if (queuedOperations > 10) {
-      warnings.add('High number of queued operations may impact performance');
-    }
-
-    return BatchValidationResult(
-      isValid: errors.isEmpty,
-      errors: errors,
-      warnings: warnings,
-      operationType: operationType,
-    );
+  /// Enhanced array sync check (includes UUIDs)
+  bool get enhancedArraysInSync {
+    return images.length == thumbnails.length && images.length == imageUuids.length;
   }
 
-  /// Get batch operation statistics for debugging
-  BatchDebugInfo getBatchDebugInfo() {
+  /// Safe UUID getter by index
+  String? getUuidAtIndex(int index) {
+    if (index >= 0 && index < imageUuids.length) {
+      return imageUuids[index];
+    }
+    return null;
+  }
+
+  /// Get UUIDs for currently selected images
+  List<String> get selectedUuids {
+    final uuids = <String>[];
+    for (final index in selectedIndexes) {
+      final uuid = getUuidAtIndex(index);
+      if (uuid != null) {
+        uuids.add(uuid);
+      }
+    }
+    return uuids;
+  }
+
+  /// Get all UUIDs in current display order
+  List<String> get orderedUuids => List<String>.from(imageUuids);
+
+  /// Get batch debug info (enhanced with UUID check)
+  BatchDebugInfo get debugInfo {
     final recentHistory = batchHistory.length > 10
         ? batchHistory.skip(batchHistory.length - 10).toList()
         : batchHistory;
@@ -188,16 +171,16 @@ class PhotoState with _$PhotoState {
       recentHistory: recentHistory,
       metrics: batchMetrics,
       lastResult: lastBatchResult,
-      arraysInSync: arraysInSync,
+      arraysInSync: enhancedArraysInSync, // Enhanced check including UUIDs
       imagesCount: images.length,
       thumbnailsCount: thumbnails.length,
       selectedCount: selectedCount,
     );
   }
 
-  /// Check if state is healthy for batch operations
+  /// Check if state is healthy for batch operations (enhanced with UUID check)
   bool get isBatchHealthy {
-    return arraysInSync &&
+    return enhancedArraysInSync &&
         !isBatchProcessing &&
         queuedOperations < 20 &&
         batchMetrics.averageProcessingTime.inMilliseconds < 1000;
