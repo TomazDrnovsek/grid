@@ -83,9 +83,9 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
                         ),
                       ),
                     ),
-                    // Screen title
+                    // ✅ UPDATED: Screen title changed to "Local Backup"
                     Text(
-                      'Cloud Backup',
+                      'Local Backup',
                       style: AppTheme.headlineSm(isDark),
                     ),
                     // Spacer to balance layout
@@ -103,34 +103,33 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
                     children: [
                       const SizedBox(height: 16),
 
-                      // Cloud folder status
-                      _buildCloudFolderSection(backupState, backupNotifier, isDark),
+                      // ✅ UPDATED: Local folder section
+                      _buildLocalFolderSection(backupState, backupNotifier, isDark),
 
                       const SizedBox(height: 24),
 
-                      // Actions
+                      // ✅ UPDATED: Actions section with state-aware button labels (Step B3)
                       _buildActionButtonsSection(backupState, backupNotifier, isDark),
 
                       const SizedBox(height: 24),
 
-                      // Backup status
-                      _buildBackupStatusSection(backupState, isDark),
+                      // ✅ REMOVED: Status, Progress, Error, and Success sections per Step B3
+                      // All state information now shown inline in button labels
 
-                      const SizedBox(height: 16),
-
-                      // Dynamic status sections
-                      if (backupState.status == BackupStatus.running) ...[
-                        _buildProgressSection(backupState, backupNotifier, isDark),
-                        const SizedBox(height: 16),
-                      ] else if (backupState.status == BackupStatus.error) ...[
-                        _buildErrorSection(backupState, isDark),
-                        const SizedBox(height: 16),
-                      ] else if (backupState.status == BackupStatus.success) ...[
-                        _buildSuccessSection(backupState, isDark),
-                        const SizedBox(height: 16),
-                      ],
+                      // Version text spacer
+                      const SizedBox(height: 100),
                     ],
                   ),
+                ),
+              ),
+
+              // Version number at bottom (matching menu screen)
+              Container(
+                padding: const EdgeInsets.only(bottom: 48, left: 16, right: 16),
+                child: Text(
+                  'Version 0.1',
+                  style: AppTheme.body(isDark),
+                  textAlign: TextAlign.center,
                 ),
               ),
             ],
@@ -140,31 +139,41 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
     );
   }
 
-  Widget _buildCloudFolderSection(BackupState backupState, BackupNotifier backupNotifier, bool isDark) {
+  /// ✅ UPDATED: Renamed and updated for Local Storage
+  Widget _buildLocalFolderSection(BackupState backupState, BackupNotifier backupNotifier, bool isDark) {
     final hasCloudFolder = backupState.cloudFolderName != null;
+    // ✅ ADDED: Check for active operations to disable Change Folder button
+    final isOperationInProgress = backupState.status == BackupStatus.running || _isOperationInProgress;
 
     return Card(
       elevation: 0,
-      color: AppColors.modalContentBackground(isDark),
+      color: Colors.transparent, // ✅ Removed black background in dark mode
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Cloud Storage', style: AppTheme.body(isDark).copyWith(fontWeight: FontWeight.w600)),
+            // ✅ UPDATED: Section heading changed to "Local Storage"
+            Text('Local Storage', style: AppTheme.body(isDark).copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 16),
             Row(
               children: [
-                Icon(
-                  hasCloudFolder ? Icons.folder : Icons.folder_outlined,
-                  color: hasCloudFolder ? AppColors.textPrimary(isDark) : AppColors.textSecondary(isDark),
-                  size: 20,
+                // ✅ UPDATED: SVG folder icon instead of material icon
+                SvgPicture.asset(
+                  'assets/folder_icon.svg',
+                  width: 20,
+                  height: 20,
+                  colorFilter: ColorFilter.mode(
+                    hasCloudFolder ? AppColors.textPrimary(isDark) : AppColors.textSecondary(isDark),
+                    BlendMode.srcIn,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    hasCloudFolder ? backupState.cloudFolderName! : 'No folder selected',
+                    // ✅ UPDATED: Folder name placeholder updated
+                    hasCloudFolder ? backupState.cloudFolderName! : 'Folder name',
                     style: AppTheme.body(isDark).copyWith(
                       color: hasCloudFolder ? AppColors.textPrimary(isDark) : AppColors.textSecondary(isDark),
                       fontSize: 14,
@@ -174,55 +183,134 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
               ],
             ),
             const SizedBox(height: 16),
+            // ✅ UPDATED: Now disabled during operations
             SizedBox(
               width: double.infinity,
-              child: OutlinedButton(
-                onPressed: _isOperationInProgress ? null : () => _selectCloudFolder(backupNotifier),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.textPrimary(isDark),
-                  side: BorderSide(color: AppColors.textSecondary(isDark)),
+              child: ElevatedButton(
+                onPressed: isOperationInProgress ? null : () => _selectCloudFolder(backupNotifier),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.deleteButtonBackground(isDark), // Primary/black background
+                  foregroundColor: AppColors.deleteButtonText(isDark), // White/black text
+                  disabledBackgroundColor: AppColors.cancelButtonBackground(isDark), // ✅ Disabled fill
+                  disabledForegroundColor: AppColors.textSecondary(isDark), // ✅ Disabled text
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10), // Same as Delete dialog
+                  ),
                 ),
                 child: Text(
                   hasCloudFolder ? 'Change Folder' : 'Select Folder',
-                  style: AppTheme.body(isDark).copyWith(fontSize: 14),
+                  style: AppTheme.body(isDark).copyWith(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600, // ✅ Added to match action buttons
+                    color: isOperationInProgress
+                        ? AppColors.textSecondary(isDark) // ✅ Disabled color
+                        : AppColors.deleteButtonText(isDark), // ✅ Enabled color
+                  ),
                 ),
               ),
             ),
-            if (hasCloudFolder) ...[
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: TextButton(
-                  onPressed: _isOperationInProgress ? null : () => _forgetCloudFolder(backupNotifier),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.deleteButtonText(isDark),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  child: Text(
-                    'Forget Folder',
-                    style: AppTheme.body(isDark).copyWith(
-                      fontSize: 14,
-                      color: AppColors.deleteButtonText(isDark),
-                    ),
+            // ✅ FIXED: Maintain consistent spacing - always reserve space for "Forget Folder"
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              height: 44, // ✅ Reserve consistent height for button area
+              child: hasCloudFolder && !isOperationInProgress
+                  ? TextButton(
+                onPressed: () => _forgetCloudFolder(backupNotifier),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.deleteButtonText(isDark),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: Text(
+                  'Forget Folder',
+                  style: AppTheme.body(isDark).copyWith(
+                    fontSize: 14,
+                    color: AppColors.deleteButtonText(isDark),
                   ),
                 ),
-              ),
-            ],
+              )
+                  : const SizedBox(), // ✅ Empty space when button is hidden
+            ),
           ],
         ),
       ),
     );
   }
 
+  /// ✅ UPDATED: Actions section with state-aware button labels (Step B3)
   Widget _buildActionButtonsSection(BackupState backupState, BackupNotifier backupNotifier, bool isDark) {
     final hasCloudFolder = backupState.cloudFolderName != null;
-    final isOperationInProgress = backupState.status == BackupStatus.running || _isOperationInProgress;
+
+    // ✅ Step B3: Map state to button labels and enablement
+    String backupButtonText;
+    bool backupButtonEnabled;
+    String restoreButtonText;
+    bool restoreButtonEnabled;
+
+    switch (backupState.status) {
+      case BackupStatus.running:
+        if (backupState.phase == BackupPhase.backingUp) {
+          // Backing up (i/n)
+          final current = backupState.current;
+          final total = backupState.total;
+          backupButtonText = 'Backing up $current of $total photos...';
+          backupButtonEnabled = false;
+          restoreButtonText = 'Restore from Backup';
+          restoreButtonEnabled = false;
+        } else if (backupState.phase == BackupPhase.restoring) {
+          // Restoring (i/n)
+          final current = backupState.current;
+          final total = backupState.total;
+          backupButtonText = 'Backup Now';
+          backupButtonEnabled = false;
+          restoreButtonText = 'Restoring $current of $total photos...';
+          restoreButtonEnabled = false;
+        } else {
+          // Default running state
+          backupButtonText = 'Backup Now';
+          backupButtonEnabled = false;
+          restoreButtonText = 'Restore from Backup';
+          restoreButtonEnabled = false;
+        }
+        break;
+
+      case BackupStatus.success:
+        if (backupState.phase == BackupPhase.backingUp) {
+          // Backup complete
+          backupButtonText = 'Backup Complete!';
+          backupButtonEnabled = false;
+          restoreButtonText = 'Restore from Backup';
+          restoreButtonEnabled = hasCloudFolder;
+        } else if (backupState.phase == BackupPhase.restoring) {
+          // Restore complete
+          backupButtonText = 'Backup Now';
+          backupButtonEnabled = hasCloudFolder;
+          restoreButtonText = 'Restore Complete!';
+          restoreButtonEnabled = false;
+        } else {
+          // Default success state
+          backupButtonText = 'Backup Now';
+          backupButtonEnabled = hasCloudFolder;
+          restoreButtonText = 'Restore from Backup';
+          restoreButtonEnabled = hasCloudFolder;
+        }
+        break;
+
+      case BackupStatus.idle:
+      case BackupStatus.error:
+      // Idle (can restore if has backup) or Error state
+        final hasBackup = backupState.lastBackupDate != null;
+        backupButtonText = 'Backup Now';
+        backupButtonEnabled = hasCloudFolder && !_isOperationInProgress;
+        restoreButtonText = 'Restore from Backup';
+        restoreButtonEnabled = hasCloudFolder && hasBackup && !_isOperationInProgress;
+        break;
+    }
 
     return Card(
       elevation: 0,
-      color: AppColors.modalContentBackground(isDark),
+      color: Colors.transparent, // ✅ Removed black background in dark mode
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -231,199 +319,104 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
           children: [
             Text('Actions', style: AppTheme.body(isDark).copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 16),
+            // ✅ UPDATED: Backup button with state-aware text
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: (isOperationInProgress || !hasCloudFolder) ? null : () => _performBackup(backupNotifier),
+              height: 52, // ✅ Height ≈ 52dp as specified
+              child: ElevatedButton(
+                onPressed: backupButtonEnabled ? () => _performBackup(backupNotifier) : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.textPrimary(isDark),
-                  foregroundColor: AppColors.scaffoldBackground(isDark),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  backgroundColor: AppColors.deleteButtonBackground(isDark), // ✅ Primary/black fill
+                  foregroundColor: AppColors.deleteButtonText(isDark), // ✅ White/black text
+                  disabledBackgroundColor: AppColors.cancelButtonBackground(isDark), // ✅ Disabled fill
+                  disabledForegroundColor: AppColors.textSecondary(isDark), // ✅ Disabled text
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10), // ✅ Same as Delete dialog
+                  ),
                 ),
-                icon: const Icon(Icons.cloud_upload_outlined, size: 20),
-                label: Text('Backup Now', style: AppTheme.body(!isDark).copyWith(fontSize: 14)),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // ✅ SVG icon with proper color filtering
+                    SvgPicture.asset(
+                      'assets/folder-up_icon.svg',
+                      width: 20,
+                      height: 20,
+                      colorFilter: ColorFilter.mode(
+                        backupButtonEnabled
+                            ? AppColors.deleteButtonText(isDark)
+                            : AppColors.textSecondary(isDark),
+                        BlendMode.srcIn,
+                      ),
+                    ),
+                    const SizedBox(width: 12), // ✅ Icon-to-label spacing = 12dp
+                    Flexible(
+                      child: Text(
+                        backupButtonText,
+                        style: AppTheme.body(isDark).copyWith(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: backupButtonEnabled
+                              ? AppColors.deleteButtonText(isDark)
+                              : AppColors.textSecondary(isDark),
+                        ),
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 12),
+            // ✅ UPDATED: Restore button with state-aware text
             SizedBox(
               width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: (isOperationInProgress || !hasCloudFolder) ? null : () => _performRestore(backupNotifier),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.textPrimary(isDark),
-                  side: BorderSide(color: AppColors.textSecondary(isDark)),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                icon: const Icon(Icons.cloud_download_outlined, size: 20),
-                label: Text('Restore from Backup', style: AppTheme.body(isDark).copyWith(fontSize: 14)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBackupStatusSection(BackupState backupState, bool isDark) {
-    final lastBackupDate = backupState.lastBackupDate;
-
-    return Card(
-      elevation: 0,
-      color: AppColors.modalContentBackground(isDark),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Status', style: AppTheme.body(isDark).copyWith(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Last Backup', style: AppTheme.body(isDark).copyWith(fontSize: 14, color: AppColors.textSecondary(isDark))),
-                Text(
-                  lastBackupDate != null ? _formatDate(lastBackupDate) : 'Never',
-                  style: AppTheme.body(isDark).copyWith(fontSize: 14),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProgressSection(BackupState backupState, BackupNotifier backupNotifier, bool isDark) {
-    final progress = backupState.current;
-    final total = backupState.total;
-    final progressPercentage = total > 0 ? (progress / total * 100).round() : 0;
-    final isBackup = backupState.phase == BackupPhase.backingUp;
-
-    return Card(
-      elevation: 0,
-      color: AppColors.modalContentBackground(isDark),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  isBackup ? 'Backing up...' : 'Restoring...',
-                  style: AppTheme.body(isDark).copyWith(fontWeight: FontWeight.w600),
-                ),
-                Text(
-                  '$progressPercentage%',
-                  style: AppTheme.body(isDark).copyWith(fontSize: 14),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            LinearProgressIndicator(
-              value: total > 0 ? progress / total : 0,
-              backgroundColor: AppColors.textSecondary(isDark).withValues(alpha: 0.2),
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.textPrimary(isDark)),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '$progress of $total photos',
-                  style: AppTheme.body(isDark).copyWith(fontSize: 12, color: AppColors.textSecondary(isDark)),
-                ),
-                TextButton(
-                  onPressed: () => backupNotifier.cancelOperation(),
-                  child: Text(
-                    'Cancel',
-                    style: AppTheme.body(isDark).copyWith(fontSize: 14, color: AppColors.deleteButtonText(isDark)),
+              height: 52, // ✅ Height ≈ 52dp as specified
+              child: ElevatedButton(
+                onPressed: restoreButtonEnabled ? () => _performRestore(backupNotifier) : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.deleteButtonBackground(isDark), // ✅ Primary/black fill
+                  foregroundColor: AppColors.deleteButtonText(isDark), // ✅ White/black text
+                  disabledBackgroundColor: AppColors.cancelButtonBackground(isDark), // ✅ Disabled fill
+                  disabledForegroundColor: AppColors.textSecondary(isDark), // ✅ Disabled text
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10), // ✅ Same as Delete dialog
                   ),
                 ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildErrorSection(BackupState backupState, bool isDark) {
-    return Card(
-      elevation: 0,
-      color: AppColors.deleteButtonText(isDark).withValues(alpha: 0.1),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.error_outline, color: AppColors.deleteButtonText(isDark), size: 16),
-                const SizedBox(width: 8),
-                Text(
-                  'Operation Failed',
-                  style: AppTheme.body(isDark).copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.deleteButtonText(isDark),
-                  ),
-                ),
-              ],
-            ),
-            if (backupState.error != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                backupState.error!,
-                style: AppTheme.body(isDark).copyWith(
-                  fontSize: 14,
-                  color: AppColors.deleteButtonText(isDark),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // ✅ SVG icon with proper color filtering
+                    SvgPicture.asset(
+                      'assets/folder-down_icon.svg',
+                      width: 20,
+                      height: 20,
+                      colorFilter: ColorFilter.mode(
+                        restoreButtonEnabled
+                            ? AppColors.deleteButtonText(isDark)
+                            : AppColors.textSecondary(isDark),
+                        BlendMode.srcIn,
+                      ),
+                    ),
+                    const SizedBox(width: 12), // ✅ Icon-to-label spacing = 12dp
+                    Flexible(
+                      child: Text(
+                        restoreButtonText,
+                        style: AppTheme.body(isDark).copyWith(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: restoreButtonEnabled
+                              ? AppColors.deleteButtonText(isDark)
+                              : AppColors.textSecondary(isDark),
+                        ),
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSuccessSection(BackupState backupState, bool isDark) {
-    final isBackup = backupState.phase == BackupPhase.backingUp;
-    final itemCount = backupState.total;
-
-    return Card(
-      elevation: 0,
-      color: Colors.green.withValues(alpha: 0.1),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.check_circle_outline, color: Colors.green, size: 16),
-                const SizedBox(width: 8),
-                Text(
-                  isBackup ? 'Backup Complete' : 'Restore Complete',
-                  style: AppTheme.body(isDark).copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: Colors.green,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              isBackup
-                  ? 'Successfully backed up $itemCount photos to cloud storage.'
-                  : 'Successfully restored $itemCount photos from backup.',
-              style: AppTheme.body(isDark).copyWith(fontSize: 14, color: Colors.green),
             ),
           ],
         ),
@@ -432,11 +425,11 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
   }
 
   Future<void> _selectCloudFolder(BackupNotifier backupNotifier) async {
-    setState(() {
-      _isOperationInProgress = true;
-    });
-
     try {
+      setState(() {
+        _isOperationInProgress = true;
+      });
+
       final safProvider = SafStorageProvider();
       final result = await safProvider.pickDirectory();
 
@@ -445,41 +438,12 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
         final name = result['name'];
 
         if (uri != null && name != null) {
-          // Save the cloud folder configuration
-          final success = await safProvider.setCloudFolder(uri, name);
-          if (success) {
-            // Update the backup provider state
-            await backupNotifier.setCloudFolder(uri, name);
-
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Cloud folder selected: $name'),
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-            }
-          } else if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Failed to set cloud folder'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
+          await backupNotifier.setCloudFolder(uri, name);
         }
       }
     } catch (e) {
-      if (kDebugMode) {
+      if (mounted && kDebugMode) {
         debugPrint('Error selecting cloud folder: $e');
-      }
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
       }
     } finally {
       if (mounted) {
@@ -492,66 +456,25 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
 
   Future<void> _forgetCloudFolder(BackupNotifier backupNotifier) async {
     final confirmed = await _showConfirmationDialog(
-      'Forget Cloud Folder',
-      'This will remove the cloud folder configuration. Your backed up photos will remain in the cloud.',
+      'Forget Folder?',
+      'This will remove the cloud folder configuration. You can always select it again later.',
     );
 
-    if (!confirmed || !mounted) return;
-
-    setState(() {
-      _isOperationInProgress = true;
-    });
-
-    try {
+    if (confirmed && mounted) {
       await backupNotifier.removeCloudFolder();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Cloud folder configuration removed'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error forgetting cloud folder: $e');
-      }
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isOperationInProgress = false;
-        });
-      }
     }
   }
 
   Future<void> _performBackup(BackupNotifier backupNotifier) async {
-    setState(() {
-      _isOperationInProgress = true;
-    });
-
     try {
+      setState(() {
+        _isOperationInProgress = true;
+      });
+
       await backupNotifier.performBackup();
     } catch (e) {
-      if (kDebugMode) {
+      if (mounted && kDebugMode) {
         debugPrint('Error performing backup: $e');
-      }
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Backup failed: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
       }
     } finally {
       if (mounted) {
@@ -564,53 +487,25 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
 
   Future<void> _performRestore(BackupNotifier backupNotifier) async {
     final confirmed = await _showRestoreConfirmationDialog();
-    if (!confirmed || !mounted) return;
 
-    setState(() {
-      _isOperationInProgress = true;
-    });
-
-    try {
-      await backupNotifier.performRestore();
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error performing restore: $e');
-      }
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Restore failed: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
+    if (confirmed && mounted) {
+      try {
         setState(() {
-          _isOperationInProgress = false;
+          _isOperationInProgress = true;
         });
-      }
-    }
-  }
 
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-
-    if (difference.inDays == 0) {
-      if (difference.inHours == 0) {
-        if (difference.inMinutes == 0) {
-          return 'Just now';
+        await backupNotifier.performRestore();
+      } catch (e) {
+        if (mounted && kDebugMode) {
+          debugPrint('Error performing restore: $e');
         }
-        return '${difference.inMinutes} ${difference.inMinutes == 1 ? 'minute' : 'minutes'} ago';
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isOperationInProgress = false;
+          });
+        }
       }
-      return '${difference.inHours} ${difference.inHours == 1 ? 'hour' : 'hours'} ago';
-    } else if (difference.inDays == 1) {
-      return 'Yesterday';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays} days ago';
-    } else {
-      return '${date.day}/${date.month}/${date.year}';
     }
   }
 
@@ -652,43 +547,101 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
     ) ?? false;
   }
 
+  /// ✅ UPDATED: Restore confirmation dialog matching Delete dialog shape (Step B4)
   Future<bool> _showRestoreConfirmationDialog() async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return await showDialog<bool>(
       context: context,
+      barrierDismissible: false,
       builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: AppColors.modalContentBackground(isDark),
-          title: Text('Restore from Backup?', style: AppTheme.headlineSm(isDark)),
-          content: Text(
-            'This will replace all current photos with the backed up photos. This action cannot be undone.',
-            style: AppTheme.body(isDark).copyWith(
-              fontSize: 14,
-              color: AppColors.textSecondary(isDark),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary(isDark)),
-              child: Text(
-                'Cancel',
-                style: AppTheme.body(isDark).copyWith(
-                  fontSize: 14,
-                  color: AppColors.textSecondary(isDark),
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).pop(false),
+                child: Container(
+                  color: AppColors.modalOverlayBackground(isDark),
                 ),
               ),
             ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.deleteButtonText(isDark),
-                foregroundColor: Colors.white,
-              ),
-              child: Text(
-                'Restore',
-                style: AppTheme.body(isDark).copyWith(fontSize: 14, color: Colors.white),
+            Center(
+              child: Semantics(
+                label: 'Restore confirmation dialog',
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+                  decoration: BoxDecoration(
+                    color: AppColors.modalContentBackground(isDark),
+                    borderRadius: BorderRadius.circular(20), // ✅ Same as Delete dialog
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // ✅ Title only: "Are you sure?"
+                      Text(
+                        'Are you sure?',
+                        textAlign: TextAlign.center,
+                        style: AppTheme.dialogTitle(isDark),
+                      ),
+                      const SizedBox(height: 24),
+                      // ✅ Buttons side-by-side matching Delete dialog
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // ✅ Cancel button - secondary/grey style (same as Delete dialog Cancel)
+                          SizedBox(
+                            width: 80, // ✅ Same width as Delete dialog
+                            height: 44, // ✅ Same height as Delete dialog
+                            child: TextButton(
+                              style: ButtonStyle(
+                                backgroundColor: WidgetStateProperty.all(
+                                    AppColors.cancelButtonBackground(isDark)),
+                                shape: WidgetStateProperty.all(
+                                  RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10), // ✅ Same as Delete dialog
+                                  ),
+                                ),
+                                overlayColor: WidgetStateProperty.all(
+                                  AppColors.textPrimary(isDark).withAlpha(18),
+                                ),
+                              ),
+                              onPressed: () => Navigator.of(context).pop(false),
+                              child: Text(
+                                'Cancel',
+                                style: AppTheme.dialogActionPrimary(isDark),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16), // ✅ Same spacing as Delete dialog
+                          // ✅ Restore button - primary/black style (same as Delete dialog Delete button)
+                          SizedBox(
+                            width: 80, // ✅ Same width as Delete dialog
+                            height: 44, // ✅ Same height as Delete dialog
+                            child: TextButton(
+                              style: ButtonStyle(
+                                backgroundColor: WidgetStateProperty.all(
+                                    AppColors.deleteButtonBackground(isDark)),
+                                shape: WidgetStateProperty.all(
+                                  RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10), // ✅ Same as Delete dialog
+                                  ),
+                                ),
+                                overlayColor: WidgetStateProperty.all(
+                                  AppColors.deleteButtonOverlay(isDark),
+                                ),
+                              ),
+                              onPressed: () => Navigator.of(context).pop(true),
+                              child: Text(
+                                'Restore',
+                                style: AppTheme.dialogActionDanger(isDark),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ],

@@ -125,5 +125,8 @@ flutter:
     - assets/arrow_left.svg
     - assets/colormap_icon-fill.svg
     - assets/colormap_icon-outline.svg
+    - assets/folder_icon.svg
+    - assets/folder-down_icon.svg
+    - assets/folder-up_icon.svg
     - assets/images/sample1.jpg
     - assets/images/profile.jpg

@@ -2,7 +2,6 @@
 
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/backup_models.dart';
 import 'saf_storage_provider.dart';
 
@@ -95,6 +94,72 @@ class CloudManifestRepository {
     }
   }
 
+  /// Cleans up all old backup files and directories
+  /// This prevents backup bloat by removing previous backup artifacts
+  /// Should be called BEFORE starting a new backup operation
+  Future<void> cleanupOldBackupFiles() async {
+    try {
+      if (kDebugMode) {
+        debugPrint('[CloudManifest] Cleaning up old backup files to prevent bloat');
+      }
+
+      final uri = await _getRequiredCloudUri();
+
+      // List all files and directories in the backup folder
+      final entries = await _safProvider.listDirectory(uri, '');
+
+      int deletedFiles = 0;
+      int deletedDirs = 0;
+
+      for (final entry in entries) {
+        if (entry.type == SafEntryType.file) {
+          // Delete all manifest files (including numbered versions)
+          if (entry.name.startsWith('manifest') && entry.name.endsWith('.json')) {
+            final deleteSuccess = await _safProvider.deleteFile(uri, entry.name);
+            if (deleteSuccess) {
+              deletedFiles++;
+              if (kDebugMode) {
+                debugPrint('[CloudManifest] Deleted old manifest file: ${entry.name}');
+              }
+            }
+          }
+          // Delete any temp files
+          else if (entry.name.endsWith('.tmp')) {
+            final deleteSuccess = await _safProvider.deleteFile(uri, entry.name);
+            if (deleteSuccess) {
+              deletedFiles++;
+              if (kDebugMode) {
+                debugPrint('[CloudManifest] Deleted temp file: ${entry.name}');
+              }
+            }
+          }
+        } else if (entry.type == SafEntryType.directory) {
+          // Delete backup content directories (originals, thumbs, meta)
+          if (entry.name == 'originals' || entry.name == 'thumbs' || entry.name == 'meta') {
+            final deleteSuccess = await _safProvider.deleteFile(uri, entry.name);
+            if (deleteSuccess) {
+              deletedDirs++;
+              if (kDebugMode) {
+                debugPrint('[CloudManifest] Deleted old backup directory: ${entry.name}');
+              }
+            }
+          }
+        }
+      }
+
+      if (kDebugMode) {
+        debugPrint('[CloudManifest] Cleanup complete: $deletedFiles files, $deletedDirs directories removed');
+      }
+
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[CloudManifest] Warning: Cleanup failed, continuing with backup: $e');
+      }
+      // Don't throw - cleanup failure shouldn't prevent backup
+      // The atomic write will still work even if cleanup fails
+    }
+  }
+
   /// Writes manifest to cloud storage using atomic operation
   /// Uses .tmp file then rename to ensure data integrity
   Future<void> writeManifest(BackupManifest manifest) async {
@@ -131,44 +196,32 @@ class CloudManifestRepository {
       // 2. Rename temp to final (atomic operation)
       // 3. Clean up temp file if rename fails
 
-      try {
-        // Step 1: Write to temporary file
-        final writeSuccess = await _safProvider.writeFile(uri, _manifestTempFileName, manifestBytes);
-        if (!writeSuccess) {
-          throw const CloudManifestException('Failed to write temporary manifest file');
-        }
+      // Write to temporary file first
+      final tempWriteSuccess = await _safProvider.writeFile(
+        uri,
+        _manifestTempFileName,
+        manifestBytes,
+      );
 
-        if (kDebugMode) {
-          debugPrint('[CloudManifest] Temporary manifest written (${manifestBytes.length} bytes)');
-        }
+      if (!tempWriteSuccess) {
+        throw const CloudManifestException('Failed to write temporary manifest file');
+      }
 
-        // Step 2: Atomic rename operation
-        final renameSuccess = await _safProvider.renameFile(uri, _manifestTempFileName, _manifestFileName);
-        if (!renameSuccess) {
-          throw const CloudManifestException('Failed to rename temporary manifest to final');
-        }
+      // Atomic rename from temp to final
+      final renameSuccess = await _safProvider.renameFile(
+        uri,
+        _manifestTempFileName,
+        _manifestFileName,
+      );
 
-        if (kDebugMode) {
-          debugPrint('[CloudManifest] Manifest successfully written via atomic operation');
-        }
+      if (!renameSuccess) {
+        // Clean up failed temp file
+        await _safProvider.deleteFile(uri, _manifestTempFileName);
+        throw const CloudManifestException('Failed to finalize manifest file (rename operation failed)');
+      }
 
-      } catch (e) {
-        // Step 3: Clean up temp file if operation failed
-        try {
-          final tempExists = await _safProvider.exists(uri, _manifestTempFileName);
-          if (tempExists) {
-            await _safProvider.deleteFile(uri, _manifestTempFileName);
-            if (kDebugMode) {
-              debugPrint('[CloudManifest] Cleaned up temporary manifest file after failure');
-            }
-          }
-        } catch (cleanupError) {
-          if (kDebugMode) {
-            debugPrint('[CloudManifest] Warning: Could not clean up temp file: $cleanupError');
-          }
-        }
-
-        throw CloudManifestException('Atomic write failed: $e');
+      if (kDebugMode) {
+        debugPrint('[CloudManifest] Manifest written successfully (${sizeInMB.toStringAsFixed(2)}MB)');
       }
 
     } catch (e) {
@@ -179,11 +232,11 @@ class CloudManifestRepository {
     }
   }
 
-  /// Creates a new manifest for initial backup
+  /// Creates a new manifest with current timestamp and device info
   BackupManifest createNewManifest({
+    required List<BackupItem> items,
     required String deviceId,
     required String appVersion,
-    required List<BackupItem> items,
     Map<String, dynamic>? metadata,
   }) {
     return BackupManifest(
@@ -435,30 +488,18 @@ class CloudManifestRepository {
       };
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('[CloudManifest] Failed to get cloud folder info: $e');
+        debugPrint('[CloudManifest] Failed to get folder info: $e');
       }
       return null;
     }
   }
 }
 
-/// Custom exception for manifest operations
+/// Custom exception for cloud manifest operations
 class CloudManifestException implements Exception {
   final String message;
-
   const CloudManifestException(this.message);
 
   @override
   String toString() => 'CloudManifestException: $message';
 }
-
-/// Riverpod provider for SafStorageProvider
-final safStorageProvider = Provider<SafStorageProvider>((ref) {
-  return SafStorageProvider();
-});
-
-/// Riverpod provider for CloudManifestRepository
-final cloudManifestRepositoryProvider = Provider<CloudManifestRepository>((ref) {
-  final safProvider = ref.read(safStorageProvider);
-  return CloudManifestRepository(safProvider);
-});

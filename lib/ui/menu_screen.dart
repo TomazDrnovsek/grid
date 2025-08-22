@@ -75,13 +75,13 @@ class MenuScreen extends StatelessWidget {
                         ],
                       ),
 
-                      // âœ… NEW: Cloud Backup settings entry (with feature flag check)
+                      // ✅ UPDATED: Local Backup settings entry (with feature flag check)
                       if (AppConfig.enableCloudBackup) ...[
                         const SizedBox(height: 24),
                         _MenuTile(
-                          title: 'Cloud Backup',
-                          subtitle: 'Backup photos to your cloud storage',
-                          icon: Icons.cloud_outlined,
+                          title: 'Local Backup',
+                          subtitle: 'Backup photos to your local storage',
+                          icon: null, // ✅ REMOVED: No leading icon
                           isDark: isDark,
                           onTap: () => _navigateToBackupSettings(context),
                         ),
@@ -132,19 +132,20 @@ class MenuScreen extends StatelessWidget {
 }
 
 /// Reusable menu tile widget for consistent styling
+/// ✅ UPDATED: Made icon optional to support tiles without leading icons
 class _MenuTile extends StatelessWidget {
   final String title;
   final String? subtitle;
-  final IconData icon;
-  final VoidCallback onTap;
+  final IconData? icon; // ✅ CHANGED: Made optional
   final bool isDark;
+  final VoidCallback onTap;
 
   const _MenuTile({
     required this.title,
     this.subtitle,
-    required this.icon,
-    required this.onTap,
+    this.icon, // ✅ OPTIONAL: No longer required
     required this.isDark,
+    required this.onTap,
   });
 
   @override
@@ -152,51 +153,46 @@ class _MenuTile extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: 16),
         child: Row(
           children: [
-            // Icon
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: AppColors.textSecondary(isDark).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+            // ✅ CONDITIONAL: Only show icon container if icon is provided
+            if (icon != null) ...[
+              Container(
+                width: 24,
+                height: 24,
+                alignment: Alignment.center,
+                child: Icon(
+                  icon,
+                  size: 20,
+                  color: AppColors.textPrimary(isDark),
+                ),
               ),
-              child: Icon(
-                icon,
-                size: 18,
-                color: AppColors.textPrimary(isDark),
-              ),
-            ),
-            const SizedBox(width: 16),
-
-            // Text content
+              const SizedBox(width: 16),
+            ],
+            // Content area
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
-                    style: AppTheme.body(isDark).copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
+                    style: AppTheme.body(isDark),
                   ),
                   if (subtitle != null) ...[
                     const SizedBox(height: 2),
                     Text(
                       subtitle!,
                       style: AppTheme.body(isDark).copyWith(
-                        fontSize: 12,
                         color: AppColors.textSecondary(isDark),
+                        fontSize: 12,
                       ),
                     ),
                   ],
                 ],
               ),
             ),
-
-            // Arrow indicator
+            // Trailing chevron (always present)
             Icon(
               Icons.chevron_right,
               size: 20,

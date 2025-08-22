@@ -3,13 +3,11 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants.dart';
 import '../models/backup_models.dart';
-import '../models/photo_state.dart';
 import '../repositories/cloud_manifest_repository.dart' as manifest;
 import '../repositories/photo_repository.dart';
 import '../repositories/saf_storage_provider.dart' as saf;
@@ -73,6 +71,8 @@ class BackupRestoreRepository {
         );
         return;
       }
+
+      await _manifestRepo.cleanupOldBackupFiles();
 
       // Phase 2: Load photos from database
       final loadResult = await _photoRepo.loadAllSavedPhotos();
