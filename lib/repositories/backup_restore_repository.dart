@@ -72,7 +72,11 @@ class BackupRestoreRepository {
         return;
       }
 
-      await _manifestRepo.cleanupOldBackupFiles();
+      // >>> Surgical fix: keep only one latest backup <<<
+      // Delete previous backup's artifacts (files referenced by old manifest)
+      // and remove manifest.json (+ .tmp) so the next write doesn't create "manifest (1).json".
+      await _cleanupPreviousBackup(cancelToken);
+      // <<< End fix >>>
 
       // Phase 2: Load photos from database
       final loadResult = await _photoRepo.loadAllSavedPhotos();
@@ -856,6 +860,40 @@ class BackupRestoreRepository {
     }
 
     return deviceId;
+  }
+
+  /// Delete previous backup artifacts and manifest files.
+  /// Uses only APIs available in SafStorageProvider and CloudManifestRepository.
+  Future<void> _cleanupPreviousBackup(CancelToken cancelToken) async {
+    try {
+      final cloudUri = await _safProvider.getCloudFolderUri();
+      if (cloudUri == null || cloudUri.isEmpty) return;
+
+      // Delete all files referenced by the previous manifest (if any)
+      final oldManifest = await _manifestRepo.readManifest();
+      if (oldManifest != null) {
+        if (kDebugMode) {
+          debugPrint('[BackupRestore] Cleanup: deleting ${oldManifest.items.length} old items');
+        }
+        for (final item in oldManifest.items) {
+          if (cancelToken.isCancelled) return;
+          if (item.relativePath.isNotEmpty) {
+            await _safProvider.deleteFile(cloudUri, item.relativePath);
+          }
+          if (item.thumbPath.isNotEmpty) {
+            await _safProvider.deleteFile(cloudUri, item.thumbPath);
+          }
+        }
+      }
+
+      // Remove manifest.json and any leftover temp manifest
+      await _safProvider.deleteFile(cloudUri, 'manifest.json');
+      await _safProvider.deleteFile(cloudUri, 'manifest.json.tmp');
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[BackupRestore] Cleanup warning: $e');
+      }
+    }
   }
 }
 

@@ -844,12 +844,15 @@ class LoadingModal extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   // FIXED: Use statValue style and remove any text decoration
-                  Text(
-                    displayText,
-                    textAlign: TextAlign.center,
-                    style: AppTheme.statValue(isDark).copyWith(
-                      decoration: TextDecoration.none,
-                      decorationColor: Colors.transparent,
+                  SizedBox(
+                    width: 180, // Fixed width for consistent layout
+                    child: Text(
+                      displayText,
+                      textAlign: TextAlign.center,
+                      style: AppTheme.statValue(isDark).copyWith(
+                        decoration: TextDecoration.none,
+                        decorationColor: Colors.transparent,
+                      ),
                     ),
                   ),
                 ],

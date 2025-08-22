@@ -75,10 +75,14 @@ class BackupNotifier extends StateNotifier<BackupState> {
           error: null,
         );
 
-        // Persist to SharedPreferences
+        // Persist via SAF (source of truth for repository)
+        // This ensures BackupRestoreRepository & CloudManifestRepository can read the same keys.
+        await SafStorageProvider().setCloudFolder(uri, displayName);
+
+        // (Back-compat) Remove any legacy keys to avoid confusion
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('backup_cloud_folder_uri', uri);
-        await prefs.setString('backup_cloud_folder_name', displayName);
+        await prefs.remove('backup_cloud_folder_uri');
+        await prefs.remove('backup_cloud_folder_name');
 
         // Check backup status in cloud folder
         await _checkCloudBackupStatus();
@@ -100,7 +104,24 @@ class BackupNotifier extends StateNotifier<BackupState> {
           debugPrint('BackupProvider: Removing cloud folder configuration');
         }
 
-        // Clear SharedPreferences
+        // Attempt to revoke persisted permission and clear SAF keys
+        final safProvider = SafStorageProvider();
+
+        // Prefer the current state value; if null, try loading from SAF
+        final existingUri =
+            state.cloudFolderUri ?? await safProvider.getCloudFolderUri();
+
+        if (existingUri != null && existingUri.isNotEmpty) {
+          await safProvider.releaseUri(existingUri);
+        } else {
+          // Fallback: clear keys directly
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.remove('cloud_folder_uri');
+          await prefs.remove('cloud_folder_name');
+          await prefs.remove('last_backup_date');
+        }
+
+        // Also remove any legacy keys used previously by this provider
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove('backup_cloud_folder_uri');
         await prefs.remove('backup_cloud_folder_name');
@@ -165,7 +186,6 @@ class BackupNotifier extends StateNotifier<BackupState> {
             onError: (error) => _handleBackupError(error),
             onDone: () => _handleBackupComplete(),
           );
-
         } catch (e) {
           // Stop performance monitoring on error
           PerformanceMonitor.instance.endOperation('cloud_backup');
@@ -225,7 +245,6 @@ class BackupNotifier extends StateNotifier<BackupState> {
             onError: (error) => _handleRestoreError(error),
             onDone: () => _handleRestoreComplete(),
           );
-
         } catch (e) {
           // Stop performance monitoring on error
           PerformanceMonitor.instance.endOperation('cloud_restore');
@@ -273,7 +292,6 @@ class BackupNotifier extends StateNotifier<BackupState> {
       if (kDebugMode) {
         debugPrint('BackupProvider: Operation cancelled successfully');
       }
-
     } catch (e) {
       if (kDebugMode) {
         debugPrint('BackupProvider: Error cancelling operation - $e');
@@ -285,10 +303,10 @@ class BackupNotifier extends StateNotifier<BackupState> {
   Future<void> _loadCloudFolderSettings() async {
     await RepositoryErrorHandler.handleAsyncOperation<void>(
           () async {
-        // Load persisted cloud folder settings
-        final prefs = await SharedPreferences.getInstance();
-        final cloudFolderUri = prefs.getString('backup_cloud_folder_uri');
-        final cloudFolderName = prefs.getString('backup_cloud_folder_name');
+        // Load persisted cloud folder settings from SAF (single source of truth)
+        final safProvider = SafStorageProvider();
+        final cloudFolderUri = await safProvider.getCloudFolderUri();
+        final cloudFolderName = await safProvider.getCloudFolderName();
 
         if (cloudFolderUri != null && cloudFolderName != null) {
           // Update state with persisted settings
@@ -344,7 +362,6 @@ class BackupNotifier extends StateNotifier<BackupState> {
             : '0.0';
         debugPrint('BackupProvider: Progress $progress% - $update.currentFile');
       }
-
     } catch (e) {
       if (kDebugMode) {
         debugPrint('BackupProvider: Error handling backup progress - $e');
@@ -370,7 +387,6 @@ class BackupNotifier extends StateNotifier<BackupState> {
             : '0.0';
         debugPrint('BackupProvider: Restore $progress% - $update.currentFile');
       }
-
     } catch (e) {
       if (kDebugMode) {
         debugPrint('BackupProvider: Error handling restore progress - $e');
@@ -400,7 +416,6 @@ class BackupNotifier extends StateNotifier<BackupState> {
 
       // Stop performance monitoring
       PerformanceMonitor.instance.endOperation('cloud_backup');
-
     } catch (e) {
       if (kDebugMode) {
         debugPrint('BackupProvider: Error handling backup completion - $e');
@@ -429,7 +444,6 @@ class BackupNotifier extends StateNotifier<BackupState> {
 
       // Stop performance monitoring
       PerformanceMonitor.instance.endOperation('cloud_restore');
-
     } catch (e) {
       if (kDebugMode) {
         debugPrint('BackupProvider: Error handling restore completion - $e');
@@ -459,7 +473,6 @@ class BackupNotifier extends StateNotifier<BackupState> {
 
       // Stop performance monitoring
       PerformanceMonitor.instance.endOperation('cloud_backup');
-
     } catch (e) {
       if (kDebugMode) {
         debugPrint('BackupProvider: Error in backup error handler - $e');
@@ -489,7 +502,6 @@ class BackupNotifier extends StateNotifier<BackupState> {
 
       // Stop performance monitoring
       PerformanceMonitor.instance.endOperation('cloud_restore');
-
     } catch (e) {
       if (kDebugMode) {
         debugPrint('BackupProvider: Error in restore error handler - $e');
