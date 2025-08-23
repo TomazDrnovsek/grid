@@ -19,11 +19,11 @@ class ProfileData {
   String? profileImagePath;
 
   ProfileData({
-    this.username = 'tomazdrnovsek',
-    this.posts = '327',
-    this.followers = '3,333',
-    this.following = '813',
-    this.bio = 'From Ljubljana, Slovenia.',
+    this.username = 'namesurname',
+    this.posts = '0',
+    this.followers = '0',
+    this.following = '0',
+    this.bio = 'Bio.',
     this.profileImagePath,
   });
 
@@ -39,11 +39,11 @@ class ProfileData {
   static ProfileData fromJson(Map<String, dynamic> json) {
     try {
       return ProfileData(
-        username: json['username']?.toString() ?? 'tomazdrnovsek',
-        posts: json['posts']?.toString() ?? '327',
-        followers: json['followers']?.toString() ?? '3,333',
-        following: json['following']?.toString() ?? '813',
-        bio: json['bio']?.toString() ?? 'From Ljubljana, Slovenia.',
+        username: json['username']?.toString() ?? 'namesurname',
+        posts: json['posts']?.toString() ?? '0',
+        followers: json['followers']?.toString() ?? '0',
+        following: json['following']?.toString() ?? '0',
+        bio: json['bio']?.toString() ?? 'Bio.',
         profileImagePath: json['profileImagePath']?.toString(),
       );
     } catch (e) {
@@ -771,7 +771,7 @@ class _HighRefreshProfileImageState extends State<_HighRefreshProfileImage>
         );
       } else {
         return _buildImageWithOptimizedLoading(
-          imageProvider: const AssetImage('assets/images/profile.jpg'),
+          imageProvider: const AssetImage('assets/images/avatar.jpg'),
           errorWidget: errorWidget,
         );
       }

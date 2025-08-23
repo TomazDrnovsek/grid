@@ -494,7 +494,7 @@ class _$PhotoStateImpl extends _PhotoState {
     this.previewImageIndex = -1,
     this.isAtTop = true,
     this.editingHeaderUsername = false,
-    this.headerUsername = 'tomazdrnovsek',
+    this.headerUsername = 'namesurname',
     this.imageCount = 0,
     this.arraysInSync = true,
     this.showHueMap = false,

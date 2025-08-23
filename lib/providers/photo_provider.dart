@@ -677,7 +677,7 @@ class PhotoNotifier extends _$PhotoNotifier {
             repairedCount: 0,
             error: 'Failed to load initial data',
           ),
-          'tomazdrnovsek' // Default username
+          'namesurname' // Default username
         ],
         context: 'Initial Data Load',
       );
@@ -720,7 +720,7 @@ class PhotoNotifier extends _$PhotoNotifier {
       PerformanceMonitor.instance.endOperation('load_initial_data');
       state = state.copyWith(
         isLoading: false,
-        headerUsername: 'tomazdrnovsek', // Fallback username
+        headerUsername: 'namesurname', // Fallback username
       );
     }
   }

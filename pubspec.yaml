@@ -128,5 +128,4 @@ flutter:
     - assets/folder_icon.svg
     - assets/folder-down_icon.svg
     - assets/folder-up_icon.svg
-    - assets/images/sample1.jpg
-    - assets/images/profile.jpg
+    - assets/images/avatar.jpg

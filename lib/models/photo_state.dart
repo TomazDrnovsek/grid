@@ -44,7 +44,7 @@ class PhotoState with _$PhotoState {
     @Default(false) bool editingHeaderUsername,
 
     /// Current header username value
-    @Default('tomazdrnovsek') String headerUsername,
+    @Default('namesurname') String headerUsername,
 
     /// Total count of images for convenience
     @Default(0) int imageCount,

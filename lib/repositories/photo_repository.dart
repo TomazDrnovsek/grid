@@ -446,12 +446,12 @@ class PhotoRepository {
 
       // Fallback to SharedPreferences for migration compatibility
       final prefs = await SharedPreferences.getInstance();
-      return prefs.getString(_legacyHeaderUsernameKey) ?? 'tomazdrnovsek';
+      return prefs.getString(_legacyHeaderUsernameKey) ?? 'namesurname';
     } catch (e) {
       if (kDebugMode) {
         debugPrint('Error loading header username: $e');
       }
-      return 'tomazdrnovsek'; // Fallback
+      return 'namesurname'; // Fallback
     }
   }
 
