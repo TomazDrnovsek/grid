@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- File: android/app/src/main/res/values/colors.xml -->
+<resources>
+    <!-- Simple dark background for immediate display -->
+    <color name="launch_background_dark">#FF111111</color>
+</resources>

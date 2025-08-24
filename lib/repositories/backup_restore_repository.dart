@@ -718,6 +718,17 @@ class BackupRestoreRepository {
       // Access the PhotoDatabase directly for UUID operations
       final photoDb = PhotoDatabase();
 
+      // >>> SURGICAL PRUNE: make restore a REPLACE, not a MERGE <<<
+      // Remove any local rows whose UUIDs are NOT present in the backup manifest.
+      final manifestUuidSet = manifestItems.map((i) => i.id).toSet();
+      final existingAllUuids = await photoDb.getAllPhotoUuids();
+      for (final uuid in existingAllUuids) {
+        if (!manifestUuidSet.contains(uuid)) {
+          await photoDb.deletePhotoByUuid(uuid);
+        }
+      }
+      // <<< END PRUNE >>>
+
       // 🔧 CRITICAL FIX: Instead of using addPhotosToDatabase (which auto-reorders),
       // we manually insert photos with their correct order indices from the manifest.
       final existingUuids = <String>{};

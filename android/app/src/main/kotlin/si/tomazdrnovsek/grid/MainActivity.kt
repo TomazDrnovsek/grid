@@ -1,4 +1,4 @@
-package com.example.grid
+package si.tomazdrnovsek.grid
 
 import android.content.Intent
 import androidx.core.net.toUri

@@ -1,19 +1,23 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- âœ… FIXED: Updated permissions for Android 14+ compatibility -->
+    <!-- ✅ FIXED: Updated permissions for Android 14+ compatibility -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
 
-    <!-- âœ… FIXED: Legacy permission with proper SDK versioning -->
+    <!-- ✅ FIXED: Legacy permission with proper SDK versioning -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
 
-    <!-- âœ… REMOVED: MANAGE_DOCUMENTS permission (only for system apps, not needed for SAF) -->
+    <!-- URL launcher permissions -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- ✅ REMOVED: MANAGE_DOCUMENTS permission (only for system apps, not needed for SAF) -->
 
     <application
         android:label="Grid"
-        android:icon="@mipmap/ic_launcher">
-        <!-- âœ… FIXED: Removed ${applicationName} which was causing "Unresolved class" error -->
+        android:icon="@mipmap/ic_launcher"
+        android:enableOnBackInvokedCallback="true">
+        <!-- ✅ FIXED: Removed ${applicationName} which was causing "Unresolved class" error -->
 
         <activity
             android:name=".MainActivity"
@@ -55,9 +59,15 @@
             <data android:mimeType="text/plain"/>
         </intent>
 
-        <!-- âœ… Allow querying for document providers (cloud storage) -->
+        <!-- ✅ Allow querying for document providers (cloud storage) -->
         <intent>
             <action android:name="android.intent.action.OPEN_DOCUMENT_TREE" />
+        </intent>
+
+        <!-- Allow querying for browsers/URL handlers -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
         </intent>
     </queries>
 </manifest>

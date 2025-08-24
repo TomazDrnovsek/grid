@@ -8,6 +8,7 @@ import 'package:palette_generator/palette_generator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Service for extracting and caching dominant colors from images
+/// PHASE A: Enhanced with persistent cache that survives app restarts
 /// SUBTLE ENHANCEMENT: Original logic + tiny vibrancy boost for appeal
 /// Uses LRU cache with max 100 colors and SharedPreferences persistence
 class DominantColorService {
@@ -19,46 +20,56 @@ class DominantColorService {
   final LinkedHashMap<String, Color> _colorCache = LinkedHashMap();
   static const int _maxCacheSize = 100;
 
-  // Persistence keys
-  static const String _cacheKey = 'dominant_colors_cache';
-  static const String _cacheOrderKey = 'dominant_colors_order';
+  // PHASE A: Updated persistence keys with v2 for better cache management
+  static const String _cacheKey = 'dominant_colors_cache_v2';
+  bool _cacheLoaded = false;
+  bool _isInitializing = false; // Prevent race condition
 
   // SUBTLE: Tiny enhancement parameters
   static const double _subtleSaturationBoost = 1.05; // TINY: +5% saturation only
   static const double _targetLightness = 0.36;       // NORMALIZE: Target brightness (36% - darker for better contrast)
 
-  bool _isInitialized = false;
-  bool _isLoadingCache = false;
-
-  /// Initialize service and load persisted cache
+  /// PHASE A: Initialize service and load persisted cache (race-condition safe)
   Future<void> initialize() async {
-    if (_isInitialized || _isLoadingCache) return;
+    if (_cacheLoaded || _isInitializing) return;
 
-    _isLoadingCache = true;
+    _isInitializing = true; // Prevent concurrent initializations
 
     try {
-      await loadPersistedCache();
-      _isInitialized = true;
+      final prefs = await SharedPreferences.getInstance();
+      final cacheJson = prefs.getString(_cacheKey);
 
-      if (kDebugMode) {
-        debugPrint('DominantColorService initialized with ${_colorCache.length} cached colors');
+      if (cacheJson != null) {
+        final Map<String, dynamic> cached = json.decode(cacheJson);
+        cached.forEach((key, value) {
+          _colorCache[key] = Color(value as int);
+        });
+
+        if (kDebugMode) {
+          debugPrint('✅ Phase A: Loaded ${_colorCache.length} colors from persistent cache');
+        }
+      } else {
+        if (kDebugMode) {
+          debugPrint('📝 Phase A: No persistent cache found, starting fresh');
+        }
       }
+
+      _cacheLoaded = true;
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('Error initializing DominantColorService: $e');
+        debugPrint('❌ Phase A: Error loading cache: $e');
       }
+      _cacheLoaded = true;
     } finally {
-      _isLoadingCache = false;
+      _isInitializing = false; // Always reset the flag
     }
   }
 
   /// Get dominant color for an image path
-  /// Returns cached color if available, otherwise extracts and caches
+  /// PHASE A: Ensures cache is loaded before proceeding
   Future<Color> getDominantColor(String imagePath) async {
-    // Initialize if needed
-    if (!_isInitialized) {
-      await initialize();
-    }
+    // PHASE A: Initialize cache if not loaded
+    if (!_cacheLoaded) await initialize();
 
     // Check cache first
     if (_colorCache.containsKey(imagePath)) {
@@ -67,7 +78,7 @@ class DominantColorService {
       _colorCache[imagePath] = color;
 
       if (kDebugMode) {
-        debugPrint('Cache hit for dominant color: $imagePath');
+        debugPrint('⚡ Phase A: Cache hit for dominant color: $imagePath');
       }
 
       return color;
@@ -77,7 +88,7 @@ class DominantColorService {
     try {
       final color = await _extractDominantColor(imagePath);
 
-      // Cache the result
+      // Cache the result with persistence
       await cacheColor(imagePath, color);
 
       return color;
@@ -171,7 +182,7 @@ class DominantColorService {
     return enhancedColor;
   }
 
-  /// Cache a color for an image path
+  /// PHASE A: Cache a color with batched persistence
   Future<void> cacheColor(String imagePath, Color color) async {
     // Add to cache (LRU - newest at end)
     _colorCache.remove(imagePath); // Remove if exists
@@ -182,97 +193,30 @@ class DominantColorService {
       _colorCache.remove(_colorCache.keys.first);
     }
 
-    // Persist to storage
-    await _persistCache();
-  }
-
-  /// Load persisted cache from SharedPreferences
-  Future<void> loadPersistedCache() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-
-      // Load cache data
-      final cacheJson = prefs.getString(_cacheKey);
-      final orderJson = prefs.getString(_cacheOrderKey);
-
-      if (cacheJson == null || orderJson == null) {
-        if (kDebugMode) {
-          debugPrint('No persisted color cache found');
-        }
-        return;
-      }
-
-      // Parse cache
-      final Map<String, dynamic> cacheMap = jsonDecode(cacheJson);
-      final List<dynamic> orderList = jsonDecode(orderJson);
-
-      // Clear current cache
-      _colorCache.clear();
-
-      // Rebuild cache in order (for LRU)
-      for (final path in orderList) {
-        if (cacheMap.containsKey(path)) {
-          final colorHex = cacheMap[path] as String;
-          final colorValue = int.tryParse(colorHex.replaceFirst('#', '0xff'));
-
-          if (colorValue != null) {
-            _colorCache[path] = Color(colorValue);
-          }
-        }
-      }
-
-      // Enforce max size
-      while (_colorCache.length > _maxCacheSize) {
-        _colorCache.remove(_colorCache.keys.first);
-      }
-
-      if (kDebugMode) {
-        debugPrint('Loaded ${_colorCache.length} colors from persistent cache');
-      }
-
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error loading persisted color cache: $e');
-      }
-      _colorCache.clear(); // Clear on error
+    // PHASE A: Persist less frequently to reduce overhead
+    if (_colorCache.length % 3 == 0) {
+      await _persistCache();
     }
   }
 
-  /// Persist current cache to SharedPreferences
+  /// PHASE A: Persist current cache to SharedPreferences
   Future<void> _persistCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      final cacheMap = <String, int>{};
 
-      // Convert cache to JSON-friendly format
-      final cacheMap = <String, String>{};
-      final orderList = <String>[];
+      _colorCache.forEach((key, color) {
+        cacheMap[key] = color.toARGB32(); // Fixed: replace deprecated .value
+      });
 
-      for (final entry in _colorCache.entries) {
-        final path = entry.key;
-        final color = entry.value;
-
-        // Convert color to hex string using new API
-        final alpha = ((color.a * 255.0).round() & 0xff).toRadixString(16).padLeft(2, '0');
-        final red = ((color.r * 255.0).round() & 0xff).toRadixString(16).padLeft(2, '0');
-        final green = ((color.g * 255.0).round() & 0xff).toRadixString(16).padLeft(2, '0');
-        final blue = ((color.b * 255.0).round() & 0xff).toRadixString(16).padLeft(2, '0');
-        final hex = '#$alpha$red$green$blue';
-
-        cacheMap[path] = hex;
-        orderList.add(path);
-      }
-
-      // Save to preferences
-      await prefs.setString(_cacheKey, jsonEncode(cacheMap));
-      await prefs.setString(_cacheOrderKey, jsonEncode(orderList));
+      await prefs.setString(_cacheKey, json.encode(cacheMap));
 
       if (kDebugMode) {
-        debugPrint('Persisted ${_colorCache.length} colors to cache');
+        debugPrint('💾 Phase A: Persisted ${_colorCache.length} colors to cache');
       }
-
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('Error persisting color cache: $e');
+        debugPrint('❌ Phase A: Error persisting cache: $e');
       }
     }
   }
@@ -292,7 +236,6 @@ class DominantColorService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_cacheKey);
-      await prefs.remove(_cacheOrderKey);
     } catch (e) {
       if (kDebugMode) {
         debugPrint('Error clearing persisted cache: $e');
@@ -305,19 +248,20 @@ class DominantColorService {
     return {
       'cacheSize': _colorCache.length,
       'maxSize': _maxCacheSize,
-      'isInitialized': _isInitialized,
+      'isInitialized': _cacheLoaded,
       'cacheUtilization': '${(_colorCache.length / _maxCacheSize * 100).toStringAsFixed(1)}%',
-      'enhancementMode': 'Original + Subtle Enhancement + Brightness Normalization',
+      'enhancementMode': 'Phase A: Original + Subtle Enhancement + Persistent Cache',
       'saturationBoost': '${((_subtleSaturationBoost - 1) * 100).toStringAsFixed(0)}%',
       'targetLightness': '${(_targetLightness * 100).toStringAsFixed(0)}%',
       'sampleSize': '200x200px',
       'maxColors': 16,
+      'phaseAActive': true,
     };
   }
 
   /// Preload colors for visible images
   Future<void> preloadColors(List<String> imagePaths) async {
-    if (!_isInitialized) {
+    if (!_cacheLoaded) {
       await initialize();
     }
 

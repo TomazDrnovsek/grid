@@ -127,7 +127,7 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
               Container(
                 padding: const EdgeInsets.only(bottom: 48, left: 16, right: 16),
                 child: Text(
-                  'Version 0.1',
+                  'Version 1.0',
                   style: AppTheme.body(isDark),
                   textAlign: TextAlign.center,
                 ),

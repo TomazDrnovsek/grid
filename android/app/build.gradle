@@ -6,15 +6,18 @@ plugins {
 }
 
 dependencies {
-    // âœ… UPDATED: Latest versions to fix warnings
+    // ✅ UNCHANGED: Keep existing working dependencies
     implementation "androidx.documentfile:documentfile:1.1.0"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2"
 }
 
 android {
-    namespace = "com.example.grid"
-    compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // 🚨 CRITICAL CHANGE: Production package name (you can adjust this)
+    namespace = "si.tomazdrnovsek.grid"
+
+    // ✅ GOOGLE PLAY REQUIREMENT: Explicit API 35 for new apps (Aug 2025+)
+    compileSdk = 35
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -26,20 +29,58 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.grid"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        // 🚨 CRITICAL CHANGE: Must match namespace above
+        applicationId = "si.tomazdrnovsek.grid"
+
+        // ✅ UNCHANGED: Keep existing minimum SDK support
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
+
+        // 🚨 GOOGLE PLAY REQUIREMENT: Explicit API 35 target
+        targetSdk = 35
+
+        // ✅ PRODUCTION VERSIONING: Ready for first release
+        versionCode = 1
+        versionName = "1.0.0"
+    }
+
+    // 🔐 SIGNING CONFIGURATION: Will read from key.properties
+    signingConfigs {
+        release {
+            if (project.hasProperty('android.injected.signing.store.file')) {
+                // Used by Android Studio build
+                storeFile file(project.property('android.injected.signing.store.file'))
+                storePassword project.property('android.injected.signing.store.password')
+                keyAlias project.property('android.injected.signing.key.alias')
+                keyPassword project.property('android.injected.signing.key.password')
+            } else {
+                // Read from key.properties file (we'll create this next)
+                def keystoreProperties = new Properties()
+                def keystorePropertiesFile = rootProject.file('key.properties')
+                if (keystorePropertiesFile.exists()) {
+                    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+                    storeFile file(keystoreProperties['storeFile'])
+                    storePassword keystoreProperties['storePassword']
+                    keyAlias keystoreProperties['keyAlias']
+                    keyPassword keystoreProperties['keyPassword']
+                }
+            }
+        }
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // 🔐 PRODUCTION SIGNING: Use release keystore
+            signingConfig signingConfigs.release
+
+            // 🚀 MINIMAL OPTIMIZATIONS: Safe for production
+            minifyEnabled = true
+            shrinkResources = true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+
+        // ✅ UNCHANGED: Keep debug build as-is
+        debug {
+            // Keep existing debug configuration
         }
     }
 }

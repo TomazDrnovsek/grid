@@ -1,6 +1,7 @@
 // File: lib/ui/menu_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../app_theme.dart';
 import '../core/app_config.dart';
 import 'backup_settings_screen.dart';
@@ -93,11 +94,27 @@ class MenuScreen extends StatelessWidget {
                 ),
               ),
 
+              // Ko-fi button
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: GestureDetector(
+                  onTap: () => _launchKofiUrl(),
+                  child: Image.asset(
+                    'assets/images/kofi5.png',
+                    width: 170,
+                    height: 40,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
               // Version number at bottom
               Container(
                 padding: const EdgeInsets.only(bottom: 48, left: 16, right: 16),
                 child: Text(
-                  'Version 0.1',
+                  'Version 1.0',
                   style: AppTheme.body(isDark),
                   textAlign: TextAlign.center,
                 ),
@@ -107,6 +124,16 @@ class MenuScreen extends StatelessWidget {
         );
       },
     );
+  }
+
+  /// Launch Ko-fi URL
+  Future<void> _launchKofiUrl() async {
+    final Uri url = Uri.parse('https://ko-fi.com/tomazdrnovsek');
+    try {
+      await launchUrl(url);
+    } catch (e) {
+      debugPrint('Error launching Ko-fi URL: $e');
+    }
   }
 
   /// Navigate to backup settings screen with proper animation
