@@ -50,3 +50,8 @@ android/local.properties
 # iOS-specific generated files (in case you add iOS support later)
 **/Pods/
 **/DerivedData/
+
+# Android signing — NEVER COMMIT
+**/key.properties
+**/*.jks
+**/*.keystore
