@@ -210,27 +210,11 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
                 ),
               ),
             ),
-            // ✅ FIXED: Maintain consistent spacing - always reserve space for "Forget Folder"
+            // ✅ FIXED: Maintain consistent spacing - removed "Forget Folder" button entirely
             const SizedBox(height: 8),
-            SizedBox(
+            const SizedBox(
               width: double.infinity,
-              height: 44, // ✅ Reserve consistent height for button area
-              child: hasCloudFolder && !isOperationInProgress
-                  ? TextButton(
-                onPressed: () => _forgetCloudFolder(backupNotifier),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.deleteButtonText(isDark),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-                child: Text(
-                  'Forget Folder',
-                  style: AppTheme.body(isDark).copyWith(
-                    fontSize: 14,
-                    color: AppColors.deleteButtonText(isDark),
-                  ),
-                ),
-              )
-                  : const SizedBox(), // ✅ Empty space when button is hidden
+              height: 44, // ✅ Reserve consistent height for button area to maintain layout
             ),
           ],
         ),
@@ -454,16 +438,6 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
     }
   }
 
-  Future<void> _forgetCloudFolder(BackupNotifier backupNotifier) async {
-    final confirmed = await _showConfirmationDialog(
-      'Forget Folder?',
-      'This will remove the cloud folder configuration. You can always select it again later.',
-    );
-
-    if (confirmed && mounted) {
-      await backupNotifier.removeCloudFolder();
-    }
-  }
 
   Future<void> _performBackup(BackupNotifier backupNotifier) async {
     try {
@@ -509,43 +483,6 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
     }
   }
 
-  Future<bool> _showConfirmationDialog(String title, String message) async {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: AppColors.modalContentBackground(isDark),
-          title: Text(title, style: AppTheme.headlineSm(isDark)),
-          content: Text(message, style: AppTheme.body(isDark).copyWith(fontSize: 14)),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(
-                'Cancel',
-                style: AppTheme.body(isDark).copyWith(
-                  fontSize: 14,
-                  color: AppColors.textSecondary(isDark),
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.deleteButtonText(isDark),
-                foregroundColor: Colors.white,
-              ),
-              child: Text(
-                'Confirm',
-                style: AppTheme.body(isDark).copyWith(fontSize: 14, color: Colors.white),
-              ),
-            ),
-          ],
-        );
-      },
-    ) ?? false;
-  }
 
   /// ✅ UPDATED: Restore confirmation dialog matching Delete dialog shape (Step B4)
   Future<bool> _showRestoreConfirmationDialog() async {

@@ -227,7 +227,6 @@ class _GridHomePageState extends ConsumerState<GridHomePage>
                       scrollController: _scrollController,
                       photoNotifier: photoNotifier,
                     ),
-                    const SliverToBoxAdapter(child: SizedBox(height: 90)),
                   ],
                 ),
               ),
