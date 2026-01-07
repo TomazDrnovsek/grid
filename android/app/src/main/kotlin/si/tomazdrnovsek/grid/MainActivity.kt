@@ -17,6 +17,9 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
+import android.os.Bundle
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsControllerCompat
 
 class MainActivity: FlutterActivity() {
     private val channelName = "com.grid/saf"
@@ -35,7 +38,19 @@ class MainActivity: FlutterActivity() {
         private const val BUFFER_SIZE = 65536 // 64KB buffer for streaming
     }
 
-    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        // Modern, non-deprecated compat API (no warnings)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+
+        // Optional but recommended: keep icons readable on any background
+        val c = WindowInsetsControllerCompat(window, window.decorView)
+        c.isAppearanceLightStatusBars = false      // false => light icons
+        c.isAppearanceLightNavigationBars = false
+    }
+
+     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
         methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)

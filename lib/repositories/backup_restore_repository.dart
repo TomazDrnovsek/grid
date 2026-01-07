@@ -129,8 +129,10 @@ class BackupRestoreRepository {
         totalBytes: totalBytes,
       );
 
-      // Sequential loop (stable, easy progress updates)
-      for (final photo in photos) {
+      // Sequential loop (stable, easy progress updates) with index-based fallback
+      for (var i = 0; i < photos.length; i++) {
+        final photo = photos[i];
+
         if (cancelToken.isCancelled) {
           yield const BackupState(
             status: BackupStatus.error,
@@ -150,8 +152,13 @@ class BackupRestoreRepository {
           currentFile: path.basename(photo.path),
         );
 
-        final result =
-        await _processPhoto(photo, cloudFolder, config, cancelToken);
+        final result = await _processPhoto(
+          photo,
+          cloudFolder,
+          config,
+          cancelToken,
+          sortIndexHint: i, // ← Pass loop index as hint
+        );
         results.add(result);
 
         completedCount++;
@@ -501,8 +508,9 @@ class BackupRestoreRepository {
       File photo,
       String cloudFolder,
       BackupConfig config,
-      CancelToken cancelToken,
-      ) async {
+      CancelToken cancelToken, {
+        int? sortIndexHint,
+      }) async {
     if (cancelToken.isCancelled) {
       return ProcessResult(isSuccess: false, error: 'Operation cancelled');
     }
@@ -564,30 +572,37 @@ class BackupRestoreRepository {
         }
       }
 
-      // Get photo metadata from database for UUID and sortIndex
+      // 🔧 ENHANCED: Get photo metadata with clean fallback
       String photoId;
-      var sortIndex = 0;
+      int sortIndex = sortIndexHint ?? fileDate.millisecondsSinceEpoch ~/ 1000; // Last resort fallback
+      bool usedFallback = false;
 
       try {
-        // Access the PhotoDatabase directly to get photo metadata
+        // Primary approach: Get from database by path
         final photoDb = PhotoDatabase();
         final photoEntry = await photoDb.getPhotoByPath(photo.path);
 
         if (photoEntry != null && photoEntry.uuid != null) {
           photoId = photoEntry.uuid!;
-          sortIndex = photoEntry.orderIndex;
+          sortIndex = photoEntry.orderIndex; // ✅ Correct DB order
         } else {
-          // Generate a fallback ID if no UUID found
-          photoId =
-          'photo_${DateTime.now().millisecondsSinceEpoch}_${photo.path.hashCode}';
+          // Fallback: use hint (loop index) to maintain relative order
+          photoId = 'photo_${DateTime.now().millisecondsSinceEpoch}_${photo.path.hashCode.abs()}';
+          usedFallback = true;
         }
       } catch (e) {
-        // Fallback ID if database lookup fails
-        photoId =
-        'photo_${DateTime.now().millisecondsSinceEpoch}_${photo.path.hashCode}';
+        // Exception fallback: use hint (loop index) to maintain relative order
+        photoId = 'photo_${DateTime.now().millisecondsSinceEpoch}_${photo.path.hashCode.abs()}';
+        usedFallback = true;
+
         if (kDebugMode) {
-          debugPrint('[BackupRestore] Could not get photo UUID: $e');
+          debugPrint('[BackupRestore] DB lookup failed for ${photo.path}: $e');
         }
+      }
+
+// Debug logging when fallback is used
+      if (kDebugMode && usedFallback) {
+        debugPrint('[BackupRestore] Fallback sortIndex for ${photo.path} = $sortIndex');
       }
 
       // Create backup item with UUID and sortIndex

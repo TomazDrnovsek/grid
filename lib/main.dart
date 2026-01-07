@@ -7,10 +7,18 @@ import 'package:grid/core/service_locator.dart';
 import 'package:grid/services/performance_monitor.dart';
 import 'package:grid/services/image_cache_service.dart';
 import 'ui/splash_screen.dart';
+import 'package:flutter/services.dart';
 
 void main() async {
   // Ensure Flutter is initialized
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Configure edge-to-edge display for Android 15 compatibility
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    systemNavigationBarColor: Colors.transparent,
+  ));
 
   // ENHANCED: Initialize dependency injection container
   await _initializeDependencyInjection();

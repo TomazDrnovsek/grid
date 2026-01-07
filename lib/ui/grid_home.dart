@@ -201,10 +201,15 @@ class _GridHomePageState extends ConsumerState<GridHomePage>
             children: [
               Scaffold(
                 backgroundColor: AppColors.scaffoldBackground(isDark),
-                bottomNavigationBar: _OptimizedBottomNavigationBar(
-                  isDark: isDark,
-                  onScrollToTop: _scrollToTop,
-                  photoNotifier: photoNotifier,
+                bottomNavigationBar: SafeArea(
+                  top: false,
+                  right: false,
+                  left: false,
+                  child: _OptimizedBottomNavigationBar(
+                    isDark: isDark,
+                    onScrollToTop: _scrollToTop,
+                    photoNotifier: photoNotifier,
+                  ),
                 ),
                 body: CustomScrollView(
                   controller: _scrollController,
@@ -404,7 +409,11 @@ class _OptimizedHeaderSliver extends ConsumerWidget {
 
     return SliverToBoxAdapter(
       child: Container(
-        padding: const EdgeInsets.only(top: 48, left: 16, right: 16),
+        padding: EdgeInsets.only(
+          top: MediaQuery.of(context).padding.top + 16,
+          left: 16,
+          right: 16,
+        ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [

@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../app_theme.dart';
 import '../core/app_config.dart';
 import 'backup_settings_screen.dart';
+import 'how_to_use_screen.dart';
 
 class MenuScreen extends StatelessWidget {
   final ThemeNotifier themeNotifier;
@@ -24,7 +25,11 @@ class MenuScreen extends StatelessWidget {
             children: [
               // Top navigation bar matching main screen layout
               Container(
-                padding: const EdgeInsets.only(top: 48, left: 16, right: 16),
+                padding: EdgeInsets.only(
+                  top: MediaQuery.of(context).padding.top + 16,
+                  left: 16,
+                  right: 16,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -76,19 +81,25 @@ class MenuScreen extends StatelessWidget {
                         ],
                       ),
 
-                      // ✅ UPDATED: Local Backup settings entry (with feature flag check)
+                      // UPDATED: Local Backup settings entry (with feature flag check)
                       if (AppConfig.enableCloudBackup) ...[
                         const SizedBox(height: 24),
                         _MenuTile(
                           title: 'Local Backup',
                           subtitle: 'Backup photos to your local storage',
-                          icon: null, // ✅ REMOVED: No leading icon
+                          icon: null, // REMOVED: No leading icon
                           isDark: isDark,
                           onTap: () => _navigateToBackupSettings(context),
                         ),
                       ],
 
                       // Future menu items can be added here
+                      _MenuTile(
+                        title: 'How to Use Grid',
+                        subtitle: 'A comprehensive guide for using the Grid app',
+                        isDark: isDark,
+                        onTap: () => _navigateToHowToUse(context),
+                      ),
                     ],
                   ),
                 ),
@@ -114,7 +125,7 @@ class MenuScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.only(bottom: 48, left: 16, right: 16),
                 child: Text(
-                  'Version 1.0',
+                  'Version 1.0.2',
                   style: AppTheme.body(isDark),
                   textAlign: TextAlign.center,
                 ),
@@ -149,6 +160,27 @@ class MenuScreen extends StatelessWidget {
             opacity: CurvedAnimation(
               parent: animation,
               curve: Curves.easeInOutCubic, // Smooth curve optimized for high refresh rate
+            ),
+            child: child,
+          );
+        },
+      ),
+    );
+  }
+
+  /// Navigate to how to use screen with proper animation
+  void _navigateToHowToUse(BuildContext context) {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            HowToUseScreen(themeNotifier: themeNotifier),
+        transitionDuration: AppConfig().animationDuration,
+        reverseTransitionDuration: AppConfig().animationDuration,
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeInOutCubic,
             ),
             child: child,
           );
