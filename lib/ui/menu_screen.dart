@@ -1,6 +1,7 @@
 // File: lib/ui/menu_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../app_theme.dart';
 import '../core/app_config.dart';
@@ -11,6 +12,9 @@ class MenuScreen extends StatelessWidget {
   final ThemeNotifier themeNotifier;
 
   const MenuScreen({super.key, required this.themeNotifier});
+
+  /// The installed package's version name and code (G-012).
+  static final Future<PackageInfo> _packageInfo = PackageInfo.fromPlatform();
 
   @override
   Widget build(BuildContext context) {
@@ -121,13 +125,21 @@ class MenuScreen extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              // Version number at bottom
+              // Version name and code at bottom, read from the installed package
               Container(
                 padding: const EdgeInsets.only(bottom: 48, left: 16, right: 16),
-                child: Text(
-                  'Version 1.0.2',
-                  style: AppTheme.body(isDark),
-                  textAlign: TextAlign.center,
+                child: FutureBuilder<PackageInfo>(
+                  future: _packageInfo,
+                  builder: (context, snapshot) {
+                    final info = snapshot.data;
+                    return Text(
+                      info == null
+                          ? ''
+                          : 'Version ${info.version} (${info.buildNumber})',
+                      style: AppTheme.body(isDark),
+                      textAlign: TextAlign.center,
+                    );
+                  },
                 ),
               ),
             ],
