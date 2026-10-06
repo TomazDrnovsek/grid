@@ -73,7 +73,7 @@ Entry shape: *What changed* · *Why* · *What is settled* · *What is not settle
 
 *Why.* Pages runs Jekyll over the repository root, and Jekyll processes Markdown files as pages and Liquid inside them. A document containing `{{` or `{%` could fail the Pages build, and that build is what serves `privacy.html` (G-003). This is the counterpart of the guide's `.vercelignore`.
 *What is settled.* Every new top-level Markdown document is added to `_config.yml` in the same PR. `privacy.html` and `README.md` stay served.
-*Not verified.* The first Pages build after the merge. `OPERATIONS.md` §4 has the check.
+*Verified (2026-10-06).* After the merge of #2, Pages built and deployed: `privacy.html` and the index answered 200, and `DECISIONS.html`, `CLAUDE.html`, `WORKPLAN.html` and `docs/DEBT.html` answered 404. The deploy for #1's merge had sat "waiting" and was cancelled when #2's deploy superseded it.
 *Paths not taken.* `.nojekyll` (serve everything raw): it would drop the rendered `README.md` index page the site has served since 2025.
 
 **G-010 — Merge policy, and what stands in for a preview (2026-10-06).** Grid has no web build, so there is no preview URL. A change a user can see or touch is verified by the owner: build it with the release workflow, upload to the internal testing track, install from Play on the phone. Production follows that check. A change to documents, CI or hooks only is merged on reading the PR and its CI result.
