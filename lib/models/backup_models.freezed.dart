@@ -324,6 +324,12 @@ mixin _$BackupItem {
   int get sortIndex => throw _privateConstructorUsedError;
   Map<String, dynamic> get metadata => throw _privateConstructorUsedError;
 
+  /// Carousel the photo belongs to, absent for a photo on its own tile (G-016)
+  String? get carouselId => throw _privateConstructorUsedError;
+
+  /// Position inside the carousel; 0 is the cover
+  int? get carouselIndex => throw _privateConstructorUsedError;
+
   /// Serializes this BackupItem to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
@@ -353,6 +359,8 @@ abstract class $BackupItemCopyWith<$Res> {
     DateTime? exifTs,
     int sortIndex,
     Map<String, dynamic> metadata,
+    String? carouselId,
+    int? carouselIndex,
   });
 }
 
@@ -382,6 +390,8 @@ class _$BackupItemCopyWithImpl<$Res, $Val extends BackupItem>
     Object? exifTs = freezed,
     Object? sortIndex = null,
     Object? metadata = null,
+    Object? carouselId = freezed,
+    Object? carouselIndex = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -429,6 +439,14 @@ class _$BackupItemCopyWithImpl<$Res, $Val extends BackupItem>
                 ? _value.metadata
                 : metadata // ignore: cast_nullable_to_non_nullable
                       as Map<String, dynamic>,
+            carouselId: freezed == carouselId
+                ? _value.carouselId
+                : carouselId // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            carouselIndex: freezed == carouselIndex
+                ? _value.carouselIndex
+                : carouselIndex // ignore: cast_nullable_to_non_nullable
+                      as int?,
           )
           as $Val,
     );
@@ -456,6 +474,8 @@ abstract class _$$BackupItemImplCopyWith<$Res>
     DateTime? exifTs,
     int sortIndex,
     Map<String, dynamic> metadata,
+    String? carouselId,
+    int? carouselIndex,
   });
 }
 
@@ -484,6 +504,8 @@ class __$$BackupItemImplCopyWithImpl<$Res>
     Object? exifTs = freezed,
     Object? sortIndex = null,
     Object? metadata = null,
+    Object? carouselId = freezed,
+    Object? carouselIndex = freezed,
   }) {
     return _then(
       _$BackupItemImpl(
@@ -531,6 +553,14 @@ class __$$BackupItemImplCopyWithImpl<$Res>
             ? _value._metadata
             : metadata // ignore: cast_nullable_to_non_nullable
                   as Map<String, dynamic>,
+        carouselId: freezed == carouselId
+            ? _value.carouselId
+            : carouselId // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        carouselIndex: freezed == carouselIndex
+            ? _value.carouselIndex
+            : carouselIndex // ignore: cast_nullable_to_non_nullable
+                  as int?,
       ),
     );
   }
@@ -551,6 +581,8 @@ class _$BackupItemImpl implements _BackupItem {
     this.exifTs,
     required this.sortIndex,
     final Map<String, dynamic> metadata = const {},
+    this.carouselId,
+    this.carouselIndex,
   }) : _metadata = metadata;
 
   factory _$BackupItemImpl.fromJson(Map<String, dynamic> json) =>
@@ -585,9 +617,17 @@ class _$BackupItemImpl implements _BackupItem {
     return EqualUnmodifiableMapView(_metadata);
   }
 
+  /// Carousel the photo belongs to, absent for a photo on its own tile (G-016)
+  @override
+  final String? carouselId;
+
+  /// Position inside the carousel; 0 is the cover
+  @override
+  final int? carouselIndex;
+
   @override
   String toString() {
-    return 'BackupItem(id: $id, relativePath: $relativePath, thumbPath: $thumbPath, checksumSha256: $checksumSha256, byteSize: $byteSize, createdAt: $createdAt, width: $width, height: $height, exifTs: $exifTs, sortIndex: $sortIndex, metadata: $metadata)';
+    return 'BackupItem(id: $id, relativePath: $relativePath, thumbPath: $thumbPath, checksumSha256: $checksumSha256, byteSize: $byteSize, createdAt: $createdAt, width: $width, height: $height, exifTs: $exifTs, sortIndex: $sortIndex, metadata: $metadata, carouselId: $carouselId, carouselIndex: $carouselIndex)';
   }
 
   @override
@@ -611,7 +651,11 @@ class _$BackupItemImpl implements _BackupItem {
             (identical(other.exifTs, exifTs) || other.exifTs == exifTs) &&
             (identical(other.sortIndex, sortIndex) ||
                 other.sortIndex == sortIndex) &&
-            const DeepCollectionEquality().equals(other._metadata, _metadata));
+            const DeepCollectionEquality().equals(other._metadata, _metadata) &&
+            (identical(other.carouselId, carouselId) ||
+                other.carouselId == carouselId) &&
+            (identical(other.carouselIndex, carouselIndex) ||
+                other.carouselIndex == carouselIndex));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -629,6 +673,8 @@ class _$BackupItemImpl implements _BackupItem {
     exifTs,
     sortIndex,
     const DeepCollectionEquality().hash(_metadata),
+    carouselId,
+    carouselIndex,
   );
 
   /// Create a copy of BackupItem
@@ -658,6 +704,8 @@ abstract class _BackupItem implements BackupItem {
     final DateTime? exifTs,
     required final int sortIndex,
     final Map<String, dynamic> metadata,
+    final String? carouselId,
+    final int? carouselIndex,
   }) = _$BackupItemImpl;
 
   factory _BackupItem.fromJson(Map<String, dynamic> json) =
@@ -685,6 +733,14 @@ abstract class _BackupItem implements BackupItem {
   int get sortIndex;
   @override
   Map<String, dynamic> get metadata;
+
+  /// Carousel the photo belongs to, absent for a photo on its own tile (G-016)
+  @override
+  String? get carouselId;
+
+  /// Position inside the carousel; 0 is the cover
+  @override
+  int? get carouselIndex;
 
   /// Create a copy of BackupItem
   /// with the given fields replaced by the non-null parameter values.

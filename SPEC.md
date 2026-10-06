@@ -22,9 +22,12 @@
 | Word | Meaning |
 | --- | --- |
 | **grid** | The three-column arrangement of tiles on the home screen |
-| **tile** | One photo's place in the grid, portrait 3:4 |
+| **tile** | One place in the grid, portrait 3:4: a photo, or a carousel |
 | **photo** | An imported image: a compressed full image plus a thumbnail, both stored by the app |
-| **order** | The sequence of photos in the grid; the user's arrangement |
+| **carousel** | Up to 20 photos on one tile, in a fixed order, like a carousel post (G-016) |
+| **slide** | One photo of a carousel |
+| **cover** | A carousel's first slide, the one the grid shows |
+| **order** | The sequence of tiles in the grid; the user's arrangement |
 | **selection** | The set of selected tiles; selection mode starts with the first selected tile |
 | **hue map** | The overlay that shows each photo's dominant colour |
 | **profile block** | The header above the grid imitating a profile: avatar, username, counts, bio |
@@ -36,25 +39,27 @@
 - The **+** button in the top bar opens the system photo picker. Several photos can be picked at once.
 - Each photo is compressed to a full image and a thumbnail, processed off the UI thread (`lib/services/image_processor_service.dart`; sizes and quality are constants there). Imports run in batches, with a loading indicator.
 - New photos join the grid (position: confirm by reading `lib/providers/photo_provider.dart` `addPhotos`).
+- **Carousels** (G-016). Picking one photo adds it straight away. Picking two or more opens a dialog, "Add N photos as", with the picked photos in a strip in picked order and two buttons: **Separate** adds each photo as its own tile, as before; **Carousel** adds them as one tile whose slides are in picked order, the first picked being the cover. Over 20 photos, **Carousel** is disabled and the dialog says a carousel holds up to 20. Tapping outside the dialog discards the picked photos. Photos are processed after the choice, with the same loading indicator.
+- A carousel's tile shows a carousel icon in its top right corner, on the photo and on the hue map (§4).
 
 ## §2 The grid and its order
 
 - Three columns, tile aspect ratio 3:4 (`lib/ui/photo_sliver_grid.dart`).
-- **Reorder:** long-press a tile and drag it to a new position; the grid closes up around it. Dragging near the top or bottom edge auto-scrolls (`lib/services/drag_scroll_service.dart`).
-- The order is saved automatically and survives restarts. Each photo has a stable UUID; the order is stored in the SQLite database (`photos.db`). An earlier SharedPreferences store is migrated once (`lib/repositories/photo_repository.dart`).
+- **Reorder:** long-press a tile and drag it to a new position; the grid closes up around it. A carousel moves as one tile. Dragging near the top or bottom edge auto-scrolls (`lib/services/drag_scroll_service.dart`).
+- The order is saved automatically and survives restarts. Each photo has a stable UUID; the order is stored in the SQLite database (`photos.db`). Each slide is a photo of its own; the stored order puts a carousel's slides right after its cover. An earlier SharedPreferences store is migrated once (`lib/repositories/photo_repository.dart`).
 - The **home** icon scrolls to the top of the grid.
 
 ## §3 Selecting, deleting, sharing, previewing
 
 - Tap a tile to select or deselect it; long-press also enters selection mode. Selected tiles show a check mark. Tapping an empty area clears the selection.
-- **Delete:** with tiles selected, the trash icon in the bottom bar asks for confirmation in a dialog, then removes them.
-- **Share:** with exactly one tile selected, the share icon opens the system share sheet.
-- **Preview:** double-tap a tile to see it full screen; tap anywhere to close.
+- **Delete:** with tiles selected, the trash icon in the bottom bar asks for confirmation in a dialog, then removes them. Deleting a carousel deletes all its slides.
+- **Share:** with exactly one tile selected, the share icon opens the system share sheet. A carousel shares all its slides in one share sheet; what the receiving app makes of several photos is up to that app.
+- **Preview:** double-tap a tile to see it full screen; tap anywhere to close. On a carousel, swipe left and right through the slides; each slide shows an `x/N` tag in its top right corner.
 
 ## §4 Hue map
 
 - The ink icon in the bottom bar toggles an overlay of each photo's dominant colour, for planning a colour-coordinated layout.
-- Dominant colours are computed once and cached (`lib/services/dominant_color_service.dart`).
+- Dominant colours are computed once and cached (`lib/services/dominant_color_service.dart`). A carousel's tile shows its cover's colour.
 
 ## §5 Profile block
 
@@ -70,7 +75,7 @@
 ## §7 Backup and restore
 
 - From **Menu → Local Backup**, the user picks a folder through Android's folder picker (Storage Access Framework). The app keeps permission to that folder.
-- **Backup** writes the photos and a `manifest.json` describing them and their order into that folder, with progress. The manifest records a SHA-256 checksum for each photo (`lib/repositories/backup_restore_repository.dart`, `lib/repositories/cloud_manifest_repository.dart`).
+- **Backup** writes the photos and a `manifest.json` describing them, their order and their carousels into that folder, with progress. The manifest records a SHA-256 checksum for each photo (`lib/repositories/backup_restore_repository.dart`, `lib/repositories/cloud_manifest_repository.dart`).
 - **Restore** reads a backup folder back into the app and rebuilds the grid in the saved order.
 - The folder can belong to any document provider the phone offers, including a cloud drive's. The app itself only writes to the folder it was given. How that sits with the privacy policy's wording is an open question (`DECISIONS.md` §11).
 

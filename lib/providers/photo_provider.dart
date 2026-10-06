@@ -10,6 +10,7 @@ import '../repositories/photo_repository.dart';
 import '../widgets/error_boundary.dart';
 import '../services/performance_monitor.dart';
 import '../file_utils.dart';
+import '../constants.dart';
 
 part 'photo_provider.g.dart';
 
@@ -26,12 +27,17 @@ class BatchOperation {
   }) : timestamp = timestamp ?? DateTime.now();
 
   /// Factory constructors for different operation types
-  factory BatchOperation.addPhotos(List<ProcessedImage> images, {bool showModal = false}) {
+  factory BatchOperation.addPhotos(
+      List<ProcessedImage> images, {
+        bool showModal = false,
+        bool asCarousel = false,
+      }) {
     return BatchOperation(
       type: BatchOperationType.addPhotos,
       data: {
         'images': images,
         'showModal': showModal, // Flag to control modal display
+        'asCarousel': asCarousel, // The images form one carousel tile (G-016)
       },
     );
   }
@@ -463,28 +469,50 @@ class PhotoNotifier extends _$PhotoNotifier {
       List<BatchOperation> operations,
       PhotoState currentState
       ) async {
-    final allNewImages = <File>[];
-    final allNewThumbnails = <File>[];
+    var updated = currentState;
 
     for (final operation in operations) {
       final images = operation.data['images'] as List<ProcessedImage>? ?? [];
-      for (final processed in images) {
-        allNewImages.add(processed.image);
-        allNewThumbnails.add(processed.thumbnail);
-      }
+      final asCarousel = operation.data['asCarousel'] as bool? ?? false;
+      updated = _withAddedImages(updated, images, asCarousel: asCarousel);
     }
-
-    if (allNewImages.isEmpty) return currentState;
-
-    // Insert all new images at the beginning
-    final updatedImages = [...allNewImages.reversed, ...currentState.images];
-    final updatedThumbnails = [...allNewThumbnails.reversed, ...currentState.thumbnails];
 
     // Save the new image order
     // Order persisted by repository after inserts; skipping duplicate save here.
-    return currentState.copyWith(
+    return updated;
+  }
+
+  /// New tiles go at the top of the grid. Separate photos land last-picked
+  /// first; a carousel is one tile, its cover the first picked photo (G-016).
+  PhotoState _withAddedImages(
+      PhotoState current,
+      List<ProcessedImage> images, {
+        required bool asCarousel,
+      }) {
+    if (images.isEmpty) return current;
+
+    final List<File> newImages;
+    final List<File> newThumbnails;
+    final carousels = Map<String, List<File>>.from(current.carousels);
+
+    if (asCarousel) {
+      newImages = [images.first.image];
+      newThumbnails = [images.first.thumbnail];
+      if (images.length > 1) {
+        carousels[images.first.image.path] = images.map((p) => p.image).toList();
+      }
+    } else {
+      newImages = images.map((p) => p.image).toList().reversed.toList();
+      newThumbnails = images.map((p) => p.thumbnail).toList().reversed.toList();
+    }
+
+    final updatedImages = [...newImages, ...current.images];
+    final updatedThumbnails = [...newThumbnails, ...current.thumbnails];
+
+    return current.copyWith(
       images: updatedImages,
       thumbnails: updatedThumbnails,
+      carousels: carousels,
       imageCount: updatedImages.length,
       arraysInSync: updatedImages.length == updatedThumbnails.length,
     );
@@ -508,36 +536,45 @@ class PhotoNotifier extends _$PhotoNotifier {
 
     final imagesToDelete = <File>[];
     final thumbnailsToDelete = <File>[];
+    final slidesToDelete = <File>[];
     final newImages = List<File>.from(currentState.images);
     final newThumbnails = List<File>.from(currentState.thumbnails);
+    final newCarousels = Map<String, List<File>>.from(currentState.carousels);
 
     // Collect files to delete and remove from arrays
     for (final i in sorted) {
       if (i >= 0 && i < newImages.length && i < newThumbnails.length) {
         imagesToDelete.add(newImages[i]);
         thumbnailsToDelete.add(newThumbnails[i]);
+        // Deleting a carousel deletes every slide (G-016)
+        final slides = newCarousels.remove(newImages[i].path);
+        if (slides != null) slidesToDelete.addAll(slides.skip(1));
         newImages.removeAt(i);
         newThumbnails.removeAt(i);
       }
     }
 
-    // Perform background operations
-    if (imagesToDelete.isNotEmpty) {
-      final deleteResult = await _repository.deleteImages(imagesToDelete, thumbnailsToDelete);
-      debugPrint('Batch delete result: ${deleteResult.deletedCount}/${deleteResult.requestedCount} files deleted');
-
-      // Save updated order and cleanup
-      await _saveImageOrder();
-      await _repository.cleanupOrphanedThumbnails(newImages.map((f) => f.path).toList());
-    }
-
-    return currentState.copyWith(
+    final newState = currentState.copyWith(
       images: newImages,
       thumbnails: newThumbnails,
+      carousels: newCarousels,
       selectedIndexes: <int>{}, // Clear selections after delete
       imageCount: newImages.length,
       arraysInSync: newImages.length == newThumbnails.length,
     );
+
+    // Perform background operations
+    if (imagesToDelete.isNotEmpty) {
+      final deleteResult = await _repository.deleteImages(imagesToDelete, thumbnailsToDelete);
+      debugPrint('Batch delete result: ${deleteResult.deletedCount}/${deleteResult.requestedCount} files deleted');
+      await _repository.deleteSlides(slidesToDelete);
+
+      // Save updated order and cleanup
+      await _saveImageOrder();
+      await _repository.cleanupOrphanedThumbnails(newState.allImagePaths);
+    }
+
+    return newState;
   }
 
   /// ENHANCED: Process batch select photos operations
@@ -617,7 +654,8 @@ class PhotoNotifier extends _$PhotoNotifier {
       switch (operation.type) {
         case BatchOperationType.addPhotos:
           final images = operation.data['images'] as List<ProcessedImage>? ?? [];
-          await _applySingleAddPhotos(images);
+          final asCarousel = operation.data['asCarousel'] as bool? ?? false;
+          await _applySingleAddPhotos(images, asCarousel: asCarousel);
           break;
         case BatchOperationType.deletePhotos:
           final indexes = operation.data['indexes'] as List<int>? ?? [];
@@ -689,6 +727,7 @@ class PhotoNotifier extends _$PhotoNotifier {
         state = state.copyWith(
           images: loadResult.images,
           thumbnails: loadResult.thumbnails,
+          carousels: loadResult.carousels,
           imageCount: loadResult.images.length,
           arraysInSync: loadResult.images.length == loadResult.thumbnails.length,
           headerUsername: headerUsername,
@@ -743,7 +782,8 @@ class PhotoNotifier extends _$PhotoNotifier {
   Future<void> _saveImageOrder() async {
     await RepositoryErrorHandler.handleAsyncOperation(
           () async {
-        final paths = state.images.map((f) => f.path).toList();
+        // Every photo, so a carousel's slides stay right after its cover (G-016)
+        final paths = state.allImagePaths;
         final success = await _repository.saveImagePaths(paths);
         if (!success) {
           throw Exception('Failed to save image order to database');
@@ -758,12 +798,14 @@ class PhotoNotifier extends _$PhotoNotifier {
   // PUBLIC API METHODS - ENHANCED with batch operations
   // ==========================================================================
 
-  /// FIXED: Pick and add multiple photos with proper loading modal timing
-  Future<void> addPhotos() async {
-    if (state.isLoading) return;
+  /// Photos picked and waiting in the "Add as" dialog
+  List<XFile> _pendingPicks = const [];
 
-    // Start performance monitoring
-    PerformanceMonitor.instance.startOperation('add_photos');
+  /// FIXED: Pick and add multiple photos with proper loading modal timing.
+  /// Two or more photos open the "Add as" dialog, which adds them as separate
+  /// tiles or as one carousel (G-016); one photo is added straight away.
+  Future<void> addPhotos() async {
+    if (state.isLoading || state.showAddAsDialog) return;
 
     // Pick images with error handling
     PerformanceMonitor.instance.startOperation('pick_images');
@@ -774,10 +816,49 @@ class PhotoNotifier extends _$PhotoNotifier {
     );
     PerformanceMonitor.instance.endOperation('pick_images');
 
-    if (pickedFiles.isEmpty) {
-      PerformanceMonitor.instance.endOperation('add_photos');
+    if (pickedFiles.isEmpty) return;
+
+    if (pickedFiles.length == 1) {
+      await _addPickedPhotos(pickedFiles, asCarousel: false);
       return;
     }
+
+    _pendingPicks = pickedFiles;
+    state = state.copyWith(
+      showAddAsDialog: true,
+      pendingPickPaths: pickedFiles.map((f) => f.path).toList(),
+    );
+  }
+
+  /// "Add as" dialog: add the picked photos as separate tiles
+  Future<void> addPendingAsSeparate() => _addPendingPicks(asCarousel: false);
+
+  /// "Add as" dialog: add the picked photos as one carousel
+  Future<void> addPendingAsCarousel() async {
+    if (_pendingPicks.length > Constants.maxCarouselSlides) return;
+    await _addPendingPicks(asCarousel: true);
+  }
+
+  /// "Add as" dialog dismissed: discard the picked photos
+  Future<void> cancelAddAs() async {
+    final picks = _pendingPicks;
+    _pendingPicks = const [];
+    state = state.copyWith(showAddAsDialog: false, pendingPickPaths: <String>[]);
+    await _deletePickedOriginals(picks);
+  }
+
+  Future<void> _addPendingPicks({required bool asCarousel}) async {
+    final picks = _pendingPicks;
+    _pendingPicks = const [];
+    state = state.copyWith(showAddAsDialog: false, pendingPickPaths: <String>[]);
+    if (picks.isEmpty) return;
+    await _addPickedPhotos(picks, asCarousel: asCarousel);
+  }
+
+  /// Process picked photos and add them to the grid
+  Future<void> _addPickedPhotos(List<XFile> pickedFiles, {required bool asCarousel}) async {
+    // Start performance monitoring
+    PerformanceMonitor.instance.startOperation('add_photos');
 
     // FIXED: Show loading modal immediately after picking images
     final startTime = DateTime.now();
@@ -800,7 +881,7 @@ class PhotoNotifier extends _$PhotoNotifier {
       // Process images with progress updates
       PerformanceMonitor.instance.startOperation('process_batch_images');
 
-      final batchResult = await _processBatchImagesWithProgress(pickedFiles);
+      final batchResult = await _processBatchImagesWithProgress(pickedFiles, asCarousel: asCarousel);
 
       PerformanceMonitor.instance.endOperation('process_batch_images');
 
@@ -820,7 +901,10 @@ class PhotoNotifier extends _$PhotoNotifier {
         state = state.copyWith(isLoading: false);
 
         // ENHANCED: Use batch operation for adding to grid
-        _enqueueBatchOperation(BatchOperation.addPhotos(batchResult.processedImages));
+        _enqueueBatchOperation(BatchOperation.addPhotos(
+          batchResult.processedImages,
+          asCarousel: asCarousel,
+        ));
 
         debugPrint('📦 Batch: Added ${batchResult.successCount} images to queue');
       } else {
@@ -859,7 +943,10 @@ class PhotoNotifier extends _$PhotoNotifier {
   }
 
   /// FIXED: Process batch images with progress updates for loading modal
-  Future<BatchImageResult> _processBatchImagesWithProgress(List<XFile> pickedFiles) async {
+  Future<BatchImageResult> _processBatchImagesWithProgress(
+      List<XFile> pickedFiles, {
+        required bool asCarousel,
+      }) async {
     try {
       final List<ProcessedImage> processedImages = [];
       final List<String> errors = [];
@@ -927,7 +1014,7 @@ class PhotoNotifier extends _$PhotoNotifier {
       // Add processed images to database if any succeeded
       if (processedImages.isNotEmpty) {
         try {
-          await _repository.addPhotosToDatabase(processedImages);
+          await _repository.addPhotosToDatabase(processedImages, asCarousel: asCarousel);
         } catch (e) {
           if (kDebugMode) {
             debugPrint('Error adding processed images to database: $e');
@@ -936,15 +1023,7 @@ class PhotoNotifier extends _$PhotoNotifier {
       }
 
       // Clean up original files
-      for (final xfile in pickedFiles) {
-        try {
-          await File(xfile.path).delete();
-        } catch (e) {
-          if (kDebugMode) {
-            debugPrint('Failed to delete original file ${xfile.path}: $e');
-          }
-        }
-      }
+      await _deletePickedOriginals(pickedFiles);
 
       if (kDebugMode) {
         debugPrint('✅ Batch processing complete: $successCount success, $failureCount failed');
@@ -968,6 +1047,19 @@ class PhotoNotifier extends _$PhotoNotifier {
         failureCount: pickedFiles.length,
         errors: ['Batch processing failed: $e'],
       );
+    }
+  }
+
+  /// Delete the picker's copies of picked photos
+  Future<void> _deletePickedOriginals(List<XFile> pickedFiles) async {
+    for (final xfile in pickedFiles) {
+      try {
+        await File(xfile.path).delete();
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('Failed to delete original file ${xfile.path}: $e');
+        }
+      }
     }
   }
 
@@ -1110,7 +1202,8 @@ class PhotoNotifier extends _$PhotoNotifier {
     }
   }
 
-  /// Share the currently selected image (only works with single selection) with error handling
+  /// Share the currently selected image (only works with single selection) with error handling.
+  /// A selected carousel shares all its slides in one share sheet (G-016).
   Future<void> shareSelectedImage() async {
     if (!state.hasSingleSelection) return;
 
@@ -1121,8 +1214,8 @@ class PhotoNotifier extends _$PhotoNotifier {
           throw Exception('Invalid image index for sharing');
         }
 
-        final imageFile = state.images[imageIndex];
-        final shareResult = await _repository.shareImage(imageFile);
+        final files = state.carouselAt(imageIndex) ?? [state.images[imageIndex]];
+        final shareResult = await _repository.shareImages(files);
 
         if (!shareResult.success) {
           throw Exception('Share failed: ${shareResult.error}');
@@ -1214,19 +1307,8 @@ class PhotoNotifier extends _$PhotoNotifier {
   // FALLBACK METHODS - For single operation processing when batching fails
   // ==========================================================================
 
-  Future<void> _applySingleAddPhotos(List<ProcessedImage> images) async {
-    final newImages = images.map((p) => p.image).toList();
-    final newThumbnails = images.map((p) => p.thumbnail).toList();
-
-    final updatedImages = [...newImages.reversed, ...state.images];
-    final updatedThumbnails = [...newThumbnails.reversed, ...state.thumbnails];
-
-    state = state.copyWith(
-      images: updatedImages,
-      thumbnails: updatedThumbnails,
-      imageCount: updatedImages.length,
-      arraysInSync: updatedImages.length == updatedThumbnails.length,
-    );
+  Future<void> _applySingleAddPhotos(List<ProcessedImage> images, {required bool asCarousel}) async {
+    state = _withAddedImages(state, images, asCarousel: asCarousel);
 
     await _saveImageOrder();
   }
@@ -1236,13 +1318,18 @@ class PhotoNotifier extends _$PhotoNotifier {
 
     final imagesToDelete = <File>[];
     final thumbnailsToDelete = <File>[];
+    final slidesToDelete = <File>[];
     final newImages = List<File>.from(state.images);
     final newThumbnails = List<File>.from(state.thumbnails);
+    final newCarousels = Map<String, List<File>>.from(state.carousels);
 
     for (final i in sorted) {
       if (i >= 0 && i < newImages.length && i < newThumbnails.length) {
         imagesToDelete.add(newImages[i]);
         thumbnailsToDelete.add(newThumbnails[i]);
+        // Deleting a carousel deletes every slide (G-016)
+        final slides = newCarousels.remove(newImages[i].path);
+        if (slides != null) slidesToDelete.addAll(slides.skip(1));
         newImages.removeAt(i);
         newThumbnails.removeAt(i);
       }
@@ -1251,6 +1338,7 @@ class PhotoNotifier extends _$PhotoNotifier {
     state = state.copyWith(
       images: newImages,
       thumbnails: newThumbnails,
+      carousels: newCarousels,
       selectedIndexes: <int>{},
       imageCount: newImages.length,
       arraysInSync: newImages.length == newThumbnails.length,
@@ -1258,8 +1346,9 @@ class PhotoNotifier extends _$PhotoNotifier {
 
     if (imagesToDelete.isNotEmpty) {
       await _repository.deleteImages(imagesToDelete, thumbnailsToDelete);
+      await _repository.deleteSlides(slidesToDelete);
       await _saveImageOrder();
-      await _repository.cleanupOrphanedThumbnails(newImages.map((f) => f.path).toList());
+      await _repository.cleanupOrphanedThumbnails(state.allImagePaths);
     }
   }
 

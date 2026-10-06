@@ -44,6 +44,8 @@ _$BackupItemImpl _$$BackupItemImplFromJson(Map<String, dynamic> json) =>
           : DateTime.parse(json['exifTs'] as String),
       sortIndex: (json['sortIndex'] as num).toInt(),
       metadata: json['metadata'] as Map<String, dynamic>? ?? const {},
+      carouselId: json['carouselId'] as String?,
+      carouselIndex: (json['carouselIndex'] as num?)?.toInt(),
     );
 
 Map<String, dynamic> _$$BackupItemImplToJson(_$BackupItemImpl instance) =>
@@ -59,6 +61,8 @@ Map<String, dynamic> _$$BackupItemImplToJson(_$BackupItemImpl instance) =>
       'exifTs': instance.exifTs?.toIso8601String(),
       'sortIndex': instance.sortIndex,
       'metadata': instance.metadata,
+      'carouselId': instance.carouselId,
+      'carouselIndex': instance.carouselIndex,
     };
 
 _$SafEntryImpl _$$SafEntryImplFromJson(Map<String, dynamic> json) =>

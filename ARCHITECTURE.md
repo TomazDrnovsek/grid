@@ -29,10 +29,11 @@ The hard constraints are `CLAUDE.md` §2. Their consequences for the architectur
 ## §3 Data model
 
 - **Photos.** Each imported photo becomes a compressed full image and a thumbnail, written into the app's documents directory (`lib/file_utils.dart`). A row in `photos.db` gives it a stable UUID, its file paths and its position. The order in the grid is the order in the database (`lib/repositories/photo_repository.dart`).
+- **Carousels** (G-016). Database version 3 adds two nullable columns to `photos`: `carousel_id`, shared by a carousel's slides, and `carousel_index`, a slide's position, 0 being the cover. Null means a photo on its own tile. Loading groups rows into tiles (`PhotoRepository.groupIntoTiles`). `PhotoState.images` holds one file per tile, a carousel's cover; `PhotoState.carousels` maps a cover's path to all its slides. Saving the order writes every photo, a carousel's slides right after its cover (`PhotoState.allImagePaths`).
 - **Legacy migration.** Versions before the database kept paths in SharedPreferences (`grid_image_paths`, `header_username`). `PhotoRepository` migrates them once and sets `database_migration_complete`. The legacy keys are addresses: an old install can still be carrying them.
 - **Profile.** One JSON object under `profile_data` (`lib/ui/profile_block.dart`).
 - **Dominant colours.** Cached under `dominant_colors_cache_v2`. The `_v2` is part of the address.
-- **Backup.** A folder chosen through Storage Access Framework, URI and name in `cloud_folder_uri` / `cloud_folder_name`. Inside it: the photo files and `manifest.json` (written via `manifest.json.tmp`), whose structure is `BackupManifest` in `lib/models/backup_models.dart` (`Constants.manifestVersion`). Its `appVersion` field holds the installed version name (G-012). Each photo's SHA-256 is recorded in the manifest (`lib/services/backup_hasher.dart`).
+- **Backup.** A folder chosen through Storage Access Framework, URI and name in `cloud_folder_uri` / `cloud_folder_name`. Inside it: the photo files and `manifest.json` (written via `manifest.json.tmp`), whose structure is `BackupManifest` in `lib/models/backup_models.dart` (`Constants.manifestVersion`). Its `appVersion` field holds the installed version name (G-012). An item in a carousel also carries `carouselId` and `carouselIndex`; the keys are optional, written only for slides, and `version` stays 1 so older app versions still read the backup (G-016). Each photo's SHA-256 is recorded in the manifest (`lib/services/backup_hasher.dart`).
 
 ## §4 Platform integration
 

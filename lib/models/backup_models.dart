@@ -43,6 +43,10 @@ class BackupItem with _$BackupItem {
     DateTime? exifTs,
     required int sortIndex,
     @Default({}) Map<String, dynamic> metadata,
+    /// Carousel the photo belongs to, absent for a photo on its own tile (G-016)
+    String? carouselId,
+    /// Position inside the carousel; 0 is the cover
+    int? carouselIndex,
   }) = _BackupItem;
 
   factory BackupItem.fromJson(Map<String, dynamic> json) =>

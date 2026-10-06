@@ -89,6 +89,19 @@ class _HowToUseScreenState extends State<HowToUseScreen> {
                     ),
                     const SizedBox(height: 16),
 
+                    _buildSubSectionTitle('Adding a Carousel', isDark),
+                    const SizedBox(height: 8),
+                    _buildBodyText(
+                      'A carousel puts up to 20 photos on one tile, like a carousel post.',
+                      isDark,
+                    ),
+                    _buildBulletText('Tap + and pick two or more photos, in the order you want them', isDark),
+                    _buildBulletText('Choose Carousel to add them as one tile, or Separate to give each photo its own tile', isDark),
+                    _buildBulletText('The first photo you picked is the cover shown on the grid', isDark),
+                    _buildBulletText('Carousel tiles show a carousel icon in the top right corner', isDark),
+                    _buildBulletText('Tap outside the choice to cancel without adding anything', isDark),
+                    const SizedBox(height: 16),
+
                     _buildSubSectionTitle('Organizing Your Grid', isDark),
                     const SizedBox(height: 8),
                     _buildBodyText(
@@ -113,6 +126,7 @@ class _HowToUseScreenState extends State<HowToUseScreen> {
                     _buildBulletText('Select photos you want to remove', isDark),
                     _buildBulletText('Tap the trash icon in the bottom bar', isDark),
                     _buildBulletText('Confirm deletion in the popup dialog', isDark),
+                    _buildBulletText('Deleting a carousel deletes all its photos', isDark),
                     const SizedBox(height: 16),
 
                     _buildSubSectionTitle('Sharing Photos', isDark),
@@ -120,12 +134,13 @@ class _HowToUseScreenState extends State<HowToUseScreen> {
                     _buildBulletText('Select a single photo', isDark),
                     _buildBulletText('Tap the share icon in the bottom bar', isDark),
                     _buildBulletText('Choose your sharing destination', isDark),
+                    _buildBulletText('A selected carousel shares all its photos at once', isDark),
                     const SizedBox(height: 16),
 
                     _buildSubSectionTitle('Previewing Photos', isDark),
                     const SizedBox(height: 8),
                     _buildBodyText(
-                      'Double tap any photo to view it full-screen. Tap anywhere to close the preview.',
+                      'Double tap any photo to view it full-screen. On a carousel, swipe left and right to see each photo; the counter in the corner shows which one you are on. Tap anywhere to close the preview.',
                       isDark,
                     ),
                     const SizedBox(height: 24),

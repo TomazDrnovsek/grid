@@ -68,9 +68,9 @@ Then: the gate is green, the PR is open, the CI result is read (the failing step
 
 - Application id and namespace `si.tomazdrnovsek.grid`; Kotlin package `si.tomazdrnovsek.grid`.
 - `MethodChannel` name `com.grid/saf` and its method names (`lib/repositories/saf_storage_provider.dart` ↔ `MainActivity.kt`).
-- SQLite database file `photos.db` and its schema (`lib/services/photo_database.dart`).
+- SQLite database file `photos.db` and its schema (`lib/services/photo_database.dart`). A shipped table or column is never renamed, removed or given a new meaning. A new one arrives only through a versioned, additive migration that leaves every existing row's values as they were (G-016).
 - SharedPreferences keys, read live: `git grep -nE "static const String _[a-zA-Z]*[Kk]ey"` in `lib/`. That includes the legacy keys a migration still reads.
-- The backup folder layout and `manifest.json` / `manifest.json.tmp` names and format (`lib/repositories/cloud_manifest_repository.dart`, `lib/models/backup_models.dart`).
+- The backup folder layout and `manifest.json` / `manifest.json.tmp` names and format (`lib/repositories/cloud_manifest_repository.dart`, `lib/models/backup_models.dart`). A shipped key keeps its name and meaning. A new key is optional, and `version` stays 1 while older app versions must still read the backup (G-016).
 - `privacy.html` at the repository root.
 - The upload key alias `upload`, and the three Actions secret names in `OPERATIONS.md` §1.
 

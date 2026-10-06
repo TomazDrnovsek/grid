@@ -26,6 +26,11 @@ mixin _$PhotoState {
   /// PHASE 2: List of photo UUIDs corresponding to images (for backup/restore order preservation)
   List<String> get imageUuids => throw _privateConstructorUsedError;
 
+  /// Carousels: every slide in order, cover first, keyed by the cover's path.
+  /// [images] holds one file per grid tile, so a carousel appears there as
+  /// its cover only (G-016).
+  Map<String, List<File>> get carousels => throw _privateConstructorUsedError;
+
   /// Set of selected image indexes
   Set<int> get selectedIndexes => throw _privateConstructorUsedError;
 
@@ -34,6 +39,12 @@ mixin _$PhotoState {
 
   /// Delete confirmation modal state
   bool get showDeleteConfirm => throw _privateConstructorUsedError;
+
+  /// "Add as" dialog: shown after picking two or more photos
+  bool get showAddAsDialog => throw _privateConstructorUsedError;
+
+  /// Paths of the photos waiting in the "Add as" dialog, in picked order
+  List<String> get pendingPickPaths => throw _privateConstructorUsedError;
 
   /// PHASE 1: Loading modal with progress state
   bool get showLoadingModal => throw _privateConstructorUsedError;
@@ -105,9 +116,12 @@ abstract class $PhotoStateCopyWith<$Res> {
     List<File> images,
     List<File> thumbnails,
     List<String> imageUuids,
+    Map<String, List<File>> carousels,
     Set<int> selectedIndexes,
     bool isLoading,
     bool showDeleteConfirm,
+    bool showAddAsDialog,
+    List<String> pendingPickPaths,
     bool showLoadingModal,
     bool showImagePreview,
     int previewImageIndex,
@@ -149,9 +163,12 @@ class _$PhotoStateCopyWithImpl<$Res, $Val extends PhotoState>
     Object? images = null,
     Object? thumbnails = null,
     Object? imageUuids = null,
+    Object? carousels = null,
     Object? selectedIndexes = null,
     Object? isLoading = null,
     Object? showDeleteConfirm = null,
+    Object? showAddAsDialog = null,
+    Object? pendingPickPaths = null,
     Object? showLoadingModal = null,
     Object? showImagePreview = null,
     Object? previewImageIndex = null,
@@ -183,6 +200,10 @@ class _$PhotoStateCopyWithImpl<$Res, $Val extends PhotoState>
                 ? _value.imageUuids
                 : imageUuids // ignore: cast_nullable_to_non_nullable
                       as List<String>,
+            carousels: null == carousels
+                ? _value.carousels
+                : carousels // ignore: cast_nullable_to_non_nullable
+                      as Map<String, List<File>>,
             selectedIndexes: null == selectedIndexes
                 ? _value.selectedIndexes
                 : selectedIndexes // ignore: cast_nullable_to_non_nullable
@@ -195,6 +216,14 @@ class _$PhotoStateCopyWithImpl<$Res, $Val extends PhotoState>
                 ? _value.showDeleteConfirm
                 : showDeleteConfirm // ignore: cast_nullable_to_non_nullable
                       as bool,
+            showAddAsDialog: null == showAddAsDialog
+                ? _value.showAddAsDialog
+                : showAddAsDialog // ignore: cast_nullable_to_non_nullable
+                      as bool,
+            pendingPickPaths: null == pendingPickPaths
+                ? _value.pendingPickPaths
+                : pendingPickPaths // ignore: cast_nullable_to_non_nullable
+                      as List<String>,
             showLoadingModal: null == showLoadingModal
                 ? _value.showLoadingModal
                 : showLoadingModal // ignore: cast_nullable_to_non_nullable
@@ -318,9 +347,12 @@ abstract class _$$PhotoStateImplCopyWith<$Res>
     List<File> images,
     List<File> thumbnails,
     List<String> imageUuids,
+    Map<String, List<File>> carousels,
     Set<int> selectedIndexes,
     bool isLoading,
     bool showDeleteConfirm,
+    bool showAddAsDialog,
+    List<String> pendingPickPaths,
     bool showLoadingModal,
     bool showImagePreview,
     int previewImageIndex,
@@ -364,9 +396,12 @@ class __$$PhotoStateImplCopyWithImpl<$Res>
     Object? images = null,
     Object? thumbnails = null,
     Object? imageUuids = null,
+    Object? carousels = null,
     Object? selectedIndexes = null,
     Object? isLoading = null,
     Object? showDeleteConfirm = null,
+    Object? showAddAsDialog = null,
+    Object? pendingPickPaths = null,
     Object? showLoadingModal = null,
     Object? showImagePreview = null,
     Object? previewImageIndex = null,
@@ -398,6 +433,10 @@ class __$$PhotoStateImplCopyWithImpl<$Res>
             ? _value._imageUuids
             : imageUuids // ignore: cast_nullable_to_non_nullable
                   as List<String>,
+        carousels: null == carousels
+            ? _value._carousels
+            : carousels // ignore: cast_nullable_to_non_nullable
+                  as Map<String, List<File>>,
         selectedIndexes: null == selectedIndexes
             ? _value._selectedIndexes
             : selectedIndexes // ignore: cast_nullable_to_non_nullable
@@ -410,6 +449,14 @@ class __$$PhotoStateImplCopyWithImpl<$Res>
             ? _value.showDeleteConfirm
             : showDeleteConfirm // ignore: cast_nullable_to_non_nullable
                   as bool,
+        showAddAsDialog: null == showAddAsDialog
+            ? _value.showAddAsDialog
+            : showAddAsDialog // ignore: cast_nullable_to_non_nullable
+                  as bool,
+        pendingPickPaths: null == pendingPickPaths
+            ? _value._pendingPickPaths
+            : pendingPickPaths // ignore: cast_nullable_to_non_nullable
+                  as List<String>,
         showLoadingModal: null == showLoadingModal
             ? _value.showLoadingModal
             : showLoadingModal // ignore: cast_nullable_to_non_nullable
@@ -486,9 +533,12 @@ class _$PhotoStateImpl extends _PhotoState {
     final List<File> images = const [],
     final List<File> thumbnails = const [],
     final List<String> imageUuids = const <String>[],
+    final Map<String, List<File>> carousels = const <String, List<File>>{},
     final Set<int> selectedIndexes = const {},
     this.isLoading = false,
     this.showDeleteConfirm = false,
+    this.showAddAsDialog = false,
+    final List<String> pendingPickPaths = const <String>[],
     this.showLoadingModal = false,
     this.showImagePreview = false,
     this.previewImageIndex = -1,
@@ -508,7 +558,9 @@ class _$PhotoStateImpl extends _PhotoState {
   }) : _images = images,
        _thumbnails = thumbnails,
        _imageUuids = imageUuids,
+       _carousels = carousels,
        _selectedIndexes = selectedIndexes,
+       _pendingPickPaths = pendingPickPaths,
        _batchHistory = batchHistory,
        super._();
 
@@ -548,6 +600,22 @@ class _$PhotoStateImpl extends _PhotoState {
     return EqualUnmodifiableListView(_imageUuids);
   }
 
+  /// Carousels: every slide in order, cover first, keyed by the cover's path.
+  /// [images] holds one file per grid tile, so a carousel appears there as
+  /// its cover only (G-016).
+  final Map<String, List<File>> _carousels;
+
+  /// Carousels: every slide in order, cover first, keyed by the cover's path.
+  /// [images] holds one file per grid tile, so a carousel appears there as
+  /// its cover only (G-016).
+  @override
+  @JsonKey()
+  Map<String, List<File>> get carousels {
+    if (_carousels is EqualUnmodifiableMapView) return _carousels;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableMapView(_carousels);
+  }
+
   /// Set of selected image indexes
   final Set<int> _selectedIndexes;
 
@@ -569,6 +637,24 @@ class _$PhotoStateImpl extends _PhotoState {
   @override
   @JsonKey()
   final bool showDeleteConfirm;
+
+  /// "Add as" dialog: shown after picking two or more photos
+  @override
+  @JsonKey()
+  final bool showAddAsDialog;
+
+  /// Paths of the photos waiting in the "Add as" dialog, in picked order
+  final List<String> _pendingPickPaths;
+
+  /// Paths of the photos waiting in the "Add as" dialog, in picked order
+  @override
+  @JsonKey()
+  List<String> get pendingPickPaths {
+    if (_pendingPickPaths is EqualUnmodifiableListView)
+      return _pendingPickPaths;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_pendingPickPaths);
+  }
 
   /// PHASE 1: Loading modal with progress state
   @override
@@ -659,7 +745,7 @@ class _$PhotoStateImpl extends _PhotoState {
 
   @override
   String toString() {
-    return 'PhotoState(images: $images, thumbnails: $thumbnails, imageUuids: $imageUuids, selectedIndexes: $selectedIndexes, isLoading: $isLoading, showDeleteConfirm: $showDeleteConfirm, showLoadingModal: $showLoadingModal, showImagePreview: $showImagePreview, previewImageIndex: $previewImageIndex, isAtTop: $isAtTop, editingHeaderUsername: $editingHeaderUsername, headerUsername: $headerUsername, imageCount: $imageCount, arraysInSync: $arraysInSync, showHueMap: $showHueMap, currentBatchOperation: $currentBatchOperation, batchHistory: $batchHistory, totalBatchOperations: $totalBatchOperations, queuedOperations: $queuedOperations, isBatchProcessing: $isBatchProcessing, lastBatchResult: $lastBatchResult, batchMetrics: $batchMetrics)';
+    return 'PhotoState(images: $images, thumbnails: $thumbnails, imageUuids: $imageUuids, carousels: $carousels, selectedIndexes: $selectedIndexes, isLoading: $isLoading, showDeleteConfirm: $showDeleteConfirm, showAddAsDialog: $showAddAsDialog, pendingPickPaths: $pendingPickPaths, showLoadingModal: $showLoadingModal, showImagePreview: $showImagePreview, previewImageIndex: $previewImageIndex, isAtTop: $isAtTop, editingHeaderUsername: $editingHeaderUsername, headerUsername: $headerUsername, imageCount: $imageCount, arraysInSync: $arraysInSync, showHueMap: $showHueMap, currentBatchOperation: $currentBatchOperation, batchHistory: $batchHistory, totalBatchOperations: $totalBatchOperations, queuedOperations: $queuedOperations, isBatchProcessing: $isBatchProcessing, lastBatchResult: $lastBatchResult, batchMetrics: $batchMetrics)';
   }
 
   @override
@@ -677,6 +763,10 @@ class _$PhotoStateImpl extends _PhotoState {
               _imageUuids,
             ) &&
             const DeepCollectionEquality().equals(
+              other._carousels,
+              _carousels,
+            ) &&
+            const DeepCollectionEquality().equals(
               other._selectedIndexes,
               _selectedIndexes,
             ) &&
@@ -684,6 +774,12 @@ class _$PhotoStateImpl extends _PhotoState {
                 other.isLoading == isLoading) &&
             (identical(other.showDeleteConfirm, showDeleteConfirm) ||
                 other.showDeleteConfirm == showDeleteConfirm) &&
+            (identical(other.showAddAsDialog, showAddAsDialog) ||
+                other.showAddAsDialog == showAddAsDialog) &&
+            const DeepCollectionEquality().equals(
+              other._pendingPickPaths,
+              _pendingPickPaths,
+            ) &&
             (identical(other.showLoadingModal, showLoadingModal) ||
                 other.showLoadingModal == showLoadingModal) &&
             (identical(other.showImagePreview, showImagePreview) ||
@@ -725,9 +821,12 @@ class _$PhotoStateImpl extends _PhotoState {
     const DeepCollectionEquality().hash(_images),
     const DeepCollectionEquality().hash(_thumbnails),
     const DeepCollectionEquality().hash(_imageUuids),
+    const DeepCollectionEquality().hash(_carousels),
     const DeepCollectionEquality().hash(_selectedIndexes),
     isLoading,
     showDeleteConfirm,
+    showAddAsDialog,
+    const DeepCollectionEquality().hash(_pendingPickPaths),
     showLoadingModal,
     showImagePreview,
     previewImageIndex,
@@ -760,9 +859,12 @@ abstract class _PhotoState extends PhotoState {
     final List<File> images,
     final List<File> thumbnails,
     final List<String> imageUuids,
+    final Map<String, List<File>> carousels,
     final Set<int> selectedIndexes,
     final bool isLoading,
     final bool showDeleteConfirm,
+    final bool showAddAsDialog,
+    final List<String> pendingPickPaths,
     final bool showLoadingModal,
     final bool showImagePreview,
     final int previewImageIndex,
@@ -794,6 +896,12 @@ abstract class _PhotoState extends PhotoState {
   @override
   List<String> get imageUuids;
 
+  /// Carousels: every slide in order, cover first, keyed by the cover's path.
+  /// [images] holds one file per grid tile, so a carousel appears there as
+  /// its cover only (G-016).
+  @override
+  Map<String, List<File>> get carousels;
+
   /// Set of selected image indexes
   @override
   Set<int> get selectedIndexes;
@@ -805,6 +913,14 @@ abstract class _PhotoState extends PhotoState {
   /// Delete confirmation modal state
   @override
   bool get showDeleteConfirm;
+
+  /// "Add as" dialog: shown after picking two or more photos
+  @override
+  bool get showAddAsDialog;
+
+  /// Paths of the photos waiting in the "Add as" dialog, in picked order
+  @override
+  List<String> get pendingPickPaths;
 
   /// PHASE 1: Loading modal with progress state
   @override

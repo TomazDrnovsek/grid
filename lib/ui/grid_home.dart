@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../constants.dart';
 import '../core/app_config.dart';
 import '../providers/photo_provider.dart';
 import '../services/scroll_optimization_service.dart';
@@ -238,6 +239,12 @@ class _GridHomePageState extends ConsumerState<GridHomePage>
 
               // Modal overlays with optimized animations
               _OptimizedDeleteModal(
+                isDark: isDark,
+                photoNotifier: photoNotifier,
+              ),
+
+              // "Add as" dialog after picking two or more photos (G-016)
+              _OptimizedAddAsModal(
                 isDark: isDark,
                 photoNotifier: photoNotifier,
               ),
@@ -523,6 +530,7 @@ class _OptimizedPhotoGridSliver extends ConsumerWidget {
     final images = ref.watch(photoNotifierProvider.select((state) => state.images));
     final thumbnails = ref.watch(photoNotifierProvider.select((state) => state.thumbnails));
     final selectedIndexes = ref.watch(photoNotifierProvider.select((state) => state.selectedIndexes));
+    final carousels = ref.watch(photoNotifierProvider.select((state) => state.carousels));
     final isNotEmpty = images.isNotEmpty;
 
     if (isNotEmpty) {
@@ -531,6 +539,7 @@ class _OptimizedPhotoGridSliver extends ConsumerWidget {
         thumbnails: thumbnails.length == images.length
             ? thumbnails
             : List.from(images), // Fallback if thumbnails out of sync
+        carouselCoverPaths: carousels.keys.toSet(),
         selectedIndexes: selectedIndexes,
         onTap: photoNotifier.toggleSelection,
         onDoubleTap: photoNotifier.showImagePreview,
@@ -618,10 +627,19 @@ class _OptimizedImagePreviewModal extends ConsumerWidget {
     final showImagePreview = ref.watch(photoNotifierProvider.select((state) => state.showImagePreview));
     final previewImageIndex = ref.watch(photoNotifierProvider.select((state) => state.previewImageIndex));
     final images = ref.watch(photoNotifierProvider.select((state) => state.images));
+    final carousels = ref.watch(photoNotifierProvider.select((state) => state.carousels));
 
     if (showImagePreview &&
         previewImageIndex >= 0 &&
         previewImageIndex < images.length) {
+      final slides = carousels[images[previewImageIndex].path];
+      if (slides != null) {
+        return CarouselPreviewModal(
+          slides: slides,
+          onClose: onClose,
+        );
+      }
+
       return ImagePreviewModal(
         image: images[previewImageIndex],
         onClose: onClose,
@@ -653,34 +671,332 @@ class ImagePreviewModal extends StatelessWidget {
           color: AppColors.imagePreviewOverlay,
           padding: const EdgeInsets.all(24),
           child: Center(
-            child: Hero(
-              tag: 'image_${image.path}',
-              child: Image.file(
-                image,
-                fit: BoxFit.contain,
-                gaplessPlayback: true, // Prevent blinking on high refresh rate
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    padding: const EdgeInsets.all(32),
-                    child: const Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          color: AppColors.imagePreviewErrorIcon,
-                          size: 48,
+            child: _previewImage(image),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Full-size preview image, shared by the single and carousel previews
+Widget _previewImage(File image) {
+  return Hero(
+    tag: 'image_${image.path}',
+    child: Image.file(
+      image,
+      fit: BoxFit.contain,
+      gaplessPlayback: true, // Prevent blinking on high refresh rate
+      errorBuilder: (context, error, stackTrace) {
+        return Container(
+          padding: const EdgeInsets.all(32),
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.error_outline,
+                color: AppColors.imagePreviewErrorIcon,
+                size: 48,
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Unable to load image',
+                style: AppTheme.imagePreviewError,
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+}
+
+/// Carousel preview: swipe left and right through the slides; each slide
+/// carries an x/N tag in its top right corner. Tap anywhere to close (G-016).
+class CarouselPreviewModal extends StatelessWidget {
+  final List<File> slides;
+  final VoidCallback onClose;
+
+  const CarouselPreviewModal({
+    super.key,
+    required this.slides,
+    required this.onClose,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onClose,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          color: AppColors.imagePreviewOverlay,
+          child: PageView.builder(
+            itemCount: slides.length,
+            itemBuilder: (context, index) {
+              return Padding(
+                padding: const EdgeInsets.all(24),
+                child: Center(
+                  // The image sizes itself to its aspect ratio inside the
+                  // loose constraints, so the tag sits on the photo's corner.
+                  child: Stack(
+                    children: [
+                      _previewImage(slides[index]),
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: _CarouselCounter(
+                          text: '${index + 1}/${slides.length}',
                         ),
-                        SizedBox(height: 16),
-                        Text(
-                          'Unable to load image',
-                          style: AppTheme.imagePreviewError,
-                        ),
-                      ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The x/N tag on a carousel slide in the preview
+class _CarouselCounter extends StatelessWidget {
+  final String text;
+
+  const _CarouselCounter({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.carouselCounterBackground,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        text,
+        style: AppTheme.carouselCounter,
+      ),
+    );
+  }
+}
+
+/// "Add as" modal: watches only the dialog state
+class _OptimizedAddAsModal extends ConsumerWidget {
+  final bool isDark;
+  final dynamic photoNotifier;
+
+  const _OptimizedAddAsModal({
+    required this.isDark,
+    required this.photoNotifier,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final showAddAsDialog = ref.watch(photoNotifierProvider.select((state) => state.showAddAsDialog));
+    final pendingPickPaths = ref.watch(photoNotifierProvider.select((state) => state.pendingPickPaths));
+
+    return AnimatedOpacity(
+      opacity: showAddAsDialog ? 1.0 : 0.0,
+      duration: AppConfig().fastAnimationDuration,
+      curve: Curves.easeInOutCubic,
+      child: showAddAsDialog && pendingPickPaths.isNotEmpty
+          ? AddAsModal(
+        pickedPaths: pendingPickPaths,
+        onCancel: photoNotifier.cancelAddAs,
+        onSeparate: photoNotifier.addPendingAsSeparate,
+        onCarousel: photoNotifier.addPendingAsCarousel,
+        isDark: isDark,
+      )
+          : const SizedBox.shrink(),
+    );
+  }
+}
+
+/// Asks whether picked photos become separate tiles or one carousel (G-016).
+/// Styled like [DeleteConfirmModal]; tapping outside discards the picks.
+class AddAsModal extends StatelessWidget {
+  final List<String> pickedPaths;
+  final VoidCallback onCancel;
+  final VoidCallback onSeparate;
+  final VoidCallback onCarousel;
+  final bool isDark;
+
+  const AddAsModal({
+    super.key,
+    required this.pickedPaths,
+    required this.onCancel,
+    required this.onSeparate,
+    required this.onCarousel,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final count = pickedPaths.length;
+    final canBeCarousel = count <= Constants.maxCarouselSlides;
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            onTap: onCancel,
+            child: Container(
+              color: AppColors.modalOverlayBackground(isDark),
+            ),
+          ),
+        ),
+        Center(
+          child: Semantics(
+            label: 'Add photos dialog',
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              decoration: BoxDecoration(
+                color: AppColors.modalContentBackground(isDark),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Add $count photos as',
+                    textAlign: TextAlign.center,
+                    style: AppTheme.dialogTitle(isDark),
+                  ),
+                  const SizedBox(height: 16),
+                  // The picked photos in slide order
+                  SizedBox(
+                    height: 48,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      shrinkWrap: true,
+                      itemCount: count,
+                      separatorBuilder: (context, index) => const SizedBox(width: 2),
+                      itemBuilder: (context, index) {
+                        return SizedBox(
+                          width: 36,
+                          child: Image.file(
+                            File(pickedPaths[index]),
+                            fit: BoxFit.cover,
+                            cacheWidth: 108,
+                            gaplessPlayback: true,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              color: AppColors.gridErrorBackground(isDark),
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: _AddAsButton(
+                          label: 'Separate',
+                          detail: '$count tiles',
+                          isPrimary: false,
+                          isDark: isDark,
+                          onPressed: onSeparate,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Flexible(
+                        child: _AddAsButton(
+                          label: 'Carousel',
+                          detail: '1 tile',
+                          isPrimary: true,
+                          isDark: isDark,
+                          onPressed: canBeCarousel ? onCarousel : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (!canBeCarousel) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      'A carousel holds up to ${Constants.maxCarouselSlides} photos. You picked $count.',
+                      textAlign: TextAlign.center,
+                      style: AppTheme.body(isDark).copyWith(
+                        color: AppColors.textSecondary(isDark),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// A button in [AddAsModal]: secondary in the cancel style, primary in the
+/// delete dialog's strong style. A null [onPressed] shows it disabled.
+class _AddAsButton extends StatelessWidget {
+  final String label;
+  final String detail;
+  final bool isPrimary;
+  final bool isDark;
+  final VoidCallback? onPressed;
+
+  const _AddAsButton({
+    required this.label,
+    required this.detail,
+    required this.isPrimary,
+    required this.isDark,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final labelStyle = isPrimary
+        ? AppTheme.dialogActionDanger(isDark)
+        : AppTheme.dialogActionPrimary(isDark);
+
+    // A minimum size, not a fixed one, so large text grows the button
+    // instead of overflowing it
+    return Opacity(
+      opacity: onPressed == null ? 0.35 : 1.0,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 104, minHeight: 52),
+        child: TextButton(
+          style: ButtonStyle(
+            padding: WidgetStateProperty.all(
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+            backgroundColor: WidgetStateProperty.all(
+              isPrimary
+                  ? AppColors.deleteButtonBackground(isDark)
+                  : AppColors.cancelButtonBackground(isDark),
+            ),
+            shape: WidgetStateProperty.all(
+              RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            overlayColor: WidgetStateProperty.all(
+              isPrimary
+                  ? AppColors.deleteButtonOverlay(isDark)
+                  : AppColors.textPrimary(isDark).withAlpha(18),
+            ),
+          ),
+          onPressed: onPressed,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(label, style: labelStyle, textAlign: TextAlign.center),
+              Text(
+                detail,
+                textAlign: TextAlign.center,
+                style: labelStyle.copyWith(fontSize: 11, color: labelStyle.color?.withValues(alpha: 0.7)),
+              ),
+            ],
           ),
         ),
       ),

@@ -7,9 +7,10 @@ import 'package:path/path.dart';
 
 /// Database service for managing photo metadata and app settings
 /// PHASE 2 IMPLEMENTATION: Added stable photo IDs for order preservation across devices
+/// Version 3 adds carousel membership: carousel_id and carousel_index (G-016)
 class PhotoDatabase {
   static const String _databaseName = 'photos.db';
-  static const int _databaseVersion = 2; // UPDATED: Incremented for UUID migration
+  static const int _databaseVersion = 3; // 2: UUIDs; 3: carousel columns (G-016)
 
   // Table names (single source of truth)
   static const String photosTable = 'photos';
@@ -69,7 +70,9 @@ class PhotoDatabase {
           is_favorite INTEGER NOT NULL DEFAULT 0,
           tags TEXT DEFAULT '',
           created_at INTEGER NOT NULL,
-          updated_at INTEGER NOT NULL
+          updated_at INTEGER NOT NULL,
+          carousel_id TEXT,
+          carousel_index INTEGER
         )
       ''');
 
@@ -175,6 +178,23 @@ class PhotoDatabase {
           await db.execute('ROLLBACK');
           debugPrint('UUID migration failed, rolling back: $e');
           rethrow;
+        }
+      }
+
+      // Version 3 (G-016): carousel membership. Additive only: existing rows
+      // keep every value and get NULL, which means "not in a carousel".
+      if (oldVersion < 3 && newVersion >= 3) {
+        debugPrint('Migrating to version 3: Adding carousel columns');
+        // Skip a column that exists already: sqflite keeps columns through a
+        // downgrade, so a later upgrade can meet them again.
+        final columns = (await db.rawQuery('PRAGMA table_info($photosTable)'))
+            .map((c) => c['name'] as String)
+            .toSet();
+        if (!columns.contains('carousel_id')) {
+          await db.execute('ALTER TABLE $photosTable ADD COLUMN carousel_id TEXT');
+        }
+        if (!columns.contains('carousel_index')) {
+          await db.execute('ALTER TABLE $photosTable ADD COLUMN carousel_index INTEGER');
         }
       }
 
@@ -641,6 +661,12 @@ class PhotoDatabaseEntry {
   final bool isFavorite;
   final List<String> tags;
 
+  /// Carousel this photo belongs to, or null for a photo on its own tile (G-016)
+  final String? carouselId;
+
+  /// Position inside the carousel; 0 is the cover shown on the grid
+  final int? carouselIndex;
+
   PhotoDatabaseEntry({
     this.id,
     this.uuid,
@@ -655,6 +681,8 @@ class PhotoDatabaseEntry {
     required this.orderIndex,
     this.isFavorite = false,
     this.tags = const [],
+    this.carouselId,
+    this.carouselIndex,
   });
 
   Map<String, dynamic> toMap() {
@@ -672,6 +700,8 @@ class PhotoDatabaseEntry {
       'order_index': orderIndex,
       'is_favorite': isFavorite ? 1 : 0,
       'tags': tags.join(','),
+      'carousel_id': carouselId,
+      'carousel_index': carouselIndex,
     };
   }
 
@@ -694,6 +724,8 @@ class PhotoDatabaseEntry {
       tags: map['tags'] != null && map['tags'].toString().isNotEmpty
           ? map['tags'].toString().split(',')
           : <String>[],
+      carouselId: map['carousel_id'] as String?,
+      carouselIndex: map['carousel_index']?.toInt(),
     );
   }
 
@@ -712,6 +744,8 @@ class PhotoDatabaseEntry {
     int? orderIndex,
     bool? isFavorite,
     List<String>? tags,
+    String? carouselId,
+    int? carouselIndex,
   }) {
     return PhotoDatabaseEntry(
       id: id ?? this.id,
@@ -727,6 +761,29 @@ class PhotoDatabaseEntry {
       orderIndex: orderIndex ?? this.orderIndex,
       isFavorite: isFavorite ?? this.isFavorite,
       tags: tags ?? this.tags,
+      carouselId: carouselId ?? this.carouselId,
+      carouselIndex: carouselIndex ?? this.carouselIndex,
+    );
+  }
+
+  /// Copy with the carousel membership replaced, including clearing it with nulls
+  PhotoDatabaseEntry withCarousel(String? carouselId, int? carouselIndex) {
+    return PhotoDatabaseEntry(
+      id: id,
+      uuid: uuid,
+      imagePath: imagePath,
+      thumbnailPath: thumbnailPath,
+      originalName: originalName,
+      fileSize: fileSize,
+      width: width,
+      height: height,
+      dateAdded: dateAdded,
+      dateModified: dateModified,
+      orderIndex: orderIndex,
+      isFavorite: isFavorite,
+      tags: tags,
+      carouselId: carouselId,
+      carouselIndex: carouselIndex,
     );
   }
 
