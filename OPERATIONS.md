@@ -12,11 +12,19 @@ Secret **values** never appear in this repository. A row existing does not mean 
 | Privacy policy URL (registered in Play) | `https://tomazdrnovsek.github.io/grid/privacy.html` |
 | Upload key | alias `upload`, PKCS12; certificate SHA-1 `CA:5B:CB:6F:E5:80:2F:07:9E:59:E5:59:70:3D:5D:5D:71:01:4B:FD`; SHA-256 `CC:8D:AD:A6:5B:E8:27:ED:CB:90:54:6A:D5:1D:66:57:0C:6B:F8:71:84:46:78:5D:CB:81:80:F5:70:B8:4C:23` |
 | App signing key | held by Google (Play App Signing). Its certificate is in Play Console → Test and release → App integrity |
-| Actions secret | `ANDROID_KEYSTORE_BASE64` — the upload keystore file, base64 |
+| Actions secret | `ANDROID_KEYSTORE_BASE64` — the upload keystore file as plain base64, made with the PowerShell line below |
 | Actions secret | `ANDROID_KEYSTORE_PASSWORD` |
 | Actions secret | `ANDROID_KEY_PASSWORD` |
-| Actions secret | `ANDROID_KEY_ALIAS` — `upload` |
+| Key alias | `upload` — a plain value in `android-release.yml`, deliberately not a secret: GitHub masks a secret's value everywhere in a run's log, and "upload" is a common word |
 | Owner's copy of the key | password manager item "Grid upload key": the keystore file, both passwords, the alias |
+
+Making the keystore secret's value, on the Windows PC that holds the file. This copies it to the clipboard; paste it straight into the secret. Don't use `certutil -encode`, which adds header lines the workflow refuses:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("<path to>\upload-keystore.jks")) | Set-Clipboard
+```
+
+The passwords go into `key.properties`, a Java properties file. A password containing `\` or a non-ASCII character would be read differently there, and signing would fail with "keystore password was incorrect". The current passwords already worked in exactly this file format on the owner's clone.
 
 The certificate fingerprints are public facts about a public certificate. They are what the release check compares against (G-007).
 
@@ -44,7 +52,7 @@ Upload is manual by decision (G-007; automatic upload is deferred in `DECISIONS.
 
 ## §5 Runbooks
 
-**Lost upload key** (the PC died and the password-manager copy is gone): Play Console → Test and release → App integrity → Upload key certificate → **Request upload key reset**. Generate a new key as Google instructs; once approved, replace the four Actions secrets and update the fingerprints in §1 and in `android-release.yml` in one PR. Users are unaffected, because Google holds the app signing key (G-002). Publishing pauses until the reset is approved.
+**Lost upload key** (the PC died and the password-manager copy is gone): Play Console → Test and release → App integrity → Upload key certificate → **Request upload key reset**. Generate a new key as Google instructs; once approved, replace the three Actions secrets and update the fingerprints in §1 and in `android-release.yml` in one PR. Users are unaffected, because Google holds the app signing key (G-002). Publishing pauses until the reset is approved.
 
 **Leaked upload key** (a secret value appeared anywhere public): the same reset, at once. A leaked key alone cannot reach users, but it can be used to upload as you.
 

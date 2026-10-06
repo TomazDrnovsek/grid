@@ -57,7 +57,7 @@ Entry shape: *What changed* · *Why* · *What is settled* · *What is not settle
 
 *What is settled.*
 - Nothing builds a release on a push. A release is a deliberate act.
-- The workflow refuses to run off `main` or without its four secrets. It writes the keystore outside the checkout, builds, and then **refuses the bundle unless its signing certificate's SHA-1 equals the upload key's** (`OPERATIONS.md` §1). It uploads the bundle as a workflow artifact.
+- The workflow refuses to run off `main` or without its three secrets (the key alias is a plain value, not a secret). It writes the keystore outside the checkout, builds, and then **refuses the bundle unless its signing certificate's SHA-1 equals the upload key's** (`OPERATIONS.md` §1). It uploads the bundle as a workflow artifact.
 - The owner uploads it in Play Console: internal testing first, production after a device check.
 - The keystore is kept in two places: the repository secret, and an item in the owner's password manager. A secret cannot be read back, so the password manager is the only copy outside GitHub.
 

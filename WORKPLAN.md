@@ -21,7 +21,7 @@ Why is `DECISIONS.md`. How is `SPEC.md`, `ARCHITECTURE.md` and `OPERATIONS.md`. 
 - [x] Production source of 1.0.3 (6) committed from the owner's clone (G-006)
 - [x] Document set, hooks, workflows, Jekyll exclusions (G-006, G-007, G-009)
 - [ ] Owner: the upload key and both passwords stored in the password manager (OPERATIONS §1)
-- [ ] Owner: the four Actions secrets added (OPERATIONS §1)
+- [ ] Owner: the three Actions secrets added (OPERATIONS §1)
 - [ ] Owner: the bootstrap PR reviewed and merged; Pages check passed (OPERATIONS §4)
 - [ ] Owner: `docs/claude-project-instructions.md` pasted into the Grid Project; the workflow guide removed from Project knowledge
 - [ ] A smoke-test cloud session started from claude.ai/code on this repository alone: the hook installs Flutter, and the gate runs green

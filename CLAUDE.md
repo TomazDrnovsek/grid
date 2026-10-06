@@ -73,7 +73,7 @@ Then: the gate is green, the PR is open, the CI result is read (the failing step
 - SharedPreferences keys, read live: `git grep -nE "static const String _[a-zA-Z]*[Kk]ey"` in `lib/`. That includes the legacy keys a migration still reads.
 - The backup folder layout and `manifest.json` / `manifest.json.tmp` names and format (`lib/repositories/cloud_manifest_repository.dart`, `lib/models/backup_models.dart`).
 - `privacy.html` at the repository root.
-- The upload key alias `upload`, and the four Actions secret names in `OPERATIONS.md` §1.
+- The upload key alias `upload`, and the three Actions secret names in `OPERATIONS.md` §1.
 
 Words, which may change: the app's display name, copy, the repository name.
 

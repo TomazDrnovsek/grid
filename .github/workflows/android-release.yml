@@ -21,6 +21,9 @@ jobs:
       FLUTTER_VERSION: "3.32.8"   # G-008 — change together with .claude/hooks/session-start.sh and quality.yml
       # The upload key's certificate (OPERATIONS.md §1). The release check refuses any other signer.
       UPLOAD_CERT_SHA1: "CA:5B:CB:6F:E5:80:2F:07:9E:59:E5:59:70:3D:5D:5D:71:01:4B:FD"
+      # The key alias is not a secret. As a secret, GitHub would mask the word "upload"
+      # everywhere in this run's log and summary.
+      UPLOAD_KEY_ALIAS: "upload"
 
     steps:
       - name: Refuse anything but main
@@ -36,10 +39,9 @@ jobs:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
           missing=""
-          for v in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_PASSWORD ANDROID_KEY_ALIAS; do
+          for v in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_PASSWORD; do
             [ -n "${!v}" ] || missing="$missing $v"
           done
           if [ -n "$missing" ]; then
@@ -63,14 +65,16 @@ jobs:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
           ks="$RUNNER_TEMP/upload-keystore.jks"
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d '\r\n ' | base64 -d > "$ks"
+          if ! printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d '\r\n ' | base64 -d > "$ks" 2>/dev/null; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 is not plain base64. Recreate it with the PowerShell line in OPERATIONS.md §1, not certutil."
+            exit 1
+          fi
           {
             echo "storeFile=$ks"
             echo "storePassword=$ANDROID_KEYSTORE_PASSWORD"
-            echo "keyAlias=$ANDROID_KEY_ALIAS"
+            echo "keyAlias=$UPLOAD_KEY_ALIAS"
             echo "keyPassword=$ANDROID_KEY_PASSWORD"
           } > android/key.properties
 
@@ -88,7 +92,7 @@ jobs:
           aab=build/app/outputs/bundle/release/app-release.aab
           signer="$(keytool -printcert -jarfile "$aab" | awk '/SHA1:/ {print $2; exit}')"
           if [ "$signer" != "$UPLOAD_CERT_SHA1" ]; then
-            echo "::error::Certificate mismatch: the bundle is signed by '${signer:-nothing}', not the upload key ${UPLOAD_CERT_SHA1}. Play would reject it. Check the four secrets against the password-manager copy."
+            echo "::error::Certificate mismatch: the bundle is signed by '${signer:-nothing}', not the upload key ${UPLOAD_CERT_SHA1}. Play would reject it. Check the three secrets against the password-manager copy."
             exit 1
           fi
           echo "Signer matches the upload key: $signer"
