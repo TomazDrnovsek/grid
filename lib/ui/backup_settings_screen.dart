@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../app_theme.dart';
 import '../models/backup_models.dart';
 import '../providers/backup_provider.dart';
@@ -20,6 +21,9 @@ class BackupSettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
+  /// The installed package's version name and code (G-012).
+  final Future<PackageInfo> _packageInfo = PackageInfo.fromPlatform();
+
   bool _isOperationInProgress = false;
 
   void _onThemeChanged() {
@@ -123,13 +127,21 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
                 ),
               ),
 
-              // Version number at bottom (matching menu screen)
+              // Version name and code at bottom, read from the installed package (as on the menu)
               Container(
                 padding: const EdgeInsets.only(bottom: 48, left: 16, right: 16),
-                child: Text(
-                  'Version 1.0.1',
-                  style: AppTheme.body(isDark),
-                  textAlign: TextAlign.center,
+                child: FutureBuilder<PackageInfo>(
+                  future: _packageInfo,
+                  builder: (context, snapshot) {
+                    final info = snapshot.data;
+                    return Text(
+                      info == null
+                          ? ''
+                          : 'Version ${info.version} (${info.buildNumber})',
+                      style: AppTheme.body(isDark),
+                      textAlign: TextAlign.center,
+                    );
+                  },
                 ),
               ),
             ],

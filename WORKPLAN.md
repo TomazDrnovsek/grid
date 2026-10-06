@@ -33,10 +33,10 @@ Why is `DECISIONS.md`. How is `SPEC.md`, `ARCHITECTURE.md` and `OPERATIONS.md`. 
 
 ## Phase 1 — Debt release 1.0.4 (8)
 
-- [x] Clear the fixable `docs/DEBT.md` items and bump to `version: 1.0.4+8`, PR from `claude/kind-turing-8l7s6o` (owner's brief, 2026-10-06): the menu's real version (G-012), the backup manifest's app version, a smoke test in the gate (G-013), `build.gradle`'s missing ProGuard file and comments, the unused `BackupCheckpoint`, the guard hook's quoted-text refusals. The highest code in Play Console is 7 (owner, 2026-10-06)
+- [x] Clear the fixable `docs/DEBT.md` items and bump to `version: 1.0.4+8`, PR from `claude/kind-turing-8l7s6o` (owner's brief, 2026-10-06): the real version on the menu and the Local Backup screen (G-012), the backup manifest's app version, a smoke test in the gate (G-013), `build.gradle`'s missing ProGuard file and comments, the unused `BackupCheckpoint`, the guard hook's quoted-text refusals. The highest code in Play Console is 7 (owner, 2026-10-06)
 - [ ] PR merged on the owner's word (G-011)
 - [ ] `android-release` run on `main` green, artifact `grid-1.0.4-8` (OPERATIONS §3 steps 2–4)
-- [ ] Bundle 8 on internal testing, installed on the owner's phone; the menu shows `Version 1.0.4 (8)`; photos, order and profile survived the update (OPERATIONS §3 steps 5–6)
+- [ ] Bundle 8 on internal testing, installed on the owner's phone; the menu and the Local Backup screen show `Version 1.0.4 (8)`; photos, order and profile survived the update (OPERATIONS §3 steps 5–6)
 - [ ] 1.0.4 (8) promoted to production (OPERATIONS §3 step 7)
 
 ## Open decisions
