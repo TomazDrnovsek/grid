@@ -96,6 +96,7 @@ Entry shape: *What changed* · *Why* · *What is settled* · *What is not settle
 *Constraint.* Pinned to `^8.3.1`. 9.0 and later require Android Gradle Plugin 8.12.1, Gradle 8.13 and Kotlin 2.2.0 (its changelog), above this repository's pins (G-008). Moving to 9 waits for that toolchain upgrade. 8.3.1's Android manifest declares no permissions, so `SPEC.md` §9 and `privacy.html` are unchanged.
 *Not verified.* The line on a device.
 *Paths not taken.* A build-time constant passed with `--dart-define`: it would need the release workflow and every local build to pass it, a second path for the same value.
+*Superseded in part.* What the version line shows: G-017.
 
 **G-013 — The gate is `flutter analyze` and `flutter test` (2026-10-06; supersedes G-006's gate clause).** Asked for by the owner in the brief for release 1.0.4 (8), once the template counter test was replaced.
 
@@ -140,10 +141,17 @@ Entry shape: *What changed* · *Why* · *What is settled* · *What is not settle
 *Verified.* `flutter analyze` and `flutter test`, with tests in `test/carousel_test.dart` for grouping rows into tiles, the stored order, the database row round trip, and the manifest round trip through `CloudManifestRepository` with an in-memory folder, including a backup made before carousels. `test/carousel_widgets_test.dart` mounts the "Add as" dialog and the carousel preview at 360 by 740: both buttons, the disabled Carousel over 20 photos, tap outside to cancel, swipe to the next slide and tap to close. It first failed on the dialog's buttons, whose fixed height overflowed when the label wrapped; they now have a minimum size instead. The grouping test fails when the sort by slide position is removed (a temporary edit, reverted). The two `ALTER TABLE` statements were run against a version 2 `photos` table with a row in SQLite 3.45; the row kept its values and read null in both new columns.
 *Paths not taken.* The `tags` column or the manifest item `metadata` map, which reuse fields for a new meaning (above). A chooser before the picker: an extra tap on every import. Sharing only the cover: it leaves out the carousel's content.
 
+**G-017 — The app shows the version name only, never the build code (2026-10-06; supersedes G-012's `Version <name> (<code>)`).** The owner, after 1.0.4 (9) showed "Version 1.0.4 (9)": "never put in game the additional number except the main game version".
+
+*What changed.* The menu's version line and the Local Backup screen's read `Version <name>`, for example "Version 1.0.5" (`SPEC.md` §8). Both still read `PackageInfo` (G-012).
+*What is settled.* The build code stays where it is needed, in `pubspec.yaml` and Play Console (G-005), and is not shown in the app.
+*Not verified.* The line on a device.
+
 ## §9 Superseded index
 
 | ID | Subject | Superseded by |
 | --- | --- | --- |
+| G-012 (version line format only) | What the version line shows | G-017 |
 | G-010 (merge clause only) | Who merges | G-011 |
 | G-006 (gate clause only) | The gate | G-013 |
 | G-004 (minimum SDK only) | Minimum SDK | G-014 |
