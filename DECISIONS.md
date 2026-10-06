@@ -113,6 +113,13 @@ Entry shape: *What changed* · *Why* · *What is settled* · *What is not settle
 *Not verified.* How many of Grid's users are on Android 5.0–6.x: Play Console shows it, this session cannot. The minimum of 24 rests on the owner's rejection message and developers' public reports from late September and October 2026; no Google documentation stating it was found.
 *Paths not taken.* Keeping 21 and turning protection off per release (the state since 1.0.3 (7)). Uploading bundle 8 first and raising the minimum in a later release: two releases instead of one.
 
+**G-015 — The privacy policy names every permission and what Local Backup does with a cloud folder (2026-10-06; decides O-3).** The owner, on the remaining `docs/DEBT.md` items: "do it all".
+
+*What changed.* `privacy.html` adds `READ_EXTERNAL_STORAGE` (Android 12 and older) and `INTERNET` (opening the support link; the app sends no data) to its permissions, matching `AndroidManifest.xml`. Under Photo Storage it adds that Local Backup copies photos and their order into a folder the user chooses, only when the user starts a backup, and that a cloud storage app owning that folder may sync it while Grid itself sends nothing. "No automatic uploads or syncing" stays: Grid does neither.
+*Approval.* The wording is approved by the owner in the PR that carries it, and quoted there (CLAUDE.md constraint 5).
+*Verified.* From code: the only network call is `launchUrl` for the Ko-fi link (`lib/ui/menu_screen.dart`); a backup starts only from the Local Backup screen's button (`lib/ui/backup_settings_screen.dart`).
+*Not verified.* The Play Data safety form against the same facts: Play Console, owner's task (`WORKPLAN.md` Backlog).
+
 ## §9 Superseded index
 
 | ID | Subject | Superseded by |
@@ -133,7 +140,7 @@ Entry shape: *What changed* · *Why* · *What is settled* · *What is not settle
 - **O-1 README.** `README.md` is Flutter's template text, and it is also the Pages index page. Options: keep it; replace it with a one-line description; or make it a pointer to `SPEC.md` §0 (the guide's default for a public repository). Changing it changes the public site's root page.
 - **O-2 Scaffolding folders.** `ios/`, `macos/`, `linux/`, `windows/` and `web/` are unshipped Flutter scaffolding. Keep them, or delete them in one PR?
 - **O-4 Android 5.0 support versus Play automatic protection.** Decided 2026-10-06: minimum SDK 24, protection on (G-014).
-- **O-3 Privacy wording versus backup.** `privacy.html` says "No automatic uploads or syncing" and lists two permissions. The manifest also declares `INTERNET` and a legacy storage permission, and a backup folder may belong to a cloud drive's document provider. Does the policy text change? It is owner-approved text (CLAUDE.md constraint 5); the Play Data safety form should be checked against the same facts.
+- **O-3 Privacy wording versus backup.** Decided 2026-10-06: the policy names all four permissions and the backup folder case (G-015).
 
 ## §12 Deliberately deferred
 
