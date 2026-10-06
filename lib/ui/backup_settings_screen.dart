@@ -514,7 +514,7 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // ✅ Title only: "Are you sure?"
+                      // ✅ Title only: \"Are you sure?\"
                       Text(
                         'Are you sure?',
                         textAlign: TextAlign.center,

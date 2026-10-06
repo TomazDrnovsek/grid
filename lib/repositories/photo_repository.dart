@@ -27,9 +27,9 @@ class PhotoRepository {
   final PhotoDatabase _database = PhotoDatabase();
   final ThumbnailService _thumbnailService = ThumbnailService();
 
-  // ========================================================================
+  // ==========================================================================
   // PHASE 2: UUID GENERATION UTILITY (NEW)
-  // ========================================================================
+  // ==========================================================================
 
   /// Generate a unique photo ID using secure random
   String _generatePhotoId() {
@@ -40,9 +40,9 @@ class PhotoRepository {
     return 'photo_${timestamp}_$randomHex';
   }
 
-  // ========================================================================
+  // ==========================================================================
   // PHASE 3: BATCH OPERATION TRACKING & PERFORMANCE INTEGRATION
-  // ========================================================================
+  // ==========================================================================
 
   /// Batch operation metrics tracking
   final BatchMetrics _batchMetrics = const BatchMetrics();
@@ -56,9 +56,9 @@ class PhotoRepository {
   /// Get active batch operations
   Map<String, BatchOperationStatus> getActiveBatchOperations() => Map.unmodifiable(_activeBatchOperations);
 
-  // ========================================================================
+  // ==========================================================================
   // ENHANCED DATABASE OPERATIONS WITH MIGRATION SUPPORT
-  // ========================================================================
+  // ==========================================================================
 
   /// PHASE 2: Add new photos to database with UUID generation (UPDATED)
   Future<void> addPhotosToDatabase(List<ProcessedImage> processedImages) async {
@@ -109,7 +109,7 @@ class PhotoRepository {
         }
       }
 
-      // ðŸ”§ SURGICAL FIX #1:
+      // 🛠 SURGICAL FIX #1:
       // Authoritative reindex so DB persists the same "newest-first" order as the UI (0 = top).
       // Requires PhotoDatabase.updatePhotoOrdersByPaths([...]) helper.
       if (newPaths.isNotEmpty) {
@@ -162,7 +162,7 @@ class PhotoRepository {
 
     try {
       if (kDebugMode) {
-        debugPrint('ðŸ”„ Processing ${imageFiles.length} images with initial thumbnails');
+        debugPrint('🔄 Processing ${imageFiles.length} images with initial thumbnails');
       }
 
       final List<ProcessedImage> processedImages = [];
@@ -189,11 +189,11 @@ class PhotoRepository {
           successCount++;
 
           if (kDebugMode) {
-            debugPrint('âœ… Successfully processed: ${processedImage.image.path}');
+            debugPrint('✅ Successfully processed: ${processedImage.image.path}');
           }
         } catch (e) {
           if (kDebugMode) {
-            debugPrint('âŒ Error processing ${imageFile.path}: $e');
+            debugPrint('❌ Error processing ${imageFile.path}: $e');
           }
           errors.add(e.toString());
           failureCount++;
@@ -269,8 +269,8 @@ class PhotoRepository {
       PerformanceMonitor.instance.endOperation('load_all_photos');
 
       if (kDebugMode) {
-        debugPrint('âœ… Load completed in ${stopwatch.elapsedMilliseconds}ms');
-        debugPrint('ðŸ“ Images: ${images.length}, Thumbnails: ${thumbnails.length}');
+        debugPrint('✅ Load completed in ${stopwatch.elapsedMilliseconds}ms');
+        debugPrint('📂 Images: ${images.length}, Thumbnails: ${thumbnails.length}');
       }
 
       return LoadPhotosResult(
@@ -542,9 +542,9 @@ class PhotoRepository {
     return 'F';
   }
 
-  // ========================================================================
+  // ==========================================================================
   // LEGACY MIGRATION SUPPORT
-  // ========================================================================
+  // ==========================================================================
 
   /// Perform one-time migration from SharedPreferences to database
   Future<void> _performLegacyMigrationIfNeeded() async {
@@ -602,7 +602,7 @@ class PhotoRepository {
             await _database.insertPhoto(entry);
 
             if (kDebugMode) {
-              debugPrint('Migrated legacy photo: $imagePath â†’ $uuid');
+              debugPrint('Migrated legacy photo: $imagePath → $uuid');
             }
           } catch (e) {
             if (kDebugMode) {
@@ -635,9 +635,9 @@ class PhotoRepository {
     }
   }
 
-  // ========================================================================
+  // ==========================================================================
   // PHASE 2: NEW UUID-BASED UTILITY METHODS
-  // ========================================================================
+  // ==========================================================================
 
   /// Get all photo UUIDs in current order
   Future<List<String>> getAllPhotoUuids() async {
@@ -718,9 +718,9 @@ class PhotoRepository {
     await _database.close();
   }
 
-  // ========================================================================
+  // ==========================================================================
   // BACKWARD COMPATIBILITY ALIASES (DON'T REMOVE)
-  // ========================================================================
+  // ==========================================================================
 
   /// Alias for loadAllPhotos - maintains backward compatibility
   Future<LoadPhotosResult> loadAllSavedPhotos() async {
@@ -737,7 +737,7 @@ class PhotoRepository {
     try {
       if (kDebugMode) {
         debugPrint('================================');
-        debugPrint('ðŸ“± PHOTO REPOSITORY STATUS');
+        debugPrint('📱 PHOTO REPOSITORY STATUS');
         debugPrint('================================');
 
         // Check migration
@@ -779,20 +779,20 @@ class PhotoRepository {
 
         // Determine migration status
         if (migrationComplete == true) {
-          debugPrint('âœ… Migration: COMPLETED - App is using database with UUIDs');
+          debugPrint('✅ Migration: COMPLETED - App is using database with UUIDs');
         } else if (photosInDb > 0) {
-          debugPrint('ðŸ”„ Migration: Database has photos but not marked complete');
+          debugPrint('🔄 Migration: Database has photos but not marked complete');
         } else if ((legacyPaths?.length ?? 0) > 0) {
-          debugPrint('â³ Migration: NEEDED - SharedPreferences data exists');
+          debugPrint('⌛ Migration: NEEDED - SharedPreferences data exists');
         } else {
-          debugPrint('ðŸ†• Migration: NOT NEEDED - Fresh install or no data');
+          debugPrint('🆕 Migration: NOT NEEDED - Fresh install or no data');
         }
 
-        debugPrint('ðŸš€ Processing: LAZY THUMBNAILS - Fast initial load, background generation');
-        debugPrint('ðŸ”„ Batching: PHASE 3 REPOSITORY INTEGRATION - Enhanced tracking active');
-        debugPrint('âœ… ORDER FIX: Photo ordering bug FIXED - database matches UI order');
-        debugPrint('ðŸ†” UUID SYSTEM: Stable photo IDs for cross-device order preservation');
-        debugPrint('ðŸŽ¯ BUG FIXED: No more photo order reversal after app restart');
+        debugPrint('🚀 Processing: LAZY THUMBNAILS - Fast initial load, background generation');
+        debugPrint('🔄 Batching: PHASE 3 REPOSITORY INTEGRATION - Enhanced tracking active');
+        debugPrint('✅ ORDER FIX: Photo ordering bug FIXED - database matches UI order');
+        debugPrint('🆔 UUID SYSTEM: Stable photo IDs for cross-device order preservation');
+        debugPrint('🎯 BUG FIXED: No more photo order reversal after app restart');
         debugPrint('================================');
       }
     } catch (e) {

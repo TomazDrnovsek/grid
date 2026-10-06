@@ -1,0 +1,11 @@
+# docs/DEBT.md — known wrong, stale or unfinished
+
+A working list, not a record. An item is added the moment it is found and **deleted** by the change that fixes it: no strikethroughs, no history. Each item is checkable: file, place, what is wrong. Not here: open questions (`DECISIONS.md` §11), unverified claims (`DECISIONS.md` §13), tastes.
+
+- `test/widget_test.dart` — Flutter's template "Counter increments" test. It pumps `GridApp` and looks for a counter that does not exist, so `flutter test` fails. It keeps tests out of the gate (`CLAUDE.md` §3).
+- `lib/ui/menu_screen.dart` — the menu's version line is the hard-coded string `'Version 1.0.2'`; production is 1.0.3. It should read the real version (`SPEC.md` §8).
+- `lib/constants.dart` — `appVersion = '1.0.0'` and `appBuildNumber = '1'` are stale copies of `pubspec.yaml` `version:` (G-005). Find what reads them before changing anything.
+- `android/app/build.gradle` — `proguardFiles … 'proguard-rules.pro'` names a file that does not exist in `android/app/`. Release builds succeed without it (2026-10-06). Either the reference goes, or a rules file with a reason arrives.
+- `lib/models/backup_models.dart` — `BackupCheckpoint` (with its generated code) is referenced nowhere else in `lib/`. It is either unfinished resumable-backup work or dead code; grep the whole repository before deciding (GUARDRAILS 3).
+- `privacy.html` versus `AndroidManifest.xml` — the policy lists two permissions; the manifest declares four (`SPEC.md` §9). Changing the wording is owner-approved text (`DECISIONS.md` §11 O-3).
+- `android/app/build.gradle` — two comments are false. "Production package name (you can adjust this)" sits on the namespace, which is an address and cannot change (`CLAUDE.md` §6). "Read from key.properties file (we'll create this next)" describes a step from 2025. Other comments describe the edits that were made, not the code.

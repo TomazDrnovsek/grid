@@ -5,6 +5,24 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader('UTF-8') { reader ->
+        localProperties.load(reader)
+    }
+}
+
+def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
+if (flutterVersionCode == null) {
+    flutterVersionCode = '1'
+}
+
+def flutterVersionName = localProperties.getProperty('flutter.versionName')
+if (flutterVersionName == null) {
+    flutterVersionName = '1.0'
+}
+
 dependencies {
     // ✅ UNCHANGED: Keep existing working dependencies
     implementation "androidx.documentfile:documentfile:1.1.0"
@@ -17,8 +35,8 @@ android {
     // 🚨 CRITICAL CHANGE: Production package name (you can adjust this)
     namespace = "si.tomazdrnovsek.grid"
 
-    // ✅ GOOGLE PLAY REQUIREMENT: Explicit API 35 for new apps (Aug 2025+)
-    compileSdk = 35
+    // ✅ GOOGLE PLAY REQUIREMENT: Explicit API 36 for new apps (Aug 2026+)
+    compileSdk = 36
     ndkVersion = "27.0.12077973"
 
     compileOptions {
@@ -34,15 +52,15 @@ android {
         // 🚨 CRITICAL CHANGE: Must match namespace above
         applicationId = "si.tomazdrnovsek.grid"
 
-        // ✅ UNCHANGED: Keep existing minimum SDK support
-        minSdk = flutter.minSdkVersion
+        // 🚨 CRITICAL: Explicitly set minSdk to 21 (Android 5.0) 
+        // to recover the ~21,000 devices lost when using defaults.
+        minSdk = 21
 
-        // 🚨 GOOGLE PLAY REQUIREMENT: Explicit API 35 target
-        targetSdk = 35
+        // 🚨 GOOGLE PLAY REQUIREMENT (Aug 2026): Target API 36
+        targetSdk = 36
 
-        // ✅ PRODUCTION VERSIONING: Ready for first release
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode flutterVersionCode.toInteger()
+        versionName flutterVersionName
     }
 
     // 🔐 SIGNING CONFIGURATION: Will read from key.properties
