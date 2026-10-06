@@ -51,9 +51,8 @@ android {
         // An address: never changes (CLAUDE.md §6). Same value as namespace
         applicationId = "si.tomazdrnovsek.grid"
 
-        // 🚨 CRITICAL: Explicitly set minSdk to 21 (Android 5.0) 
-        // to recover the ~21,000 devices lost when using defaults.
-        minSdk = 21
+        // Android 7.0: Play automatic protection requires a minimum SDK of 24 (G-014)
+        minSdk = 24
 
         // 🚨 GOOGLE PLAY REQUIREMENT (Aug 2026): Target API 36
         targetSdk = 36
