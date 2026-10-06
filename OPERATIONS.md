@@ -30,7 +30,7 @@ The certificate fingerprints are public facts about a public certificate. They a
 
 ## §2 Delivery of a change
 
-Branch → `flutter analyze` → PR → CI (`quality.yml`) green, or the failing step read → owner merges (G-010). A merge deploys nothing except the GitHub Pages site (§4). A merged change reaches users only through a release (§3).
+Branch → `flutter analyze` and `flutter test` → PR → CI (`quality.yml`) green, or the failing step read → owner merges (G-010). A merge deploys nothing except the GitHub Pages site (§4). A merged change reaches users only through a release (§3).
 
 ## §3 Release
 

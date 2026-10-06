@@ -48,7 +48,7 @@ Entry shape: *What changed* · *Why* · *What is settled* · *What is not settle
 *What is settled.*
 - Chat plans and writes briefs and never writes to the repository. A Claude Code session implements one change on a `claude/…` branch and opens a PR. The owner merges.
 - This repository's documents are the only source of project state. The Claude Project's instructions are `docs/claude-project-instructions.md`.
-- Configuration: prefix `G-`; no work-order numbers (the PR is the unit); full document tier (there is a lockfile and a multi-step release); gate `flutter analyze`; CI on every PR; no hosting preview (G-010); secrets in Actions secrets plus the owner's password manager; no `.vercelignore` (no Vercel), with Jekyll exclusions in its place (G-009).
+- Configuration: prefix `G-`; no work-order numbers (the PR is the unit); full document tier (there is a lockfile and a multi-step release); gate `flutter analyze` (superseded by G-013); CI on every PR; no hosting preview (G-010); secrets in Actions secrets plus the owner's password manager; no `.vercelignore` (no Vercel), with Jekyll exclusions in its place (G-009).
 - The local clone is retired once a CI-built bundle has been accepted by Play and installed from internal testing (`WORKPLAN.md` Phase 0).
 
 *Paths not taken.* A private repository (G-003). Release builds on the Windows clone: a single machine is the failure this entry exists to remove. A Vercel project: there is no web build to preview.
@@ -96,11 +96,19 @@ Entry shape: *What changed* · *Why* · *What is settled* · *What is not settle
 *Not verified.* The line on a device.
 *Paths not taken.* A build-time constant passed with `--dart-define`: it would need the release workflow and every local build to pass it, a second path for the same value.
 
+**G-013 — The gate is `flutter analyze` and `flutter test` (2026-10-06; supersedes G-006's gate clause).** Asked for by the owner in the brief for release 1.0.4 (8), once the template counter test was replaced.
+
+*What changed.* `test/widget_test.dart` is a smoke test: `GridApp` builds its first screen, the splash, without an exception. `flutter test` runs after `flutter analyze` locally (`CLAUDE.md` §3) and in `quality.yml`.
+*What is settled.* A red test is a red gate.
+*What is not settled.* The test reaches the splash only. Reaching the grid needs fakes for sqflite, path_provider and shared_preferences, or app changes; neither has been asked for. `android-release.yml` still runs `flutter analyze` alone before building.
+*Verified.* The test passes, and fails when `SplashScreen.build` throws (a temporary edit, reverted).
+
 ## §9 Superseded index
 
 | ID | Subject | Superseded by |
 | --- | --- | --- |
 | G-010 (merge clause only) | Who merges | G-011 |
+| G-006 (gate clause only) | The gate | G-013 |
 
 ## §10 Assumptions still to validate
 

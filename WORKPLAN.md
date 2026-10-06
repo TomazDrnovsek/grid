@@ -46,7 +46,6 @@ Nothing.
 ## Backlog — each needs an owner brief before it is worked
 
 - Fix the debt items in `docs/DEBT.md` (each is a small PR).
-- Replace the template widget test with a real smoke test, then add `flutter test` to the gate.
 - Automatic upload to Play internal testing (`DECISIONS.md` §12 D-1).
 
 ## Done log

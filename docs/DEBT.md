@@ -2,7 +2,6 @@
 
 A working list, not a record. An item is added the moment it is found and **deleted** by the change that fixes it: no strikethroughs, no history. Each item is checkable: file, place, what is wrong. Not here: open questions (`DECISIONS.md` §11), unverified claims (`DECISIONS.md` §13), tastes.
 
-- `test/widget_test.dart` — Flutter's template "Counter increments" test. It pumps `GridApp` and looks for a counter that does not exist, so `flutter test` fails. It keeps tests out of the gate (`CLAUDE.md` §3).
 - `android/app/build.gradle` — `proguardFiles … 'proguard-rules.pro'` names a file that does not exist in `android/app/`. Release builds succeed without it (2026-10-06). Either the reference goes, or a rules file with a reason arrives.
 - `lib/models/backup_models.dart` — `BackupCheckpoint` (with its generated code) is referenced nowhere else in `lib/`. It is either unfinished resumable-backup work or dead code; grep the whole repository before deciding (GUARDRAILS 3).
 - GitHub Pages: the "pages build and deployment" run for merge `2a9a17a` (2026-10-06) built successfully, but its `deploy` job stayed "waiting" with no reviewers and no approve button. The site still serves the January deployment, so `privacy.html` is unaffected. Check whether the next merge deploys; if it also waits, look at Settings → Environments → `github-pages` and Settings → Pages.

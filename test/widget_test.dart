@@ -1,30 +1,24 @@
-// This is a basic Flutter widget test.
+// Smoke test: the app's first screen builds without throwing.
 //
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+// It pumps GridApp inside a ProviderScope, as main() does. It skips main()'s
+// service-locator setup, which nothing on the splash screen uses, and it
+// stops before the splash hands over to GridHomePage (about 2.3 s), whose
+// database and plugins are not available in a widget test.
 
-import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:grid/main.dart';
+import 'package:grid/ui/splash_screen.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const GridApp());
+  testWidgets('first screen builds without throwing', (tester) async {
+    await tester.pumpWidget(const ProviderScope(child: GridApp()));
+    await tester.pump(const Duration(milliseconds: 500));
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    expect(find.byType(SplashScreen), findsOneWidget);
+    expect(find.byType(SvgPicture), findsOneWidget);
   });
 }

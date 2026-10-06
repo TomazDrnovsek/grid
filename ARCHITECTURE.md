@@ -49,9 +49,9 @@ The hard constraints are `CLAUDE.md` §2. Their consequences for the architectur
 
 ## §6 Quality gate
 
-- **Gate:** `flutter analyze`, using `flutter_lints` (`analysis_options.yaml`). Clean as of G-006.
-- **CI:** `.github/workflows/quality.yml` runs `flutter pub get` and `flutter analyze` on every pull request and every push to `main`. It has read-only permissions and a 15-minute limit, and newer runs cancel older ones on the same ref.
-- **Tests:** none that pass. `test/widget_test.dart` is the template counter test (`docs/DEBT.md`).
+- **Gate:** `flutter analyze`, using `flutter_lints` (`analysis_options.yaml`), then `flutter test` (G-013).
+- **CI:** `.github/workflows/quality.yml` runs `flutter pub get`, `flutter analyze` and `flutter test` on every pull request and every push to `main`. It has read-only permissions and a 15-minute limit, and newer runs cancel older ones on the same ref.
+- **Tests:** one smoke test, `test/widget_test.dart`. It pumps `GridApp` in a `ProviderScope` and checks that the splash screen builds without an exception. It does not run `main()`'s service-locator setup and stops before the grid, whose database and plugins a widget test does not have.
 - **Release check:** the signing-certificate comparison inside `android-release.yml` (G-007). Its comparison was run by hand: it refused a throwaway-signed bundle and admitted the production one. The workflow has not run yet (`DECISIONS.md` G-007).
 
 ## §7 Release checklist
