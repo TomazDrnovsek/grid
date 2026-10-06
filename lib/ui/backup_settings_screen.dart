@@ -127,7 +127,7 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
                 ),
               ),
 
-              // Version name and code at bottom, read from the installed package (as on the menu)
+              // Version name at bottom, read from the installed package (as on the menu; G-017)
               Container(
                 padding: const EdgeInsets.only(bottom: 48, left: 16, right: 16),
                 child: FutureBuilder<PackageInfo>(
@@ -137,7 +137,7 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
                     return Text(
                       info == null
                           ? ''
-                          : 'Version ${info.version} (${info.buildNumber})',
+                          : 'Version ${info.version}',
                       style: AppTheme.body(isDark),
                       textAlign: TextAlign.center,
                     );

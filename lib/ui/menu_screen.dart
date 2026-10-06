@@ -125,7 +125,7 @@ class MenuScreen extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              // Version name and code at bottom, read from the installed package
+              // Version name at bottom, read from the installed package; no build code (G-017)
               Container(
                 padding: const EdgeInsets.only(bottom: 48, left: 16, right: 16),
                 child: FutureBuilder<PackageInfo>(
@@ -135,7 +135,7 @@ class MenuScreen extends StatelessWidget {
                     return Text(
                       info == null
                           ? ''
-                          : 'Version ${info.version} (${info.buildNumber})',
+                          : 'Version ${info.version}',
                       style: AppTheme.body(isDark),
                       textAlign: TextAlign.center,
                     );
