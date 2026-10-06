@@ -2,4 +2,3 @@
 
 A working list, not a record. An item is added the moment it is found and **deleted** by the change that fixes it: no strikethroughs, no history. Each item is checkable: file, place, what is wrong. Not here: open questions (`DECISIONS.md` §11), unverified claims (`DECISIONS.md` §13), tastes.
 
-- `privacy.html` versus `AndroidManifest.xml` — the policy lists two permissions; the manifest declares four (`SPEC.md` §9). Changing the wording is owner-approved text (`DECISIONS.md` §11 O-3).

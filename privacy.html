@@ -31,12 +31,15 @@
     <li>All photos remain on your device</li>
     <li>Grid only accesses photos you explicitly select</li>
     <li>No automatic uploads or syncing</li>
+    <li>Local Backup copies your photos and their order into a folder you choose, only when you start a backup. If that folder belongs to a cloud storage app on your phone, that app may sync it; Grid itself sends nothing.</li>
 </ul>
 
 <h2>Permissions</h2>
 <ul>
     <li><code>READ_MEDIA_IMAGES</code>: To display photos you select for planning</li>
     <li><code>READ_MEDIA_VISUAL_USER_SELECTED</code>: For Android 14+ photo picker</li>
+    <li><code>READ_EXTERNAL_STORAGE</code> (Android 12 and older): To display photos you select for planning</li>
+    <li><code>INTERNET</code>: To open the support link in your browser. Grid sends no data over the network.</li>
 </ul>
 
 <h2>Third-Party Services</h2>

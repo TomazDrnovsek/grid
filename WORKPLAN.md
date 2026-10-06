@@ -58,8 +58,8 @@ Nothing.
 
 ## Backlog — each needs an owner brief before it is worked
 
-- Fix the debt items in `docs/DEBT.md` (each is a small PR).
 - Automatic upload to Play internal testing (`DECISIONS.md` §12 D-1).
+- Owner: check the Play Data safety form against `privacy.html` as changed by G-015.
 
 ## Done log
 
@@ -68,3 +68,4 @@ Nothing.
 - 2026-10-06 — The Android SDK script's Maven Central mirror covers the Gradle Plugin Portal, PR from `claude/kind-turing-8l7s6o`.
 - 2026-10-06 — Minimum SDK 24 and `version: 1.0.4+9`, PR from `claude/kind-turing-8l7s6o` (G-014).
 - 2026-10-06 — 1.0.4 (9) in production; Phase 1 closed, PR from `claude/kind-turing-8l7s6o`.
+- 2026-10-06 — `docs/DEBT.md` emptied: Pages item dropped, `photo_provider.g.dart` regenerated, privacy policy matches the manifest (G-015), PR from `claude/kind-turing-8l7s6o`.

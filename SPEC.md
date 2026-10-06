@@ -85,7 +85,7 @@
 ## §9 Privacy and permissions
 
 - Permissions (`android/app/src/main/AndroidManifest.xml`): `READ_MEDIA_IMAGES`, `READ_MEDIA_VISUAL_USER_SELECTED`, `READ_EXTERNAL_STORAGE` up to API 32, and `INTERNET` (used by the support link).
-- The policy text is `privacy.html` (CLAUDE.md constraint 5). Where it and this section disagree, see `docs/DEBT.md`.
+- The policy text is `privacy.html` (CLAUDE.md constraint 5). It lists the same four permissions and says what Local Backup does with a cloud drive's folder (§7; `DECISIONS.md` G-015).
 - No analytics, advertising, tracking or accounts (§0).
 
 ## §10 Open
