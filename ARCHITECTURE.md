@@ -44,7 +44,6 @@ The hard constraints are `CLAUDE.md` §2. Their consequences for the architectur
 
 - `android/app/build.gradle` reads the signing config from `android/key.properties`: `storeFile`, `storePassword`, `keyAlias`, `keyPassword`. If Android Studio injects signing properties, those win. `storeFile` may be absolute; CI writes the keystore outside the checkout and points to it (G-007).
 - With no `key.properties`, a release build fails at `:app:signReleaseBundle` (`CLAUDE.md` §8).
-- `build.gradle` names a `proguard-rules.pro` that does not exist. The build succeeds without it (`docs/DEBT.md`).
 - The version name and code come from `pubspec.yaml` through `local.properties` (G-005).
 
 ## §6 Quality gate
