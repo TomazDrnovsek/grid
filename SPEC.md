@@ -80,7 +80,7 @@
 - **Local Backup** (§7).
 - **How to Use Grid**: a static guide to the features above (`lib/ui/how_to_use_screen.dart`). Its text is a second description of the app; when behaviour changes, it changes too.
 - A **Ko-fi** support link that opens `https://ko-fi.com/tomazdrnovsek` in the browser.
-- A version line. It is hard-coded and does not show the real version (`docs/DEBT.md`).
+- A version line, `Version <name> (<code>)`, read at runtime from the installed package (`DECISIONS.md` G-012). The Local Backup screen (§7) shows the same line. The name and code are the ones `pubspec.yaml` `version:` gave the build (G-005).
 
 ## §9 Privacy and permissions
 

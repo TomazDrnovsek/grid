@@ -27,12 +27,11 @@ These hold until a dated entry in `DECISIONS.md` says otherwise. If a task requi
 
 In a cloud session the SessionStart hook (`.claude/hooks/session-start.sh`) installs Flutter 3.32.8 and runs `flutter pub get`. It takes a few minutes on a fresh machine.
 
-- **Gate:** `flutter analyze`. Healthy output: `No issues found!`. CI runs the same on every PR (`.github/workflows/quality.yml`).
-- `flutter test` fails today: `test/widget_test.dart` is Flutter's template counter test and was never adapted (`docs/DEBT.md`). It is not part of the gate until it is replaced.
+- **Gate:** `flutter analyze`, then `flutter test` (G-013). Healthy output: `No issues found!`, then `All tests passed!`. CI runs both on every PR (`.github/workflows/quality.yml`).
 - **Code generation** after editing a `@freezed`, `@riverpod` or `@JsonSerializable` source: `dart run build_runner build --delete-conflicting-outputs`. The generated `*.freezed.dart` and `*.g.dart` files are committed.
 - **Android compile check** (optional; not a release): `bash docs/tools/android-sdk.sh` once per machine, then `flutter build apk --debug`. The first run downloads the SDK, NDK 27.0.12077973 and CMake, which takes several minutes.
 
-A green gate is a floor, never a verdict. No automated check here mounts a screen or touches a photo. Anything a user sees is unverified until it has been seen on a phone.
+A green gate is a floor, never a verdict. The only screen an automated check mounts is the splash (`test/widget_test.dart`); none touches a photo. Anything a user sees is unverified until it has been seen on a phone.
 
 ## 4. Working rules
 

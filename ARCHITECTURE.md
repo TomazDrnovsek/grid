@@ -22,6 +22,7 @@ The hard constraints are `CLAUDE.md` §2. Their consequences for the architectur
 | Images | image_picker, flutter_image_compress, palette_generator (dominant colour), flutter_svg (icons) | `lib/services/image_processor_service.dart`, `lib/services/dominant_color_service.dart` |
 | Native | Kotlin `MainActivity` exposing the Storage Access Framework over `MethodChannel` `com.grid/saf` | `android/app/src/main/kotlin/si/tomazdrnovsek/grid/MainActivity.kt`, `lib/repositories/saf_storage_provider.dart` |
 | Sharing, links | share_plus, url_launcher | `pubspec.yaml` |
+| Version at runtime | package_info_plus 8.x: the installed package's version name and code (G-012) | `lib/ui/menu_screen.dart` |
 | Android build | AGP 8.7.3, Kotlin 2.1.0, Gradle 8.12, NDK 27.0.12077973, compile/target 36, min 21 (G-004) | `android/settings.gradle.kts`, `android/gradle/wrapper/gradle-wrapper.properties`, `android/app/build.gradle` |
 | Release shrink | R8 minify and resource shrinking on, Android's default optimize rules | `android/app/build.gradle` `buildTypes.release` |
 
@@ -31,7 +32,7 @@ The hard constraints are `CLAUDE.md` §2. Their consequences for the architectur
 - **Legacy migration.** Versions before the database kept paths in SharedPreferences (`grid_image_paths`, `header_username`). `PhotoRepository` migrates them once and sets `database_migration_complete`. The legacy keys are addresses: an old install can still be carrying them.
 - **Profile.** One JSON object under `profile_data` (`lib/ui/profile_block.dart`).
 - **Dominant colours.** Cached under `dominant_colors_cache_v2`. The `_v2` is part of the address.
-- **Backup.** A folder chosen through Storage Access Framework, URI and name in `cloud_folder_uri` / `cloud_folder_name`. Inside it: the photo files and `manifest.json` (written via `manifest.json.tmp`), whose structure is `BackupManifest` in `lib/models/backup_models.dart` (`Constants.manifestVersion`). Each photo's SHA-256 is recorded in the manifest (`lib/services/backup_hasher.dart`). `BackupCheckpoint` is defined for resumable operations but is referenced nowhere outside its model (`docs/DEBT.md`).
+- **Backup.** A folder chosen through Storage Access Framework, URI and name in `cloud_folder_uri` / `cloud_folder_name`. Inside it: the photo files and `manifest.json` (written via `manifest.json.tmp`), whose structure is `BackupManifest` in `lib/models/backup_models.dart` (`Constants.manifestVersion`). Its `appVersion` field holds the installed version name (G-012). Each photo's SHA-256 is recorded in the manifest (`lib/services/backup_hasher.dart`).
 
 ## §4 Platform integration
 
@@ -43,14 +44,13 @@ The hard constraints are `CLAUDE.md` §2. Their consequences for the architectur
 
 - `android/app/build.gradle` reads the signing config from `android/key.properties`: `storeFile`, `storePassword`, `keyAlias`, `keyPassword`. If Android Studio injects signing properties, those win. `storeFile` may be absolute; CI writes the keystore outside the checkout and points to it (G-007).
 - With no `key.properties`, a release build fails at `:app:signReleaseBundle` (`CLAUDE.md` §8).
-- `build.gradle` names a `proguard-rules.pro` that does not exist. The build succeeds without it (`docs/DEBT.md`).
 - The version name and code come from `pubspec.yaml` through `local.properties` (G-005).
 
 ## §6 Quality gate
 
-- **Gate:** `flutter analyze`, using `flutter_lints` (`analysis_options.yaml`). Clean as of G-006.
-- **CI:** `.github/workflows/quality.yml` runs `flutter pub get` and `flutter analyze` on every pull request and every push to `main`. It has read-only permissions and a 15-minute limit, and newer runs cancel older ones on the same ref.
-- **Tests:** none that pass. `test/widget_test.dart` is the template counter test (`docs/DEBT.md`).
+- **Gate:** `flutter analyze`, using `flutter_lints` (`analysis_options.yaml`), then `flutter test` (G-013).
+- **CI:** `.github/workflows/quality.yml` runs `flutter pub get`, `flutter analyze` and `flutter test` on every pull request and every push to `main`. It has read-only permissions and a 15-minute limit, and newer runs cancel older ones on the same ref.
+- **Tests:** one smoke test, `test/widget_test.dart`. It pumps `GridApp` in a `ProviderScope` and checks that the splash screen builds without an exception. It does not run `main()`'s service-locator setup and stops before the grid, whose database and plugins a widget test does not have.
 - **Release check:** the signing-certificate comparison inside `android-release.yml` (G-007). Its comparison was run by hand: it refused a throwaway-signed bundle and admitted the production one. The workflow has not run yet (`DECISIONS.md` G-007).
 
 ## §7 Release checklist

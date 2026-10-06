@@ -24,7 +24,6 @@ if (flutterVersionName == null) {
 }
 
 dependencies {
-    // ✅ UNCHANGED: Keep existing working dependencies
     implementation "androidx.documentfile:documentfile:1.1.0"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2"
     implementation "androidx.activity:activity-ktx:1.10.1"
@@ -32,7 +31,7 @@ dependencies {
 }
 
 android {
-    // 🚨 CRITICAL CHANGE: Production package name (you can adjust this)
+    // An address: never changes (CLAUDE.md §6)
     namespace = "si.tomazdrnovsek.grid"
 
     // ✅ GOOGLE PLAY REQUIREMENT: Explicit API 36 for new apps (Aug 2026+)
@@ -49,7 +48,7 @@ android {
     }
 
     defaultConfig {
-        // 🚨 CRITICAL CHANGE: Must match namespace above
+        // An address: never changes (CLAUDE.md §6). Same value as namespace
         applicationId = "si.tomazdrnovsek.grid"
 
         // 🚨 CRITICAL: Explicitly set minSdk to 21 (Android 5.0) 
@@ -63,7 +62,7 @@ android {
         versionName flutterVersionName
     }
 
-    // 🔐 SIGNING CONFIGURATION: Will read from key.properties
+    // 🔐 SIGNING: Android Studio's injected properties if present, otherwise key.properties
     signingConfigs {
         release {
             if (project.hasProperty('android.injected.signing.store.file')) {
@@ -73,7 +72,8 @@ android {
                 keyAlias project.property('android.injected.signing.key.alias')
                 keyPassword project.property('android.injected.signing.key.password')
             } else {
-                // Read from key.properties file (we'll create this next)
+                // android/key.properties; CI writes it (G-007). Without it a release build
+                // fails at :app:signReleaseBundle (CLAUDE.md §8)
                 def keystoreProperties = new Properties()
                 def keystorePropertiesFile = rootProject.file('key.properties')
                 if (keystorePropertiesFile.exists()) {
@@ -92,15 +92,14 @@ android {
             // 🔐 PRODUCTION SIGNING: Use release keystore
             signingConfig signingConfigs.release
 
-            // 🚀 MINIMAL OPTIMIZATIONS: Safe for production
+            // R8 minification and resource shrinking, with Android's default optimize rules
             minifyEnabled = true
             shrinkResources = true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
         }
 
-        // ✅ UNCHANGED: Keep debug build as-is
+        // No overrides: Android's debug defaults
         debug {
-            // Keep existing debug configuration
         }
     }
 }

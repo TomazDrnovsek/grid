@@ -37,7 +37,7 @@ Entry shape: *What changed* · *Why* · *What is settled* · *What is not settle
 **G-005 — `pubspec.yaml` `version:` is the single source of the version name and code (reconstructed; 2026-07-22).** `android/app/build.gradle` reads `flutter.versionCode` and `flutter.versionName`, which Flutter writes from `pubspec.yaml`. Before this, the code and name were hard-coded in `build.gradle` and had drifted from `pubspec.yaml`.
 
 *What is settled.* A release changes `version:` and nothing else does. The code is a hand-kept integer that only goes up. It is never derived from a commit count, which a shallow clone makes meaningless. Play Console is the authority on which codes have been used, including codes uploaded to testing tracks only.
-*Not settled.* `Constants.appVersion` and the menu's version line are separate, stale copies (`docs/DEBT.md`).
+*Not settled.* `Constants.appVersion` and the menu's version line are separate, stale copies (`docs/DEBT.md`). → Settled by G-012.
 
 ## Workflow and delivery
 
@@ -48,7 +48,7 @@ Entry shape: *What changed* · *Why* · *What is settled* · *What is not settle
 *What is settled.*
 - Chat plans and writes briefs and never writes to the repository. A Claude Code session implements one change on a `claude/…` branch and opens a PR. The owner merges.
 - This repository's documents are the only source of project state. The Claude Project's instructions are `docs/claude-project-instructions.md`.
-- Configuration: prefix `G-`; no work-order numbers (the PR is the unit); full document tier (there is a lockfile and a multi-step release); gate `flutter analyze`; CI on every PR; no hosting preview (G-010); secrets in Actions secrets plus the owner's password manager; no `.vercelignore` (no Vercel), with Jekyll exclusions in its place (G-009).
+- Configuration: prefix `G-`; no work-order numbers (the PR is the unit); full document tier (there is a lockfile and a multi-step release); gate `flutter analyze` (superseded by G-013); CI on every PR; no hosting preview (G-010); secrets in Actions secrets plus the owner's password manager; no `.vercelignore` (no Vercel), with Jekyll exclusions in its place (G-009).
 - The local clone is retired once a CI-built bundle has been accepted by Play and installed from internal testing (`WORKPLAN.md` Phase 0).
 
 *Paths not taken.* A private repository (G-003). Release builds on the Windows clone: a single machine is the failure this entry exists to remove. A Vercel project: there is no web build to preview.
@@ -85,11 +85,30 @@ Entry shape: *What changed* · *Why* · *What is settled* · *What is not settle
 *What is settled.* The owner decides when a PR merges. A session merges when the owner says so in the conversation, after CI is green and the report is read. Without that instruction it pushes, opens the PR and stops. G-010's device-check rule for user-facing changes is unchanged.
 *Not settled.* Whether merges should also be approved in advance through the session's permission settings rather than case by case. That is the owner's setting, not a repository rule.
 
+## Dependencies
+
+**G-012 — The app reads its version at runtime with `package_info_plus` (2026-10-06).** Asked for by the owner in the brief for release 1.0.4 (8): the menu shows the real version name and build code instead of a hard-coded string.
+
+*What changed.* `package_info_plus` is a new dependency. The menu's version line, and the same line on the Local Backup screen (which read `'Version 1.0.1'`), read `PackageInfo.fromPlatform()` and show `Version <name> (<code>)` (`SPEC.md` §8). The backup manifest's `appVersion` field, which was filled from the stale `Constants.appVersion = '1.0.0'`, now gets the installed version name the same way; `Constants.appVersion` and `Constants.appBuildNumber` are gone. The field's name and type are unchanged (CLAUDE.md §6).
+*Why.* The version line was a hand-typed copy of `pubspec.yaml` and had drifted twice (G-005). The installed package carries the name and code Flutter wrote from `pubspec.yaml`, so reading it leaves `version:` as the only place a release changes.
+*What is settled.* No version name or code is typed into Dart source. A place that needs one asks `PackageInfo`.
+*Constraint.* Pinned to `^8.3.1`. 9.0 and later require Android Gradle Plugin 8.12.1, Gradle 8.13 and Kotlin 2.2.0 (its changelog), above this repository's pins (G-008). Moving to 9 waits for that toolchain upgrade. 8.3.1's Android manifest declares no permissions, so `SPEC.md` §9 and `privacy.html` are unchanged.
+*Not verified.* The line on a device.
+*Paths not taken.* A build-time constant passed with `--dart-define`: it would need the release workflow and every local build to pass it, a second path for the same value.
+
+**G-013 — The gate is `flutter analyze` and `flutter test` (2026-10-06; supersedes G-006's gate clause).** Asked for by the owner in the brief for release 1.0.4 (8), once the template counter test was replaced.
+
+*What changed.* `test/widget_test.dart` is a smoke test: `GridApp` builds its first screen, the splash, without an exception. `flutter test` runs after `flutter analyze` locally (`CLAUDE.md` §3) and in `quality.yml`.
+*What is settled.* A red test is a red gate.
+*What is not settled.* The test reaches the splash only. Reaching the grid needs fakes for sqflite, path_provider and shared_preferences, or app changes; neither has been asked for. `android-release.yml` still runs `flutter analyze` alone before building.
+*Verified.* The test passes, and fails when `SplashScreen.build` throws (a temporary edit, reverted).
+
 ## §9 Superseded index
 
 | ID | Subject | Superseded by |
 | --- | --- | --- |
 | G-010 (merge clause only) | Who merges | G-011 |
+| G-006 (gate clause only) | The gate | G-013 |
 
 ## §10 Assumptions still to validate
 

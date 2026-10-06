@@ -32,3 +32,6 @@ jobs:
 
       - name: Gate — flutter analyze
         run: flutter analyze
+
+      - name: Gate — flutter test
+        run: flutter test

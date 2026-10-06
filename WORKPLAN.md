@@ -9,12 +9,12 @@ Why is `DECISIONS.md`. How is `SPEC.md`, `ARCHITECTURE.md` and `OPERATIONS.md`. 
 
 ## Current phase
 
-**Phase 0 — Cloud migration** (G-006). Done when a bundle built by the workflow is live and the local clone is retired.
+**Phase 1 — Debt release 1.0.4 (8).** Done when 1.0.4 (8) is in production. Phase 0 is complete: every item below is checked.
 
 ## Phase map
 
 - Phase 0 — Cloud migration
-- Phase 1 — not yet defined. The candidates are in Backlog. Each needs an owner brief.
+- Phase 1 — Debt release 1.0.4 (8)
 
 ## Phase 0 — Cloud migration
 
@@ -31,6 +31,14 @@ Why is `DECISIONS.md`. How is `SPEC.md`, `ARCHITECTURE.md` and `OPERATIONS.md`. 
 - [x] 1.0.3 (7) does not go to production (owner, 2026-10-06): the menu still shows the hard-coded "Version 1.0.2" (`docs/DEBT.md`). Internal-test releases cannot be halted, so 7 stays on internal testing until a later code replaces it
 - [x] Local clone at `C:\Users\tomaz\Documents\grid` archived (owner, 2026-10-06)
 
+## Phase 1 — Debt release 1.0.4 (8)
+
+- [x] Clear the fixable `docs/DEBT.md` items and bump to `version: 1.0.4+8`, PR from `claude/kind-turing-8l7s6o` (owner's brief, 2026-10-06): the real version on the menu and the Local Backup screen (G-012), the backup manifest's app version, a smoke test in the gate (G-013), `build.gradle`'s missing ProGuard file and comments, the unused `BackupCheckpoint`, the guard hook's quoted-text refusals. The highest code in Play Console is 7 (owner, 2026-10-06)
+- [ ] PR merged on the owner's word (G-011)
+- [ ] `android-release` run on `main` green, artifact `grid-1.0.4-8` (OPERATIONS §3 steps 2–4)
+- [ ] Bundle 8 on internal testing, installed on the owner's phone; the menu and the Local Backup screen show `Version 1.0.4 (8)`; photos, order and profile survived the update (OPERATIONS §3 steps 5–6)
+- [ ] 1.0.4 (8) promoted to production (OPERATIONS §3 step 7)
+
 ## Open decisions
 
 `DECISIONS.md` §11. Not restated here.
@@ -46,9 +54,9 @@ Nothing.
 ## Backlog — each needs an owner brief before it is worked
 
 - Fix the debt items in `docs/DEBT.md` (each is a small PR).
-- Replace the template widget test with a real smoke test, then add `flutter test` to the gate.
 - Automatic upload to Play internal testing (`DECISIONS.md` §12 D-1).
 
 ## Done log
 
 - 2026-10-06 — Bootstrap onto the cloud-first workflow, PR from `claude/cloud-workflow-bootstrap` (G-006).
+- 2026-10-06 — Debt items and `version: 1.0.4+8`, PR from `claude/kind-turing-8l7s6o` (G-012, G-013).

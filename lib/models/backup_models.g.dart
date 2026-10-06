@@ -108,43 +108,6 @@ Map<String, dynamic> _$$BackupConfigImplToJson(_$BackupConfigImpl instance) =>
       'cloudFolderName': instance.cloudFolderName,
     };
 
-_$BackupCheckpointImpl _$$BackupCheckpointImplFromJson(
-  Map<String, dynamic> json,
-) => _$BackupCheckpointImpl(
-  operationId: json['operationId'] as String,
-  phase: $enumDecode(_$BackupPhaseEnumMap, json['phase']),
-  startedAt: DateTime.parse(json['startedAt'] as String),
-  lastUpdatedAt: json['lastUpdatedAt'] == null
-      ? null
-      : DateTime.parse(json['lastUpdatedAt'] as String),
-  lastProcessedIndex: (json['lastProcessedIndex'] as num).toInt(),
-  processedIds: (json['processedIds'] as List<dynamic>)
-      .map((e) => e as String)
-      .toList(),
-  failedIds: (json['failedIds'] as List<dynamic>)
-      .map((e) => e as String)
-      .toList(),
-  metadata: json['metadata'] as Map<String, dynamic>? ?? const {},
-);
-
-Map<String, dynamic> _$$BackupCheckpointImplToJson(
-  _$BackupCheckpointImpl instance,
-) => <String, dynamic>{
-  'operationId': instance.operationId,
-  'phase': _$BackupPhaseEnumMap[instance.phase]!,
-  'startedAt': instance.startedAt.toIso8601String(),
-  'lastUpdatedAt': instance.lastUpdatedAt?.toIso8601String(),
-  'lastProcessedIndex': instance.lastProcessedIndex,
-  'processedIds': instance.processedIds,
-  'failedIds': instance.failedIds,
-  'metadata': instance.metadata,
-};
-
-const _$BackupPhaseEnumMap = {
-  BackupPhase.backingUp: 'backingUp',
-  BackupPhase.restoring: 'restoring',
-};
-
 _$DeviceInfoImpl _$$DeviceInfoImplFromJson(Map<String, dynamic> json) =>
     _$DeviceInfoImpl(
       deviceId: json['deviceId'] as String,
