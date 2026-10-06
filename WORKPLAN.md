@@ -51,8 +51,11 @@ Phase 2 — Carousels. Phase 1 — Release 1.0.4 (9) is complete: 1.0.4 (9) is i
 - [x] `android-release` run 37489094908 on `main` dispatched by the session on the owner's word ("merge and build the aab.. v1.0.5", 2026-10-06). Bundle 10 is not uploaded: it shows the build code in the version line, which the owner ruled out (G-017)
 - [x] The version line shows the name only (G-017), and `version: 1.0.5+11`, PR #11, merged on the owner's word (2026-10-06)
 - [x] `android-release` run on `main` green, artifact `grid-1.0.5-11` (2026-10-06, run 37490005980 on `41bad3b`, dispatched by the session; run 37489094908 for bundle 10 cancelled) (OPERATIONS §3 steps 2–4)
-- [ ] Owner: bundle 11 on internal testing; carousels seen on a phone, including the update over an existing install and a backup and restore; the menu shows "Version 1.0.5" (G-010) (OPERATIONS §3 steps 5–6)
-- [ ] Owner: 1.0.5 (11) promoted to production (OPERATIONS §3 step 7)
+- [x] Owner: bundle 11 on internal testing, seen on the phone (2026-10-06). Two fixes asked for: a more compact carousel icon, and no underline under the preview's x/N tag (incident 7). Bundle 11 does not go to production
+- [ ] The carousel icon's squares closer together, no underline on overlay text, and `version: 1.0.5+12`, PR from `claude/trusting-lamport-nmx81h`
+- [ ] `android-release` run on `main` green, artifact `grid-1.0.5-12` (OPERATIONS §3 steps 2–4)
+- [ ] Owner: bundle 12 on internal testing; carousels seen on a phone, including the update over an existing install and a backup and restore; the menu shows "Version 1.0.5" (G-010) (OPERATIONS §3 steps 5–6)
+- [ ] Owner: 1.0.5 (12) promoted to production (OPERATIONS §3 step 7)
 
 ## Open decisions
 

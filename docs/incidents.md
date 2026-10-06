@@ -41,3 +41,10 @@ Entry shape: **N — date — what happened.** *Effect.* *Cause.* *Fix.* *Rule i
 *Cause.* Applying a rule's wording without asking what it protects.
 *Fix.* G-016; CLAUDE.md §6 reworded.
 *Rule.* GUARDRAILS 3 (ground every claim). First instance.
+
+**7 — 2026-10-06 — The carousel preview's x/N tag shipped with a yellow double underline.** The owner saw it on bundle 11 from internal testing. The preview and the "Add as" dialog sit in the home screen's top `Stack`, beside the `Scaffold`, with no `Material` above them. There, Flutter's fallback text style draws a yellow double underline under any text whose own style does not switch decoration off. The counter's style did not. The dialog's over-20 note had the same fault; it shows only past 20 photos, so the owner had not seen it.
+*Effect.* One internal-testing build with the underline; bundle 11 does not go to production. Fixed in 1.0.5 (12).
+*Cause.* `test/carousel_widgets_test.dart` mounted both widgets inside a `Scaffold`, which supplies `Material`, so the test ran in a context the app never has and could not see the fault. The existing `LoadingModal` in the same `Stack` already sets `decoration: TextDecoration.none`; that precedent was not read across.
+*Fix.* The counter style and the note set `decoration: TextDecoration.none`. The widget test now mounts both widgets in a `Stack` with no `Material`, as the app does, and asserts the decoration. It fails without the fix (reads `TextDecoration.underline`) and passes with it.
+*Rule.* GUARDRAILS 5 (verify in the real runtime) and 7 (a test proves only what it asserts). First instance.
+

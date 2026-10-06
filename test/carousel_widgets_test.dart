@@ -12,7 +12,9 @@ Future<void> _pumpAtPhoneSize(WidgetTester tester, Widget child) async {
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
-  await tester.pumpWidget(MaterialApp(home: Scaffold(body: child)));
+  // As in the app: the dialog and the preview sit in the home screen's top
+  // Stack, beside the Scaffold, with no Material above them
+  await tester.pumpWidget(MaterialApp(home: Stack(children: [child])));
   await tester.pump();
 }
 
@@ -57,6 +59,11 @@ void main() {
     );
 
     expect(find.text('A carousel holds up to 20 photos. You picked 25.'), findsOneWidget);
+    final note = tester.widget<RichText>(find.descendant(
+      of: find.text('A carousel holds up to 20 photos. You picked 25.'),
+      matching: find.byType(RichText),
+    ));
+    expect(note.text.style?.decoration, TextDecoration.none);
     await tester.tap(find.text('Carousel'));
     expect(carousel, 0);
   });
@@ -89,6 +96,12 @@ void main() {
     );
 
     expect(find.text('1/4'), findsOneWidget);
+    // No Material sits above the preview, so the counter must switch the
+    // underline off itself
+    final counter = tester.widget<RichText>(
+      find.descendant(of: find.text('1/4'), matching: find.byType(RichText)),
+    );
+    expect(counter.text.style?.decoration, TextDecoration.none);
     await tester.drag(find.byType(PageView), const Offset(-300, 0));
     await tester.pumpAndSettle();
     expect(find.text('2/4'), findsOneWidget);

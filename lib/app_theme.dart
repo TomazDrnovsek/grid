@@ -217,6 +217,10 @@ class AppTheme {
     color: AppColors.carouselCounterText,
     height: 1.2,
     fontFeatures: [FontFeature.tabularFigures()],
+    // The preview is an overlay with no Material above it, where Flutter
+    // would otherwise draw its yellow double underline
+    decoration: TextDecoration.none,
+    decorationColor: Colors.transparent,
   );
 
   // UPDATED: Switch styling properties - new custom styling
