@@ -23,3 +23,9 @@ Entry shape: **N — date — what happened.** *Effect.* *Cause.* *Fix.* *Rule i
 *Cause.* Staging everything after a command that writes generated files, without reading the list against the brief's fences.
 *Fix.* Stage by path, and restore `macos/` before staging, for as long as the dependency regenerates it. Whether the regenerated file should be committed is the owner's call under O-2.
 *Rule.* GUARDRAILS 1 (compare the diff against the stated boundary) and 11 (a tool run may write into the repository).
+
+**4 — 2026-10-06 — The Maven Central workaround missed the Gradle Plugin Portal.** `docs/tools/android-sdk.sh` rewrote repositories whose URL is Maven Central's to Google's mirror. Flutter's included build (`packages/flutter_tools/gradle`) declares no plugin repositories, so Gradle uses its implicit default, the Plugin Portal. The portal redirects what it does not host to `repo.maven.apache.org`, which answered 429. The first `flutter build apk --debug` of the 1.0.4 branch failed this way; Flutter's own retry succeeded. With an empty Gradle home, `./gradlew help --info` made 39 requests to `repo.maven.apache.org` and failed.
+*Effect.* One failed debug build, then a passing retry. No release affected: GitHub's runners are not rate-limited.
+*Cause.* The workaround was written for the repositories it could see and checked only on a build that happened to succeed (GUARDRAILS 11, "a runbook step that has not been run is an untested claim").
+*Fix.* The init script now puts the mirror first in every build's plugin repositories, keeping the portal after it. Same empty-home check: 0 requests to `repo.maven.apache.org`, build successful.
+*Rule.* GUARDRAILS 11. Second instance in this repository (after 2).

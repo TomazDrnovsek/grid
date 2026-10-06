@@ -6,8 +6,9 @@
 #
 # Also installs a Gradle init script that sends Maven Central requests to
 # Google's public mirror of it, because Maven Central answers 429 to the
-# cloud sandbox's shared egress (CLAUDE.md §8, observed 2026-10-06). The init
-# script lives in ~/.gradle, outside the repository.
+# cloud sandbox's shared egress (CLAUDE.md §8, observed 2026-10-06). That
+# includes plugin resolution, where the Gradle Plugin Portal redirects to
+# Maven Central. The init script lives in ~/.gradle, outside the repository.
 set -euo pipefail
 
 SDK="${ANDROID_HOME:-$HOME/android-sdk}"
@@ -40,8 +41,25 @@ def rewrite = { repos ->
     }
   }
 }
+// The Gradle Plugin Portal redirects whatever it does not host to Maven Central,
+// which the rewrite above cannot see. Plugin resolution asks the mirror first; a
+// file the mirror lacks is a 404 there, and Gradle moves on to the next repository.
+// An empty list means Gradle's implicit default, the portal, so it is kept.
+def mirrorFirst = { repos ->
+  if (repos.isEmpty()) {
+    repos.maven { url = MIRROR }
+    repos.gradlePluginPortal()
+  } else {
+    def m = repos.maven { url = MIRROR }
+    repos.remove(m)
+    repos.addFirst(m)
+  }
+}
 beforeSettings { s -> rewrite(s.pluginManagement.repositories); rewrite(s.buildscript.repositories) }
-settingsEvaluated { s -> rewrite(s.pluginManagement.repositories); rewrite(s.dependencyResolutionManagement.repositories) }
+settingsEvaluated { s ->
+  rewrite(s.pluginManagement.repositories); rewrite(s.dependencyResolutionManagement.repositories)
+  mirrorFirst(s.pluginManagement.repositories)
+}
 allprojects { rewrite(buildscript.repositories); rewrite(repositories) }
 EOF
 

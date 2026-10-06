@@ -85,7 +85,7 @@ Words, which may change: the app's display name, copy, the repository name.
 
 ## 8. Session gotchas
 
-- **Maven Central answers 429 to the cloud sandbox's shared egress** (observed 2026-10-06). `docs/tools/android-sdk.sh` installs a Gradle init script that sends Maven Central traffic to Google's public mirror of it, outside the repository. GitHub's runners are not affected.
+- **Maven Central answers 429 to the cloud sandbox's shared egress** (observed 2026-10-06). `docs/tools/android-sdk.sh` installs a Gradle init script that sends Maven Central traffic to Google's public mirror of it, outside the repository. That covers plugin resolution too, where the Gradle Plugin Portal redirects to Maven Central. GitHub's runners are not affected.
 - **A release build without `android/key.properties` fails at `:app:signReleaseBundle` with a bare `NullPointerException`.** That is the missing key, not a code fault. Debug builds don't need a key.
 - `flutter` prints a warning about running as root in a cloud session. It is harmless.
 - `build/` and `android/build/` are outputs and are ignored.
