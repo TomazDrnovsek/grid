@@ -126,6 +126,7 @@ Entry shape: *What changed* · *Why* · *What is settled* · *What is not settle
 - **A-1** GitHub's Ubuntu runner image installs whatever Android platform, build tools, NDK 27.0.12077973 and CMake the build asks for, as the cloud machine did on 2026-10-06. *Validated 2026-10-06:* the first `android-release` run passed every step.
 - **A-2** Play accepts a bundle built by the workflow (same upload key, higher code). *Validated 2026-10-06:* bundle 7 was accepted on internal testing once automatic protection was turned off for the release (O-4), and installed on the owner's phone.
 - **A-3** The prefix `G-` is unused in the owner's other repositories. The Bauhaus Suite repositories were not checked.
+- **A-4** Play accepts a bundle with minimum SDK 24 while automatic protection stays on (G-014). *Validated 2026-10-06:* bundle 9 was accepted on internal testing, uploaded under `OPERATIONS.md` §3 step 5 without turning protection off, and promoted to production. Play's warning at upload: 2,038 device models no longer supported compared with bundle 7 (phones 1,633, −12%; tablets 404, −6%; TV 1). Those are catalogue models, not users; how many of Grid's users were on Android 5.0–6.x is still not known.
 
 ## §11 Open decisions — nothing here is briefed as if decided
 
