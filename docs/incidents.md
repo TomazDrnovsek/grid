@@ -11,3 +11,9 @@ Entry shape: **N — date — what happened.** *Effect.* *Cause.* *Fix.* *Rule i
 *Cause.* "Read-only" was assumed of a command that writes (GUARDRAILS 11, "a tool run for the first time in a repository may write into it").
 *Fix.* Read another machine's repository with `git --no-optional-locks …`, or set `GIT_OPTIONAL_LOCKS=0`. Then check that no `.git/*.lock` remains.
 *Rule.* GUARDRAILS 11. First instance.
+
+**2 — 2026-10-06 — The release procedure missed a Play Console gate.** `OPERATIONS.md` §3 was written without knowing that Play automatic protection was on for the app and requires minimum SDK 24. The first upload of bundle 7 was rejected for its minimum SDK of 21. Re-uploading the same file then failed with "Version code 7 has already been used", because Play had stored the rejected bundle.
+*Effect.* Two failed attempts on the owner's side. No harm: bundle 7 was added from the library with protection turned off, and it installed.
+*Cause.* A procedure written from documentation and the repository, never run end to end before it was handed over (GUARDRAILS 11, "a runbook step that has not been run is an untested claim").
+*Fix.* OPERATIONS §3 step 5 now names both, and the minimum-SDK question is open decision O-4.
+*Rule.* GUARDRAILS 11. First instance in this repository.
