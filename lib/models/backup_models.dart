@@ -208,44 +208,6 @@ class BackupConfig with _$BackupConfig {
       _$BackupConfigFromJson(json);
 }
 
-/// Checkpoint for resumable operations
-@freezed
-class BackupCheckpoint with _$BackupCheckpoint {
-  const factory BackupCheckpoint({
-    required String operationId,
-    required BackupPhase phase,
-    required DateTime startedAt,
-    DateTime? lastUpdatedAt,
-    required int lastProcessedIndex,
-    required List<String> processedIds,
-    required List<String> failedIds,
-    @Default({}) Map<String, dynamic> metadata,
-  }) = _BackupCheckpoint;
-
-  factory BackupCheckpoint.fromJson(Map<String, dynamic> json) =>
-      _$BackupCheckpointFromJson(json);
-
-  const BackupCheckpoint._();
-
-  /// Create a new checkpoint from current state
-  BackupCheckpoint copyWithProgress({
-    required int newIndex,
-    String? newProcessedId,
-    String? newFailedId,
-  }) {
-    return copyWith(
-      lastProcessedIndex: newIndex,
-      lastUpdatedAt: DateTime.now(),
-      processedIds: newProcessedId != null
-          ? [...processedIds, newProcessedId]
-          : processedIds,
-      failedIds: newFailedId != null
-          ? [...failedIds, newFailedId]
-          : failedIds,
-    );
-  }
-}
-
 /// Device information for manifest metadata
 @freezed
 class DeviceInfo with _$DeviceInfo {
