@@ -923,6 +923,9 @@ class AddAsModal extends StatelessWidget {
                       textAlign: TextAlign.center,
                       style: AppTheme.body(isDark).copyWith(
                         color: AppColors.textSecondary(isDark),
+                        // An overlay with no Material above it: no underline
+                        decoration: TextDecoration.none,
+                        decorationColor: Colors.transparent,
                       ),
                     ),
                   ],
