@@ -32,7 +32,7 @@ The hard constraints are `CLAUDE.md` §2. Their consequences for the architectur
 - **Legacy migration.** Versions before the database kept paths in SharedPreferences (`grid_image_paths`, `header_username`). `PhotoRepository` migrates them once and sets `database_migration_complete`. The legacy keys are addresses: an old install can still be carrying them.
 - **Profile.** One JSON object under `profile_data` (`lib/ui/profile_block.dart`).
 - **Dominant colours.** Cached under `dominant_colors_cache_v2`. The `_v2` is part of the address.
-- **Backup.** A folder chosen through Storage Access Framework, URI and name in `cloud_folder_uri` / `cloud_folder_name`. Inside it: the photo files and `manifest.json` (written via `manifest.json.tmp`), whose structure is `BackupManifest` in `lib/models/backup_models.dart` (`Constants.manifestVersion`). Each photo's SHA-256 is recorded in the manifest (`lib/services/backup_hasher.dart`). `BackupCheckpoint` is defined for resumable operations but is referenced nowhere outside its model (`docs/DEBT.md`).
+- **Backup.** A folder chosen through Storage Access Framework, URI and name in `cloud_folder_uri` / `cloud_folder_name`. Inside it: the photo files and `manifest.json` (written via `manifest.json.tmp`), whose structure is `BackupManifest` in `lib/models/backup_models.dart` (`Constants.manifestVersion`). Its `appVersion` field holds the installed version name (G-012). Each photo's SHA-256 is recorded in the manifest (`lib/services/backup_hasher.dart`). `BackupCheckpoint` is defined for resumable operations but is referenced nowhere outside its model (`docs/DEBT.md`).
 
 ## §4 Platform integration
 

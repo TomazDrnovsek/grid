@@ -3,10 +3,10 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../constants.dart';
 import '../models/backup_models.dart';
 import '../repositories/cloud_manifest_repository.dart' as manifest;
 import '../repositories/photo_repository.dart';
@@ -863,7 +863,7 @@ class BackupRestoreRepository {
       version: 1,
       exportedAt: DateTime.now(),
       deviceId: deviceId,
-      appVersion: Constants.appVersion,
+      appVersion: (await PackageInfo.fromPlatform()).version,
       items: items,
       metadata: {
         'totalItems': items.length,

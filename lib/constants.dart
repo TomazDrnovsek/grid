@@ -4,8 +4,6 @@
 class Constants {
   // App Information
   static const String appName = 'Grid';
-  static const String appVersion = '1.0.0';
-  static const String appBuildNumber = '1';
 
   // Cloud Backup Constants
   static const String defaultCloudFolderName = 'Grid';
