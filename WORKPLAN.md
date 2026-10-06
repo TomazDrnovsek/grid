@@ -20,7 +20,7 @@ Why is `DECISIONS.md`. How is `SPEC.md`, `ARCHITECTURE.md` and `OPERATIONS.md`. 
 
 - [x] Production source of 1.0.3 (6) committed from the owner's clone (G-006)
 - [x] Document set, hooks, workflows, Jekyll exclusions (G-006, G-007, G-009)
-- [ ] Owner: the upload key and both passwords stored in the password manager (OPERATIONS §1)
+- [x] Owner: the upload key and both passwords stored in the password manager (OPERATIONS §1; owner, 2026-10-06)
 - [x] Owner: the three Actions secrets added (OPERATIONS §1)
 - [x] Bootstrap PR #1 merged on the owner's instruction (2026-10-06). Privacy page checked live afterwards (200). The Pages deploy of that merge was still "waiting" with no approval offered — `docs/DEBT.md`
 - [x] `docs/claude-project-instructions.md` in the Grid Project's instructions (read in the session context, 2026-10-06)
@@ -28,8 +28,8 @@ Why is `DECISIONS.md`. How is `SPEC.md`, `ARCHITECTURE.md` and `OPERATIONS.md`. 
 - [x] `version: 1.0.3+7`, so the first CI build carries a new code — carried as the last commit of the bootstrap PR (OPERATIONS §3 step 1)
 - [x] First `android-release` run green, certificate check passed, artifact `grid-1.0.3-7` (2026-10-06; validates `DECISIONS.md` §10 A-1). The run before it refused correctly while the secrets were missing
 - [x] Bundle 7 rolled out to internal testing and installed on the owner's phone; the owner reported "it worked" (2026-10-06; validates A-2). Play automatic protection had to be turned off for the release (OPERATIONS §3 step 5)
-- [ ] Decide whether 1.0.3 (7) goes to production. It is the same app as 6, rebuilt; promoting it is optional
-- [ ] Local clone at `C:\Users\tomaz\Documents\grid` archived (renamed or zipped, not deleted) once the item above is done
+- [x] 1.0.3 (7) does not go to production (owner, 2026-10-06): the menu still shows the hard-coded "Version 1.0.2" (`docs/DEBT.md`). Internal-test releases cannot be halted, so 7 stays on internal testing until a later code replaces it
+- [x] Local clone at `C:\Users\tomaz\Documents\grid` archived (owner, 2026-10-06)
 
 ## Open decisions
 
