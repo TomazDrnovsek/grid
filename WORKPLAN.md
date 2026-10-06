@@ -22,7 +22,7 @@ Why is `DECISIONS.md`. How is `SPEC.md`, `ARCHITECTURE.md` and `OPERATIONS.md`. 
 - [x] Document set, hooks, workflows, Jekyll exclusions (G-006, G-007, G-009)
 - [x] Owner: the upload key and both passwords stored in the password manager (OPERATIONS §1; owner, 2026-10-06)
 - [x] Owner: the three Actions secrets added (OPERATIONS §1)
-- [x] Bootstrap PR #1 merged on the owner's instruction (2026-10-06). Privacy page checked live afterwards (200). The Pages deploy of that merge was still "waiting" with no approval offered — `docs/DEBT.md`
+- [x] Bootstrap PR #1 merged on the owner's instruction (2026-10-06). Privacy page checked live afterwards (200). Its Pages deploy stalled; the next merge (#2) deployed, and the documents were confirmed excluded (G-009)
 - [x] `docs/claude-project-instructions.md` in the Grid Project's instructions (read in the session context, 2026-10-06)
 - [x] Hooks seen working in a live cloud session (2026-10-06): the SessionStart hook installed Flutter on resume; the guard refused a shallow-clone history query
 - [x] `version: 1.0.3+7`, so the first CI build carries a new code — carried as the last commit of the bootstrap PR (OPERATIONS §3 step 1)
