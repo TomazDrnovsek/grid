@@ -10,7 +10,7 @@
 
 **Users.** People who plan a social-media profile feed visually: creators, photographers, designers.
 
-**Devices.** Android phones, Android 5.0 (API 21) and later (G-004). Portrait phone layout. No tablet-specific layout, no iOS build (§11).
+**Devices.** Android phones, Android 7.0 (API 24) and later (G-014). Portrait phone layout. No tablet-specific layout, no iOS build (§11).
 
 **Principles.**
 1. Local only (CLAUDE.md constraint 4).

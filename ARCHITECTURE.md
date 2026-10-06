@@ -23,7 +23,7 @@ The hard constraints are `CLAUDE.md` §2. Their consequences for the architectur
 | Native | Kotlin `MainActivity` exposing the Storage Access Framework over `MethodChannel` `com.grid/saf` | `android/app/src/main/kotlin/si/tomazdrnovsek/grid/MainActivity.kt`, `lib/repositories/saf_storage_provider.dart` |
 | Sharing, links | share_plus, url_launcher | `pubspec.yaml` |
 | Version at runtime | package_info_plus 8.x: the installed package's version name and code (G-012) | `lib/ui/menu_screen.dart` |
-| Android build | AGP 8.7.3, Kotlin 2.1.0, Gradle 8.12, NDK 27.0.12077973, compile/target 36, min 21 (G-004) | `android/settings.gradle.kts`, `android/gradle/wrapper/gradle-wrapper.properties`, `android/app/build.gradle` |
+| Android build | AGP 8.7.3, Kotlin 2.1.0, Gradle 8.12, NDK 27.0.12077973, compile/target 36 (G-004), min 24 (G-014) | `android/settings.gradle.kts`, `android/gradle/wrapper/gradle-wrapper.properties`, `android/app/build.gradle` |
 | Release shrink | R8 minify and resource shrinking on, Android's default optimize rules | `android/app/build.gradle` `buildTypes.release` |
 
 ## §3 Data model

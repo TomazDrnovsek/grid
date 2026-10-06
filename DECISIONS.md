@@ -33,6 +33,7 @@ Entry shape: *What changed* · *Why* · *What is settled* · *What is not settle
 *What is settled.* Target API keeps pace with Play's requirement (CLAUDE.md constraint 6).
 *Verified (2026-10-06).* The production bundle's manifest reads `minSdkVersion 21`, `targetSdkVersion 36`, version code 6, name 1.0.3.
 *Paths not taken.* `abiFilters` to force 32-bit ABIs was proposed in the same session's plan and is not in the shipped `build.gradle`.
+*Superseded in part.* The minimum SDK: G-014.
 
 **G-005 — `pubspec.yaml` `version:` is the single source of the version name and code (reconstructed; 2026-07-22).** `android/app/build.gradle` reads `flutter.versionCode` and `flutter.versionName`, which Flutter writes from `pubspec.yaml`. Before this, the code and name were hard-coded in `build.gradle` and had drifted from `pubspec.yaml`.
 
@@ -103,12 +104,22 @@ Entry shape: *What changed* · *Why* · *What is settled* · *What is not settle
 *What is not settled.* The test reaches the splash only. Reaching the grid needs fakes for sqflite, path_provider and shared_preferences, or app changes; neither has been asked for. `android-release.yml` still runs `flutter analyze` alone before building.
 *Verified.* The test passes, and fails when `SplashScreen.build` throws (a temporary edit, reverted).
 
+**G-014 — Minimum SDK 24, so Play automatic protection stays on (2026-10-06; supersedes G-004's minimum SDK; decides O-4).** The owner, after reading the trade-off: "we do it all and then ship everything once instead of many builds. just proceed".
+
+*What changed.* `minSdk` goes from 21 (Android 5.0) to 24 (Android 7.0) in `android/app/build.gradle`. The first release carrying it is 1.0.4 (9). Bundle 8, built from the same code at minimum SDK 21, is not uploaded, so 1.0.4 ships once.
+*Why.* Play automatic protection rejects a bundle whose minimum SDK is below 24 (the owner's upload of bundle 7, 2026-10-06), and Google turns protection on for every new release. Keeping 21 meant turning it off by hand on every upload, and a forgotten step meant a rejected upload with its version code spent (incident 2).
+*What is settled.* Protection stays on. `OPERATIONS.md` §3 step 5 no longer turns it off.
+*Cost.* Phones on Android 5.0–6.x get no update after 1.0.3. They keep the version they have; Play stops offering Grid to new installs on them.
+*Not verified.* How many of Grid's users are on Android 5.0–6.x: Play Console shows it, this session cannot. The minimum of 24 rests on the owner's rejection message and developers' public reports from late September and October 2026; no Google documentation stating it was found.
+*Paths not taken.* Keeping 21 and turning protection off per release (the state since 1.0.3 (7)). Uploading bundle 8 first and raising the minimum in a later release: two releases instead of one.
+
 ## §9 Superseded index
 
 | ID | Subject | Superseded by |
 | --- | --- | --- |
 | G-010 (merge clause only) | Who merges | G-011 |
 | G-006 (gate clause only) | The gate | G-013 |
+| G-004 (minimum SDK only) | Minimum SDK | G-014 |
 
 ## §10 Assumptions still to validate
 
@@ -120,7 +131,7 @@ Entry shape: *What changed* · *Why* · *What is settled* · *What is not settle
 
 - **O-1 README.** `README.md` is Flutter's template text, and it is also the Pages index page. Options: keep it; replace it with a one-line description; or make it a pointer to `SPEC.md` §0 (the guide's default for a public repository). Changing it changes the public site's root page.
 - **O-2 Scaffolding folders.** `ios/`, `macos/`, `linux/`, `windows/` and `web/` are unshipped Flutter scaffolding. Keep them, or delete them in one PR?
-- **O-4 Android 5.0 support versus Play automatic protection** (found 2026-10-06). Play automatic protection (anti-tamper) requires minimum SDK 24 (Android 7.0); Grid's is 21 (G-004). Google switches the protection on for every new release, so each upload rejects the bundle until it is turned off for that release (OPERATIONS §3 step 5). The choice is between keeping Android 5.0–6.x devices and turning protection off on every release, or raising `minSdk` to 24 to get anti-tamper protection, which ends updates for those devices and reverses G-004. Production builds 6 and 7 shipped without protection.
+- **O-4 Android 5.0 support versus Play automatic protection.** Decided 2026-10-06: minimum SDK 24, protection on (G-014).
 - **O-3 Privacy wording versus backup.** `privacy.html` says "No automatic uploads or syncing" and lists two permissions. The manifest also declares `INTERNET` and a legacy storage permission, and a backup folder may belong to a cloud drive's document provider. Does the policy text change? It is owner-approved text (CLAUDE.md constraint 5); the Play Data safety form should be checked against the same facts.
 
 ## §12 Deliberately deferred

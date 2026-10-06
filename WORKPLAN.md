@@ -9,12 +9,12 @@ Why is `DECISIONS.md`. How is `SPEC.md`, `ARCHITECTURE.md` and `OPERATIONS.md`. 
 
 ## Current phase
 
-**Phase 1 — Debt release 1.0.4 (8).** Done when 1.0.4 (8) is in production. Phase 0 is complete: every item below is checked.
+**Phase 1 — Release 1.0.4 (9).** Done when 1.0.4 (9) is in production. Phase 0 is complete: every item below is checked.
 
 ## Phase map
 
 - Phase 0 — Cloud migration
-- Phase 1 — Debt release 1.0.4 (8)
+- Phase 1 — Release 1.0.4 (9)
 
 ## Phase 0 — Cloud migration
 
@@ -31,13 +31,17 @@ Why is `DECISIONS.md`. How is `SPEC.md`, `ARCHITECTURE.md` and `OPERATIONS.md`. 
 - [x] 1.0.3 (7) does not go to production (owner, 2026-10-06): the menu still shows the hard-coded "Version 1.0.2" (`docs/DEBT.md`). Internal-test releases cannot be halted, so 7 stays on internal testing until a later code replaces it
 - [x] Local clone at `C:\Users\tomaz\Documents\grid` archived (owner, 2026-10-06)
 
-## Phase 1 — Debt release 1.0.4 (8)
+## Phase 1 — Release 1.0.4 (9)
 
 - [x] Clear the fixable `docs/DEBT.md` items and bump to `version: 1.0.4+8`, PR from `claude/kind-turing-8l7s6o` (owner's brief, 2026-10-06): the real version on the menu and the Local Backup screen (G-012), the backup manifest's app version, a smoke test in the gate (G-013), `build.gradle`'s missing ProGuard file and comments, the unused `BackupCheckpoint`, the guard hook's quoted-text refusals. The highest code in Play Console is 7 (owner, 2026-10-06)
 - [x] PR #4 merged on the owner's word (G-011), 2026-10-06
 - [x] `android-release` run on `main` green, artifact `grid-1.0.4-8` (2026-10-06, run 37461406732 on `65c436a`; certificate check passed) (OPERATIONS §3 steps 2–4)
-- [ ] Bundle 8 on internal testing, installed on the owner's phone; the menu and the Local Backup screen show `Version 1.0.4 (8)`; photos, order and profile survived the update (OPERATIONS §3 steps 5–6)
-- [ ] 1.0.4 (8) promoted to production (OPERATIONS §3 step 7)
+- [x] Bundle 8 is not uploaded: 1.0.4 ships once, as code 9 (owner, 2026-10-06)
+- [x] The Android SDK script's mirror covers the Gradle Plugin Portal, PR #5 merged on the owner's word (2026-10-06)
+- [x] Minimum SDK 24 so Play automatic protection stays on, and `version: 1.0.4+9` (G-014), PR from `claude/kind-turing-8l7s6o`
+- [ ] `android-release` run on `main` green, artifact `grid-1.0.4-9` (OPERATIONS §3 steps 2–4)
+- [ ] Bundle 9 on internal testing with protection on, installed on the owner's phone; the menu and the Local Backup screen show `Version 1.0.4 (9)`; photos, order and profile survived the update (OPERATIONS §3 steps 5–6)
+- [ ] 1.0.4 (9) promoted to production (OPERATIONS §3 step 7)
 
 ## Open decisions
 
@@ -61,3 +65,4 @@ Nothing.
 - 2026-10-06 — Bootstrap onto the cloud-first workflow, PR from `claude/cloud-workflow-bootstrap` (G-006).
 - 2026-10-06 — Debt items and `version: 1.0.4+8`, PR from `claude/kind-turing-8l7s6o` (G-012, G-013).
 - 2026-10-06 — The Android SDK script's Maven Central mirror covers the Gradle Plugin Portal, PR from `claude/kind-turing-8l7s6o`.
+- 2026-10-06 — Minimum SDK 24 and `version: 1.0.4+9`, PR from `claude/kind-turing-8l7s6o` (G-014).
