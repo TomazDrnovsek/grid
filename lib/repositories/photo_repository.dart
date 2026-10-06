@@ -40,6 +40,46 @@ class PhotoRepository {
     return 'photo_${timestamp}_$randomHex';
   }
 
+  /// Generate a unique carousel ID, in the same shape as photo IDs
+  String _generateCarouselId() {
+    final random = Random.secure();
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final randomBytes = List<int>.generate(8, (i) => random.nextInt(256));
+    final randomHex = randomBytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return 'carousel_${timestamp}_$randomHex';
+  }
+
+  /// Groups photos, already in stored order, into grid tiles (G-016).
+  /// A photo outside any carousel is a tile of one. A carousel's photos form
+  /// one tile, sorted by carousel position; the tile sits where its first
+  /// photo sits in the stored order.
+  static List<List<PhotoDatabaseEntry>> groupIntoTiles(List<PhotoDatabaseEntry> photos) {
+    final tiles = <List<PhotoDatabaseEntry>>[];
+    final carouselTiles = <String, List<PhotoDatabaseEntry>>{};
+
+    for (final photo in photos) {
+      final carouselId = photo.carouselId;
+      if (carouselId == null) {
+        tiles.add([photo]);
+        continue;
+      }
+      final existing = carouselTiles[carouselId];
+      if (existing != null) {
+        existing.add(photo);
+      } else {
+        final tile = [photo];
+        carouselTiles[carouselId] = tile;
+        tiles.add(tile);
+      }
+    }
+
+    for (final tile in carouselTiles.values) {
+      tile.sort((a, b) => (a.carouselIndex ?? 0).compareTo(b.carouselIndex ?? 0));
+    }
+
+    return tiles;
+  }
+
   // ==========================================================================
   // PHASE 3: BATCH OPERATION TRACKING & PERFORMANCE INTEGRATION
   // ==========================================================================
@@ -61,7 +101,12 @@ class PhotoRepository {
   // ==========================================================================
 
   /// PHASE 2: Add new photos to database with UUID generation (UPDATED)
-  Future<void> addPhotosToDatabase(List<ProcessedImage> processedImages) async {
+  /// With [asCarousel], the photos become one carousel in the given order:
+  /// the first is the cover, and all of them share one carousel id (G-016).
+  Future<void> addPhotosToDatabase(
+      List<ProcessedImage> processedImages, {
+        bool asCarousel = false,
+      }) async {
     try {
       // Get current photo count for order indices
       final currentCount = await _database.getPhotoCount();
@@ -73,6 +118,8 @@ class PhotoRepository {
 
       // Track paths of newly inserted photos (for final authoritative reindex)
       final List<String> newPaths = [];
+
+      final String? carouselId = asCarousel ? _generateCarouselId() : null;
 
       // Insert each photo with generated UUID
       for (int i = 0; i < processedImages.length; i++) {
@@ -94,6 +141,8 @@ class PhotoRepository {
             fileSize: fileSize,
             dateAdded: DateTime.now(),
             orderIndex: orderIndex,
+            carouselId: carouselId,
+            carouselIndex: asCarousel ? newPaths.length : null,
           );
 
           await _database.insertPhoto(entry);
@@ -113,8 +162,10 @@ class PhotoRepository {
       // Authoritative reindex so DB persists the same "newest-first" order as the UI (0 = top).
       // Requires PhotoDatabase.updatePhotoOrdersByPaths([...]) helper.
       if (newPaths.isNotEmpty) {
+        // A carousel keeps its slides in picked order, cover first,
+        // so the stored order reads cover, slides, then the next tile.
         final finalOrderedPaths = <String>[
-          ...newPaths.reversed, // newly added should be at the top
+          ...(asCarousel ? newPaths : newPaths.reversed), // newly added at the top
           ...existingPaths,     // then all the older photos
         ];
         try {
@@ -242,25 +293,36 @@ class PhotoRepository {
         debugPrint('Loaded ${photos.length} photos from database');
       }
 
-      // Convert to File objects and collect paths
+      // Only include photos whose file exists
+      final existingPhotos = <PhotoDatabaseEntry>[];
+      for (final photo in photos) {
+        if (await File(photo.imagePath).exists()) {
+          existingPhotos.add(photo);
+        }
+      }
+
+      // Convert to File objects and collect paths. The grid gets one image per
+      // tile: a carousel's cover, with all its slides in [carousels] (G-016).
       final images = <File>[];
       final thumbnails = <File>[];
       final validPaths = <String>[];
+      final carousels = <String, List<File>>{};
 
-      for (final photo in photos) {
-        final imageFile = File(photo.imagePath);
+      for (final tile in groupIntoTiles(existingPhotos)) {
+        final cover = tile.first;
+        final imageFile = File(cover.imagePath);
+        images.add(imageFile);
+        validPaths.addAll(tile.map((p) => p.imagePath));
 
-        // Only include if file exists
-        if (await imageFile.exists()) {
-          images.add(imageFile);
-          validPaths.add(photo.imagePath);
+        if (tile.length > 1) {
+          carousels[cover.imagePath] = tile.map((p) => File(p.imagePath)).toList();
+        }
 
-          // Add thumbnail if exists
-          if (photo.thumbnailPath != null) {
-            final thumbnailFile = File(photo.thumbnailPath!);
-            if (await thumbnailFile.exists()) {
-              thumbnails.add(thumbnailFile);
-            }
+        // Add thumbnail if exists
+        if (cover.thumbnailPath != null) {
+          final thumbnailFile = File(cover.thumbnailPath!);
+          if (await thumbnailFile.exists()) {
+            thumbnails.add(thumbnailFile);
           }
         }
       }
@@ -277,6 +339,7 @@ class PhotoRepository {
         images: images,
         thumbnails: thumbnails,
         validPaths: validPaths,
+        carousels: carousels,
         migratedCount: 0, // Migration handled separately
         repairedCount: 0,
         isLazy: true, // Flag indicating lazy loading is active
@@ -397,6 +460,37 @@ class PhotoRepository {
     }
   }
 
+  /// Delete a carousel's slides other than its cover: database row, image and
+  /// thumbnail. The cover is deleted with the grid tile by [deleteImages].
+  Future<void> deleteSlides(List<File> slides) async {
+    for (final slide in slides) {
+      try {
+        final photo = await _database.getPhotoByPath(slide.path);
+        if (photo?.uuid != null) {
+          await _database.deletePhotoByUuid(photo!.uuid!);
+        } else {
+          await _database.deletePhotoByPath(slide.path);
+        }
+
+        if (await slide.exists()) {
+          await slide.delete();
+        }
+
+        final thumbnailPath = photo?.thumbnailPath;
+        if (thumbnailPath != null && thumbnailPath != slide.path) {
+          final thumbnail = File(thumbnailPath);
+          if (await thumbnail.exists()) {
+            await thumbnail.delete();
+          }
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('Error deleting slide ${slide.path}: $e');
+        }
+      }
+    }
+  }
+
   /// Cleanup orphaned thumbnails
   Future<int> cleanupOrphanedThumbnails(List<String> validImagePaths) async {
     try {
@@ -410,16 +504,18 @@ class PhotoRepository {
     }
   }
 
-  /// Share a single image file
-  Future<ShareResult> shareImage(File imageFile) async {
+  /// Share image files in one share sheet: one photo, or a carousel's slides
+  Future<ShareResult> shareImages(List<File> imageFiles) async {
     try {
-      // Verify file exists before sharing
-      if (!await imageFile.exists()) {
-        throw Exception('Image file no longer exists');
+      // Verify files exist before sharing
+      for (final imageFile in imageFiles) {
+        if (!await imageFile.exists()) {
+          throw Exception('Image file no longer exists');
+        }
       }
 
       await Share.shareXFiles(
-        [XFile(imageFile.path)],
+        imageFiles.map((f) => XFile(f.path)).toList(),
         text: 'Shared from Grid',
       );
 
@@ -806,6 +902,8 @@ class LoadPhotosResult {
   final List<File> images;
   final List<File> thumbnails;
   final List<String> validPaths;
+  /// Every slide of each carousel, cover first, keyed by the cover's path (G-016)
+  final Map<String, List<File>> carousels;
   final int migratedCount;
   final int repairedCount;
   final String? error;
@@ -815,6 +913,7 @@ class LoadPhotosResult {
     required this.images,
     required this.thumbnails,
     required this.validPaths,
+    this.carousels = const {},
     required this.migratedCount,
     required this.repairedCount,
     this.error,
@@ -822,6 +921,12 @@ class LoadPhotosResult {
   });
 
   bool get isSuccess => error == null;
+
+  /// Every photo in grid order: each tile's image, or each of a carousel's slides
+  List<File> get allImages => [
+    for (final image in images) ...(carousels[image.path] ?? [image]),
+  ];
+
   bool get hasMigrations => migratedCount > 0;
   bool get hasRepairs => repairedCount > 0;
 }

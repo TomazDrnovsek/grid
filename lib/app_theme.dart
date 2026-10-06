@@ -104,6 +104,12 @@ class AppColors {
   static const Color imagePreviewErrorIcon = Color(0xFFFFFFFF);  // White for error icon
   static const Color imagePreviewErrorText = Color(0xFFFFFFFF);  // White for error text
 
+  // Carousels (G-016): the tile icon and the preview's x/N tag, same in both themes
+  static const Color carouselIcon = Color(0xFFFFFFFF);            // White glyph on the photo
+  static const Color carouselIconShadow = Color(0x8C000000);      // ~55% black, keeps it legible on pale photos
+  static const Color carouselCounterBackground = Color(0xB3121212); // ~70% near-black pill
+  static const Color carouselCounterText = Color(0xFFFFFFFF);
+
   // Splash screen colors (unchanged - always dark)
   static const Color splashBackground = Color(0xFF1A1A1A);       // Dark background
 
@@ -201,6 +207,16 @@ class AppTheme {
     fontWeight: FontWeight.normal,
     color: AppColors.imagePreviewErrorText,
     height: 1.4,
+  );
+
+  // Carousel preview x/N tag (always white on its dark pill, G-016)
+  static const TextStyle carouselCounter = TextStyle(
+    fontFamily: 'Roboto',
+    fontSize: 12,
+    fontWeight: FontWeight.w500,
+    color: AppColors.carouselCounterText,
+    height: 1.2,
+    fontFeatures: [FontFeature.tabularFigures()],
   );
 
   // UPDATED: Switch styling properties - new custom styling

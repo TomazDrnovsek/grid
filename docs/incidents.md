@@ -29,3 +29,15 @@ Entry shape: **N — date — what happened.** *Effect.* *Cause.* *Fix.* *Rule i
 *Cause.* The workaround was written for the repositories it could see and checked only on a build that happened to succeed (GUARDRAILS 11, "a runbook step that has not been run is an untested claim").
 *Fix.* The init script now puts the mirror first in every build's plugin repositories, keeping the portal after it. Same empty-home check: 0 requests to `repo.maven.apache.org`, build successful.
 *Rule.* GUARDRAILS 11. Second instance in this repository (after 2).
+
+**5 — 2026-10-06 — A suggested task would have committed a file the owner had fenced off.** The SessionStart hook's `flutter pub get` regenerated `macos/Flutter/GeneratedPluginRegistrant.swift`, and the stop hook asked for the change to be committed. The session restored the file, correctly, and then queued a task suggestion to commit the regenerated file in its own PR, without first reading `docs/incidents.md`. Entry 3 says whether that file is committed is the owner's call under O-2.
+*Effect.* None. The suggestion was withdrawn in the same session, before it was started.
+*Cause.* A proposal written from the immediate symptom, without checking the incident log for the same file.
+*Fix.* Withdrawn. The regenerated file stays out of commits until O-2 is decided.
+*Rule.* GUARDRAILS 1 (never silently reopen a decision) and 11. Second instance of this file (after 3).
+
+**6 — 2026-10-06 — A design proposal read an address rule by its letter and recommended reusing a column.** The carousel proposal recommended storing carousel membership in the unused `tags` column and the manifest items' `metadata` map, to avoid "changing the schema" under CLAUDE.md §6. The rule exists to protect what shipped builds wrote; an additive, versioned migration does not touch that, and the repository already had one (version 1 to 2). Reusing a field named for something else is the riskier long-run choice.
+*Effect.* None in code. The owner asked why the rule existed and to pick the best option; the implementation uses two added columns, and §6 now says what it protects (G-016).
+*Cause.* Applying a rule's wording without asking what it protects.
+*Fix.* G-016; CLAUDE.md §6 reworded.
+*Rule.* GUARDRAILS 3 (ground every claim). First instance.

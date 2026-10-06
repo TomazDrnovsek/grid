@@ -318,6 +318,9 @@ class CloudManifestRepository {
         'exifTs': item.exifTs?.toIso8601String(),
         'sortIndex': item.sortIndex,
         'metadata': item.metadata,
+        // Optional keys (G-016); older app versions ignore them
+        if (item.carouselId != null) 'carouselId': item.carouselId,
+        if (item.carouselIndex != null) 'carouselIndex': item.carouselIndex,
       }).toList(),
       'metadata': manifest.metadata,
     };
@@ -358,6 +361,8 @@ class CloudManifestRepository {
         exifTs: itemJson['exifTs'] != null ? DateTime.parse(itemJson['exifTs'] as String) : null,
         sortIndex: itemJson['sortIndex'] as int? ?? 0,
         metadata: (itemJson['metadata'] as Map<String, dynamic>?) ?? {},
+        carouselId: itemJson['carouselId'] as String?,
+        carouselIndex: itemJson['carouselIndex'] as int?,
       );
     } catch (e) {
       throw CloudManifestException('Failed to deserialize backup item: $e');

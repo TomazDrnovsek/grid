@@ -19,6 +19,11 @@ class PhotoState with _$PhotoState {
     /// PHASE 2: List of photo UUIDs corresponding to images (for backup/restore order preservation)
     @Default(<String>[]) List<String> imageUuids,
 
+    /// Carousels: every slide in order, cover first, keyed by the cover's path.
+    /// [images] holds one file per grid tile, so a carousel appears there as
+    /// its cover only (G-016).
+    @Default(<String, List<File>>{}) Map<String, List<File>> carousels,
+
     /// Set of selected image indexes
     @Default({}) Set<int> selectedIndexes,
 
@@ -27,6 +32,12 @@ class PhotoState with _$PhotoState {
 
     /// Delete confirmation modal state
     @Default(false) bool showDeleteConfirm,
+
+    /// "Add as" dialog: shown after picking two or more photos
+    @Default(false) bool showAddAsDialog,
+
+    /// Paths of the photos waiting in the "Add as" dialog, in picked order
+    @Default(<String>[]) List<String> pendingPickPaths,
 
     /// PHASE 1: Loading modal with progress state
     @Default(false) bool showLoadingModal,
@@ -108,6 +119,18 @@ class PhotoState with _$PhotoState {
   /// Check if all arrays (images, thumbnails) are in sync
   bool get arraysInSyncBasic {
     return images.length == thumbnails.length;
+  }
+
+  /// Every photo path in grid order: each tile's image, or each of a carousel's slides
+  List<String> get allImagePaths => [
+    for (final image in images)
+      ...(carousels[image.path] ?? [image]).map((f) => f.path),
+  ];
+
+  /// Slides of the carousel on the tile at [index], or null for a single photo
+  List<File>? carouselAt(int index) {
+    if (index < 0 || index >= images.length) return null;
+    return carousels[images[index].path];
   }
 
   /// Check if currently displaying the image preview modal

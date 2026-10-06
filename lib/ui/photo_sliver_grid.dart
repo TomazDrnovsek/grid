@@ -1,9 +1,11 @@
 import 'dart:io';
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:grid/app_theme.dart';
 import 'package:grid/widgets/error_boundary.dart';
 import 'package:grid/services/scroll_optimization_service.dart';
@@ -18,6 +20,8 @@ enum EdgeZone { none, top, bottom }
 class PhotoSliverGrid extends StatefulWidget {
   final List<File> images;
   final List<File> thumbnails;
+  /// Image paths of tiles that are carousel covers; they show the carousel icon
+  final Set<String> carouselCoverPaths;
   final Set<int> selectedIndexes;
   final void Function(int) onTap;
   final void Function(int) onDoubleTap;
@@ -29,6 +33,7 @@ class PhotoSliverGrid extends StatefulWidget {
     super.key,
     required this.images,
     required this.thumbnails,
+    this.carouselCoverPaths = const {},
     required this.selectedIndexes,
     required this.onTap,
     required this.onDoubleTap,
@@ -260,6 +265,7 @@ class _PhotoSliverGridState extends State<PhotoSliverGrid>
                   thumbnail: thumbnail,
                   index: index,
                   isSelected: widget.selectedIndexes.contains(index),
+                  isCarousel: widget.carouselCoverPaths.contains(widget.images[index].path),
                   showHueMap: showHueMap,
                   onTap: widget.onTap,
                   onDoubleTap: widget.onDoubleTap,
@@ -288,6 +294,7 @@ class _PerformanceOptimizedGridItem extends StatefulWidget {
   final File thumbnail;
   final int index;
   final bool isSelected;
+  final bool isCarousel;
   final bool showHueMap;
   final void Function(int) onTap;
   final void Function(int) onDoubleTap;
@@ -303,6 +310,7 @@ class _PerformanceOptimizedGridItem extends StatefulWidget {
     required this.thumbnail,
     required this.index,
     required this.isSelected,
+    required this.isCarousel,
     required this.showHueMap,
     required this.onTap,
     required this.onDoubleTap,
@@ -364,6 +372,7 @@ class _PerformanceOptimizedGridItemState extends State<_PerformanceOptimizedGrid
         thumbnailFile: widget.thumbnail,
         fullImageFile: widget.file,
         isSelected: widget.isSelected,
+        isCarousel: widget.isCarousel,
         showHueMap: widget.showHueMap,
         isDark: isDark,
         cacheService: widget.cacheService,
@@ -479,6 +488,9 @@ class _PerformanceOptimizedGridItemState extends State<_PerformanceOptimizedGrid
                     },
                   ),
 
+                // Carousel icon, above the hue map overlay
+                if (widget.isCarousel) const _CarouselTileIcon(),
+
                 // Selection checkmark if selected
                 if (widget.isSelected)
                   Positioned(
@@ -512,6 +524,7 @@ class _MemoryAwareImage extends StatefulWidget {
   final File thumbnailFile;
   final File fullImageFile;
   final bool isSelected;
+  final bool isCarousel;
   final bool showHueMap;
   final bool isDark;
   final ImageCacheService cacheService;
@@ -520,6 +533,7 @@ class _MemoryAwareImage extends StatefulWidget {
     required this.thumbnailFile,
     required this.fullImageFile,
     required this.isSelected,
+    required this.isCarousel,
     required this.showHueMap,
     required this.isDark,
     required this.cacheService,
@@ -612,6 +626,9 @@ class _MemoryAwareImageState extends State<_MemoryAwareImage>
               },
             ),
 
+          // Carousel icon, above the hue map overlay
+          if (widget.isCarousel) const _CarouselTileIcon(),
+
           if (widget.isSelected)
             Positioned(
               bottom: 4,
@@ -631,6 +648,53 @@ class _MemoryAwareImageState extends State<_MemoryAwareImage>
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// Carousel icon in a tile's top right corner (G-016): a white glyph over a
+/// soft dark copy of itself, so it reads on pale photos and on the hue map.
+class _CarouselTileIcon extends StatelessWidget {
+  const _CarouselTileIcon();
+
+  static const double _size = 18;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: 6,
+      right: 6,
+      child: IgnorePointer(
+        child: SizedBox(
+          width: _size,
+          height: _size,
+          child: Stack(
+            children: [
+              ImageFiltered(
+                imageFilter: ImageFilter.blur(sigmaX: 1.5, sigmaY: 1.5),
+                child: SvgPicture.asset(
+                  'assets/carousel_icon.svg',
+                  width: _size,
+                  height: _size,
+                  colorFilter: const ColorFilter.mode(
+                    AppColors.carouselIconShadow,
+                    BlendMode.srcIn,
+                  ),
+                ),
+              ),
+              SvgPicture.asset(
+                'assets/carousel_icon.svg',
+                width: _size,
+                height: _size,
+                colorFilter: const ColorFilter.mode(
+                  AppColors.carouselIcon,
+                  BlendMode.srcIn,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

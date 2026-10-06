@@ -88,7 +88,8 @@ class BackupRestoreRepository {
         return;
       }
 
-      final photos = loadResult.images;
+      // Every photo, including each carousel's slides (G-016)
+      final photos = loadResult.allImages;
       if (photos.isEmpty) {
         yield const BackupState(
           status: BackupStatus.success,
@@ -576,6 +577,8 @@ class BackupRestoreRepository {
       String photoId;
       int sortIndex = sortIndexHint ?? fileDate.millisecondsSinceEpoch ~/ 1000; // Last resort fallback
       bool usedFallback = false;
+      String? carouselId;
+      int? carouselIndex;
 
       try {
         // Primary approach: Get from database by path
@@ -585,6 +588,8 @@ class BackupRestoreRepository {
         if (photoEntry != null && photoEntry.uuid != null) {
           photoId = photoEntry.uuid!;
           sortIndex = photoEntry.orderIndex; // ✅ Correct DB order
+          carouselId = photoEntry.carouselId;
+          carouselIndex = photoEntry.carouselIndex;
         } else {
           // Fallback: use hint (loop index) to maintain relative order
           photoId = 'photo_${DateTime.now().millisecondsSinceEpoch}_${photo.path.hashCode.abs()}';
@@ -616,6 +621,8 @@ class BackupRestoreRepository {
         width: 0, // TODO: Extract from EXIF if available
         height: 0, // TODO: Extract from EXIF if available
         sortIndex: sortIndex,
+        carouselId: carouselId,
+        carouselIndex: carouselIndex,
       );
 
       return ProcessResult(
@@ -759,14 +766,18 @@ class BackupRestoreRepository {
           if (existingPhoto != null) {
             existingUuids.add(item.id);
 
-            // Update the existing photo's path and order if it changed
+            // Update the existing photo's path, order and carousel if they changed
             if (existingPhoto.imagePath != imageFile.path ||
-                existingPhoto.orderIndex != item.sortIndex) {
+                existingPhoto.orderIndex != item.sortIndex ||
+                existingPhoto.carouselId != item.carouselId ||
+                existingPhoto.carouselIndex != item.carouselIndex) {
               await photoDb.updatePhoto(
-                existingPhoto.copyWith(
-                  imagePath: imageFile.path,
-                  orderIndex: item.sortIndex,
-                ),
+                existingPhoto
+                    .copyWith(
+                      imagePath: imageFile.path,
+                      orderIndex: item.sortIndex,
+                    )
+                    .withCarousel(item.carouselId, item.carouselIndex),
               );
             }
           } else {
@@ -801,6 +812,8 @@ class BackupRestoreRepository {
               orderIndex: item.sortIndex, // 🔧 CRITICAL: Use exact order from manifest
               isFavorite: false,
               tags: const <String>[],
+              carouselId: item.carouselId,
+              carouselIndex: item.carouselIndex,
             );
 
             // Insert directly without automatic reordering
