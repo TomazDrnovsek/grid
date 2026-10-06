@@ -87,7 +87,7 @@ When done: update SPEC.md / ARCHITECTURE.md / OPERATIONS.md where touched; appen
 Push the branch and open a PR. Do not merge.
 ```
 
-A release is its own brief: "Bump `version:` to `<name>+<code>` per OPERATIONS.md §3 step 1." The code is read from Play Console first.
+A release is its own brief: "Bump `version:` to `<name>+<code>` per OPERATIONS.md §3 step 1." The code is read from Play Console first. The session's report on the built bundle includes release notes ready to paste (OPERATIONS.md §3 step 5).
 
 ## 8. How the work happens
 

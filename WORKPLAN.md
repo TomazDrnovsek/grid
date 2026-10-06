@@ -49,8 +49,8 @@ Phase 2 — Carousels. Phase 1 — Release 1.0.4 (9) is complete: 1.0.4 (9) is i
 - [x] Design previews and flow diagram reviewed by the owner, choices answered (G-016; 2026-10-06)
 - [x] Carousels: the "Add as" dialog, carousel tiles, the swipeable preview, delete and share of every slide, database version 3, manifest keys, How to Use Grid text (G-016), and `version: 1.0.5+10`, PR #10 from `claude/trusting-lamport-nmx81h`, merged on the owner's word (2026-10-06). The highest code in Play Console is 9, as recorded in Phase 1 (OPERATIONS §3 step 1)
 - [x] `android-release` run 37489094908 on `main` dispatched by the session on the owner's word ("merge and build the aab.. v1.0.5", 2026-10-06). Bundle 10 is not uploaded: it shows the build code in the version line, which the owner ruled out (G-017)
-- [ ] The version line shows the name only (G-017), and `version: 1.0.5+11`, PR from `claude/trusting-lamport-nmx81h`
-- [ ] `android-release` run on `main` green, artifact `grid-1.0.5-11` (OPERATIONS §3 steps 2–4)
+- [x] The version line shows the name only (G-017), and `version: 1.0.5+11`, PR #11, merged on the owner's word (2026-10-06)
+- [x] `android-release` run on `main` green, artifact `grid-1.0.5-11` (2026-10-06, run 37490005980 on `41bad3b`, dispatched by the session; run 37489094908 for bundle 10 cancelled) (OPERATIONS §3 steps 2–4)
 - [ ] Owner: bundle 11 on internal testing; carousels seen on a phone, including the update over an existing install and a backup and restore; the menu shows "Version 1.0.5" (G-010) (OPERATIONS §3 steps 5–6)
 - [ ] Owner: 1.0.5 (11) promoted to production (OPERATIONS §3 step 7)
 

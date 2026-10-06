@@ -60,7 +60,7 @@ A change is finished when the PR that carries it also carries every document it 
 | touches the release procedure, a secret's name, an identifier | `OPERATIONS.md` |
 | involved a mistake, a wrong diagnosis, a corrected premise | `docs/incidents.md`, same task |
 | edits a generated-code source | the regenerated files |
-| is a release | `pubspec.yaml` `version:` (name and code), per `OPERATIONS.md` §3 |
+| is a release | `pubspec.yaml` `version:` (name and code), per `OPERATIONS.md` §3; the report gives the owner release notes ready to paste (`OPERATIONS.md` §3 step 5) |
 
 Then: the gate is green, the PR is open, the CI result is read (the failing step, if red), and the report says what was verified and how, with any unmade decision at the **top**. Commit subjects are imperative (`Fix the hue map toggle on restore`). Push the branch and open a PR. Do not merge unless the owner tells you to (G-011).
 
