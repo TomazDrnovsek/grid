@@ -61,9 +61,9 @@ mixin _$PhotoState {
 
   /// PHASE 2: Hue map overlay toggle state
   bool get showHueMap =>
-      throw _privateConstructorUsedError; // ========================================================================
+      throw _privateConstructorUsedError; // ==========================================================================
   // PHASE 2: ENHANCED BATCH OPERATION TRACKING
-  // ========================================================================
+  // ==========================================================================
   /// Current batch operation in progress (null if none)
   BatchOperationStatus? get currentBatchOperation =>
       throw _privateConstructorUsedError;
@@ -614,9 +614,9 @@ class _$PhotoStateImpl extends _PhotoState {
   @override
   @JsonKey()
   final bool showHueMap;
-  // ========================================================================
+  // ==========================================================================
   // PHASE 2: ENHANCED BATCH OPERATION TRACKING
-  // ========================================================================
+  // ==========================================================================
   /// Current batch operation in progress (null if none)
   @override
   final BatchOperationStatus? currentBatchOperation;
@@ -840,9 +840,9 @@ abstract class _PhotoState extends PhotoState {
 
   /// PHASE 2: Hue map overlay toggle state
   @override
-  bool get showHueMap; // ========================================================================
+  bool get showHueMap; // ==========================================================================
   // PHASE 2: ENHANCED BATCH OPERATION TRACKING
-  // ========================================================================
+  // ==========================================================================
   /// Current batch operation in progress (null if none)
   @override
   BatchOperationStatus? get currentBatchOperation;

@@ -55,9 +55,9 @@ class PhotoState with _$PhotoState {
     /// PHASE 2: Hue map overlay toggle state
     @Default(false) bool showHueMap,
 
-    // ========================================================================
+    // ==========================================================================
     // PHASE 2: ENHANCED BATCH OPERATION TRACKING
-    // ========================================================================
+    // ==========================================================================
 
     /// Current batch operation in progress (null if none)
     BatchOperationStatus? currentBatchOperation,
@@ -229,9 +229,9 @@ class PhotoOperationEvent with _$PhotoOperationEvent {
   }) = _PhotoOperationEvent;
 }
 
-// ============================================================================
+// ==========================================================================
 // PHASE 2: ENHANCED BATCH OPERATION MODELS & TRACKING
-// ============================================================================
+// ==========================================================================
 
 /// Enum for batch operation types (matches provider implementation)
 enum BatchOperationType {

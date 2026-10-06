@@ -6,12 +6,9 @@ part of 'photo_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$photoNotifierHash() => r'6153b506efdabe214ff57c8afe8106ac0831c04e';
+String _$photoNotifierHash() => r'26110f96321f9e895064ba5d68067d14cca3c310';
 
-/// Riverpod provider for photo state management with ENHANCED batch processing
-/// Reduces cascading rebuilds from multiple operations (5 photos = 1 state update)
-///
-/// Copied from [PhotoNotifier].
+/// See also [PhotoNotifier].
 @ProviderFor(PhotoNotifier)
 final photoNotifierProvider =
     AutoDisposeNotifierProvider<PhotoNotifier, PhotoState>.internal(

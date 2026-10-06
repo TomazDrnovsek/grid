@@ -754,9 +754,9 @@ class PhotoNotifier extends _$PhotoNotifier {
     );
   }
 
-  // ============================================================================
+  // ==========================================================================
   // PUBLIC API METHODS - ENHANCED with batch operations
-  // ============================================================================
+  // ==========================================================================
 
   /// FIXED: Pick and add multiple photos with proper loading modal timing
   Future<void> addPhotos() async {
@@ -1210,9 +1210,9 @@ class PhotoNotifier extends _$PhotoNotifier {
     );
   }
 
-  // ============================================================================
+  // ==========================================================================
   // FALLBACK METHODS - For single operation processing when batching fails
-  // ============================================================================
+  // ==========================================================================
 
   Future<void> _applySingleAddPhotos(List<ProcessedImage> images) async {
     final newImages = images.map((p) => p.image).toList();
@@ -1300,8 +1300,8 @@ class PhotoNotifier extends _$PhotoNotifier {
     await _saveImageOrder();
   }
 
-// ============================================================================
+// ==========================================================================
 // NOTE: Riverpod AutoDisposeNotifier handles cleanup automatically
 // The ref.onDispose() method ensures proper resource cleanup
-// ============================================================================
+// ==========================================================================
 }
