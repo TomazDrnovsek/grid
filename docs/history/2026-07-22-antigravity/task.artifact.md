@@ -1,0 +1,4 @@
+- [x] Update `pubspec.yaml` version to `1.0.3+6`
+- [x] Update `android/app/build.gradle` to target API 36
+- [x] Explicitly set `minSdk = 21` to fix device support warning
+- [ ] Verify build and provide Play Console UI instructions

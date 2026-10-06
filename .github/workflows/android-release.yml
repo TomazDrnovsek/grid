@@ -1,0 +1,119 @@
+# Signed release bundle for Google Play (G-007). Manual dispatch only: a
+# release is a deliberate act, never a side effect of a push. Procedure:
+# OPERATIONS.md §3. The bundle is uploaded to Play by the owner.
+name: Android release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      FLUTTER_VERSION: "3.32.8"   # G-008 — change together with .claude/hooks/session-start.sh and quality.yml
+      # The upload key's certificate (OPERATIONS.md §1). The release check refuses any other signer.
+      UPLOAD_CERT_SHA1: "CA:5B:CB:6F:E5:80:2F:07:9E:59:E5:59:70:3D:5D:5D:71:01:4B:FD"
+
+    steps:
+      - name: Refuse anything but main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Release bundles are built only from main (G-007). This run is on ${GITHUB_REF}."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - name: Refuse without the signing secrets
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          missing=""
+          for v in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_PASSWORD ANDROID_KEY_ALIAS; do
+            [ -n "${!v}" ] || missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Secrets missing:$missing. Add them in Settings → Secrets and variables → Actions (OPERATIONS.md §1)."
+            exit 1
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Write signing material outside the checkout
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          ks="$RUNNER_TEMP/upload-keystore.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d '\r\n ' | base64 -d > "$ks"
+          {
+            echo "storeFile=$ks"
+            echo "storePassword=$ANDROID_KEYSTORE_PASSWORD"
+            echo "keyAlias=$ANDROID_KEY_ALIAS"
+            echo "keyPassword=$ANDROID_KEY_PASSWORD"
+          } > android/key.properties
+
+      - name: Fetch packages
+        run: flutter pub get
+
+      - name: Gate — flutter analyze
+        run: flutter analyze
+
+      - name: Build the bundle
+        run: flutter build appbundle --release
+
+      - name: Release check — signed with the upload key
+        run: |
+          aab=build/app/outputs/bundle/release/app-release.aab
+          signer="$(keytool -printcert -jarfile "$aab" | awk '/SHA1:/ {print $2; exit}')"
+          if [ "$signer" != "$UPLOAD_CERT_SHA1" ]; then
+            echo "::error::Certificate mismatch: the bundle is signed by '${signer:-nothing}', not the upload key ${UPLOAD_CERT_SHA1}. Play would reject it. Check the four secrets against the password-manager copy."
+            exit 1
+          fi
+          echo "Signer matches the upload key: $signer"
+
+      - name: Read the version
+        run: |
+          v="$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | tr -d '\r')"
+          name="${v%%+*}"; code="${v##*+}"
+          echo "VERSION_NAME=$name" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$code" >> "$GITHUB_ENV"
+          {
+            echo "### Grid $name ($code)"
+            echo ""
+            echo "- Built from \`${GITHUB_SHA}\` on \`main\`"
+            echo "- Signed by the upload key, certificate SHA-1 \`${UPLOAD_CERT_SHA1}\`"
+            echo "- Next: download the artifact below and upload it to Play internal testing (OPERATIONS.md §3, step 4)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: grid-${{ env.VERSION_NAME }}-${{ env.VERSION_CODE }}
+          path: build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Remove signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/upload-keystore.jks" android/key.properties

@@ -1,0 +1,34 @@
+# The gate on every PR and every push to main (ARCHITECTURE.md §6).
+# A check, not a deployment: nothing is built for release here.
+name: Quality
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.32.8"   # G-008
+          channel: stable
+          cache: true
+
+      - name: Fetch packages
+        run: flutter pub get
+
+      - name: Gate — flutter analyze
+        run: flutter analyze

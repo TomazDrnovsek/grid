@@ -1,0 +1,15 @@
+# LF everywhere in the repository and the checkout (G-006). Windows editors
+# handle LF; mixed endings made 120+ files show as modified on the old clone.
+* text=auto eol=lf
+
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.webp binary
+*.ico  binary
+*.jar  binary
+*.jks  binary
+*.keystore binary

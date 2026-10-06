@@ -1,0 +1,14 @@
+# GitHub Pages (Jekyll) for this repository: serves privacy.html — the privacy
+# policy URL registered in Play Console — and renders README.md as the index.
+# The documents are excluded so that Liquid inside one can never fail the build
+# that serves the policy (G-009). Add every new top-level Markdown document here
+# in the same PR that creates it.
+exclude:
+  - CLAUDE.md
+  - SPEC.md
+  - DECISIONS.md
+  - WORKPLAN.md
+  - ARCHITECTURE.md
+  - OPERATIONS.md
+  - GUARDRAILS.md
+  - docs

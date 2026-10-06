@@ -55,3 +55,34 @@ android/local.properties
 **/key.properties
 **/*.jks
 **/*.keystore
+
+# --- Cloud workflow additions (G-006; guide §5.10) ---
+# secrets
+.env
+.env.*
+!.env.example
+
+# per-person and installed agent tooling — settings.json and hooks/ are committed
+.claude/settings.local.json
+.claude/skills/
+.agents/
+skills-lock.json
+
+# signing material and built packages, pre-emptively, so a key can never be
+# committed by accident
+*.keystore
+*.jks
+*.p12
+*.p8
+*.mobileprovision
+*.apk
+*.aab
+**/key.properties
+android/local.properties
+ios/Pods/
+
+# Android Gradle outputs (a problems report was once committed from here)
+/android/build/
+
+# the Antigravity agent's per-session notes (one set kept in docs/history/)
+/.artifacts/
