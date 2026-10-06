@@ -47,8 +47,10 @@ Phase 2 — Carousels. Phase 1 — Release 1.0.4 (9) is complete: 1.0.4 (9) is i
 ## Phase 2 — Carousels
 
 - [x] Design previews and flow diagram reviewed by the owner, choices answered (G-016; 2026-10-06)
-- [ ] Carousels: the "Add as" dialog, carousel tiles, the swipeable preview, delete and share of every slide, database version 3, manifest keys, How to Use Grid text (G-016), PR from `claude/trusting-lamport-nmx81h`
-- [ ] Owner: carousels seen on a phone from internal testing, including an update over an existing install and a backup and restore (G-010)
+- [ ] Carousels: the "Add as" dialog, carousel tiles, the swipeable preview, delete and share of every slide, database version 3, manifest keys, How to Use Grid text (G-016), and `version: 1.0.5+10`, PR from `claude/trusting-lamport-nmx81h`. The highest code in Play Console is 9, as recorded in Phase 1 (OPERATIONS §3 step 1)
+- [ ] `android-release` run on `main` green, artifact `grid-1.0.5-10`, dispatched by the session on the owner's word ("merge and build the aab.. v1.0.5", 2026-10-06) (OPERATIONS §3 steps 2–4)
+- [ ] Owner: bundle 10 on internal testing; carousels seen on a phone, including the update over an existing install and a backup and restore (G-010) (OPERATIONS §3 steps 5–6)
+- [ ] Owner: 1.0.5 (10) promoted to production (OPERATIONS §3 step 7)
 
 ## Open decisions
 
