@@ -9,12 +9,13 @@ Why is `DECISIONS.md`. How is `SPEC.md`, `ARCHITECTURE.md` and `OPERATIONS.md`. 
 
 ## Current phase
 
-**Phase 1 — Release 1.0.4 (9).** Done when 1.0.4 (9) is in production. Phase 0 is complete: every item below is checked.
+None. Phase 1 — Release 1.0.4 (9) is complete: 1.0.4 (9) is in production (owner, 2026-10-06). Phase 0 is complete too.
 
 ## Phase map
 
 - Phase 0 — Cloud migration
 - Phase 1 — Release 1.0.4 (9)
+- Phase 2 — not yet defined. The candidates are in Backlog. Each needs an owner brief.
 
 ## Phase 0 — Cloud migration
 
@@ -39,9 +40,9 @@ Why is `DECISIONS.md`. How is `SPEC.md`, `ARCHITECTURE.md` and `OPERATIONS.md`. 
 - [x] Bundle 8 is not uploaded: 1.0.4 ships once, as code 9 (owner, 2026-10-06)
 - [x] The Android SDK script's mirror covers the Gradle Plugin Portal, PR #5 merged on the owner's word (2026-10-06)
 - [x] Minimum SDK 24 so Play automatic protection stays on, and `version: 1.0.4+9` (G-014), PR from `claude/kind-turing-8l7s6o`
-- [ ] `android-release` run on `main` green, artifact `grid-1.0.4-9` (OPERATIONS §3 steps 2–4)
-- [ ] Bundle 9 on internal testing with protection on, installed on the owner's phone; the menu and the Local Backup screen show `Version 1.0.4 (9)`; photos, order and profile survived the update (OPERATIONS §3 steps 5–6)
-- [ ] 1.0.4 (9) promoted to production (OPERATIONS §3 step 7)
+- [x] `android-release` run on `main` green, artifact `grid-1.0.4-9` (2026-10-06, run 37463669991 on `a4ab0ac`; certificate check passed) (OPERATIONS §3 steps 2–4)
+- [x] Bundle 9 on internal testing, installed on the owner's phone; the menu and the Local Backup screen show `Version 1.0.4 (9)`; photos, order and profile survived the update (owner, 2026-10-06) (OPERATIONS §3 steps 5–6)
+- [x] 1.0.4 (9) promoted to production (owner, 2026-10-06) (OPERATIONS §3 step 7)
 
 ## Open decisions
 
@@ -66,3 +67,4 @@ Nothing.
 - 2026-10-06 — Debt items and `version: 1.0.4+8`, PR from `claude/kind-turing-8l7s6o` (G-012, G-013).
 - 2026-10-06 — The Android SDK script's Maven Central mirror covers the Gradle Plugin Portal, PR from `claude/kind-turing-8l7s6o`.
 - 2026-10-06 — Minimum SDK 24 and `version: 1.0.4+9`, PR from `claude/kind-turing-8l7s6o` (G-014).
+- 2026-10-06 — 1.0.4 (9) in production; Phase 1 closed, PR from `claude/kind-turing-8l7s6o`.
