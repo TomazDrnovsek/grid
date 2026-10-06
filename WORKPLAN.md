@@ -9,7 +9,7 @@ Why is `DECISIONS.md`. How is `SPEC.md`, `ARCHITECTURE.md` and `OPERATIONS.md`. 
 
 ## Current phase
 
-Phase 2 — Carousels. Phase 1 — Release 1.0.4 (9) is complete: 1.0.4 (9) is in production (owner, 2026-10-06). Phase 0 is complete too.
+None. Phase 2 — Carousels is complete: 1.0.5 (12) is in production (owner, 2026-10-06). Phases 0 and 1 are complete too.
 
 ## Phase map
 
@@ -52,10 +52,9 @@ Phase 2 — Carousels. Phase 1 — Release 1.0.4 (9) is complete: 1.0.4 (9) is i
 - [x] The version line shows the name only (G-017), and `version: 1.0.5+11`, PR #11, merged on the owner's word (2026-10-06)
 - [x] `android-release` run on `main` green, artifact `grid-1.0.5-11` (2026-10-06, run 37490005980 on `41bad3b`, dispatched by the session; run 37489094908 for bundle 10 cancelled) (OPERATIONS §3 steps 2–4)
 - [x] Owner: bundle 11 on internal testing, seen on the phone (2026-10-06). Two fixes asked for: a more compact carousel icon, and no underline under the preview's x/N tag (incident 7). Bundle 11 does not go to production
-- [ ] The carousel icon's squares closer together, no underline on overlay text, and `version: 1.0.5+12`, PR from `claude/trusting-lamport-nmx81h`
-- [ ] `android-release` run on `main` green, artifact `grid-1.0.5-12` (OPERATIONS §3 steps 2–4)
-- [ ] Owner: bundle 12 on internal testing; carousels seen on a phone, including the update over an existing install and a backup and restore; the menu shows "Version 1.0.5" (G-010) (OPERATIONS §3 steps 5–6)
-- [ ] Owner: 1.0.5 (12) promoted to production (OPERATIONS §3 step 7)
+- [x] The carousel icon's squares closer together, no underline on overlay text, the release-notes rule (OPERATIONS §3 step 5), and `version: 1.0.5+12`, PR #12, merged on the owner's word (2026-10-06)
+- [x] `android-release` run on `main` green, artifact `grid-1.0.5-12` (2026-10-06, run 37499476227 on `482b47b`, dispatched by the session) (OPERATIONS §3 steps 2–4)
+- [x] Owner: bundle 12 on internal testing, then promoted to production (owner, 2026-10-06: "promoted to production") (OPERATIONS §3 steps 5–7). The owner reported the promotion; the individual device checks listed for bundle 11 were not reported one by one
 
 ## Open decisions
 
@@ -82,3 +81,5 @@ Nothing.
 - 2026-10-06 — 1.0.4 (9) in production; Phase 1 closed, PR from `claude/kind-turing-8l7s6o`.
 - 2026-10-06 — `docs/DEBT.md` emptied: Pages item dropped, `photo_provider.g.dart` regenerated, privacy policy matches the manifest (G-015), PR from `claude/kind-turing-8l7s6o`.
 - 2026-10-06 — Owner: the live privacy page shows the G-015 text, and the Play Data safety form matches it.
+- 2026-10-06 — Carousels (G-016), PR #10 from `claude/trusting-lamport-nmx81h`; the version line shows the name only (G-017), PR #11; internal-testing fixes and the release-notes rule, PR #12.
+- 2026-10-06 — 1.0.5 (12) in production; Phase 2 closed, PR from `claude/trusting-lamport-nmx81h`.
