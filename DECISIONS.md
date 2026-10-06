@@ -80,22 +80,28 @@ Entry shape: *What changed* · *Why* · *What is settled* · *What is not settle
 
 *What is settled.* Internal testing is the device surface, and its version codes count against the code sequence (G-005).
 
+**G-011 — A session merges a PR when the owner tells it to (2026-10-06; supersedes G-010's "the owner merges" and CLAUDE.md constraint 7's wording).** The owner, on PR #1: "you can and should do it! do it". The merge was first refused by the session's permission check, which reads `CLAUDE.md`'s "the owner merges". It went through once the owner switched the session to a mode that asks him to approve the action.
+
+*What is settled.* The owner decides when a PR merges. A session merges when the owner says so in the conversation, after CI is green and the report is read. Without that instruction it pushes, opens the PR and stops. G-010's device-check rule for user-facing changes is unchanged.
+*Not settled.* Whether merges should also be approved in advance through the session's permission settings rather than case by case. That is the owner's setting, not a repository rule.
+
 ## §9 Superseded index
 
 | ID | Subject | Superseded by |
 | --- | --- | --- |
-| — | none yet | — |
+| G-010 (merge clause only) | Who merges | G-011 |
 
 ## §10 Assumptions still to validate
 
-- **A-1** GitHub's Ubuntu runner image installs whatever Android platform, build tools, NDK 27.0.12077973 and CMake the build asks for, as the cloud machine did on 2026-10-06. *Validated by:* the first successful `android-release` run.
-- **A-2** Play accepts a bundle built by the workflow (same upload key, higher code). *Validated by:* the first upload to internal testing.
+- **A-1** GitHub's Ubuntu runner image installs whatever Android platform, build tools, NDK 27.0.12077973 and CMake the build asks for, as the cloud machine did on 2026-10-06. *Validated 2026-10-06:* the first `android-release` run passed every step.
+- **A-2** Play accepts a bundle built by the workflow (same upload key, higher code). *Validated 2026-10-06:* bundle 7 was accepted on internal testing once automatic protection was turned off for the release (O-4), and installed on the owner's phone.
 - **A-3** The prefix `G-` is unused in the owner's other repositories. The Bauhaus Suite repositories were not checked.
 
 ## §11 Open decisions — nothing here is briefed as if decided
 
 - **O-1 README.** `README.md` is Flutter's template text, and it is also the Pages index page. Options: keep it; replace it with a one-line description; or make it a pointer to `SPEC.md` §0 (the guide's default for a public repository). Changing it changes the public site's root page.
 - **O-2 Scaffolding folders.** `ios/`, `macos/`, `linux/`, `windows/` and `web/` are unshipped Flutter scaffolding. Keep them, or delete them in one PR?
+- **O-4 Android 5.0 support versus Play automatic protection** (found 2026-10-06). Play automatic protection (anti-tamper) requires minimum SDK 24 (Android 7.0); Grid's is 21 (G-004). Google switches the protection on for every new release, so each upload rejects the bundle until it is turned off for that release (OPERATIONS §3 step 5). The choice is between keeping Android 5.0–6.x devices and turning protection off on every release, or raising `minSdk` to 24 to get anti-tamper protection, which ends updates for those devices and reverses G-004. Production builds 6 and 7 shipped without protection.
 - **O-3 Privacy wording versus backup.** `privacy.html` says "No automatic uploads or syncing" and lists two permissions. The manifest also declares `INTERNET` and a legacy storage permission, and a backup folder may belong to a cloud drive's document provider. Does the policy text change? It is owner-approved text (CLAUDE.md constraint 5); the Play Data safety form should be checked against the same facts.
 
 ## §12 Deliberately deferred
@@ -106,4 +112,3 @@ Entry shape: *What changed* · *Why* · *What is settled* · *What is not settle
 
 - **U-1** The appearance choice resets on restart (`SPEC.md` §6). Read from code; not seen on a device.
 - **U-2** On the owner's clone, `android/app/build.gradle` was modified about nine minutes after the production bundle was built. The bundle's manifest matches the committed file on every value checked (version, SDK levels). Whether that late edit touched anything else could not be determined.
-- **U-3** The committed hooks fire in a live single-repository cloud session. They were proved by hand only (G-006).

@@ -20,7 +20,7 @@ These hold until a dated entry in `DECISIONS.md` says otherwise. If a task requi
 4. **Everything stays on the device.** No analytics, ads, tracking, accounts or uploads by the app. The only network use is opening an external link. A change to this also changes `privacy.html` and the Play Data safety form, both owner-approved.
 5. **`privacy.html` is the live privacy-policy URL registered in Play Console**, served by GitHub Pages from `main` (G-003). Never move, rename or delete it. Its text changes only with the owner's explicit approval, quoted in the PR. The repository stays public while Pages serves it.
 6. **The target API level meets Google Play's current requirement** (G-004).
-7. **Every change is a branch and a PR; the owner merges.** Nothing is pushed to `main` directly.
+7. **Every change is a branch and a PR.** Nothing is pushed to `main` directly. The owner decides when a PR merges; a session merges it only when the owner tells it to in the conversation (G-011).
 8. **Release bundles come only from the `android-release` workflow run on `main`** (G-007). A session never produces a bundle for upload and never handles the real key.
 
 ## 3. Commands
@@ -63,7 +63,7 @@ A change is finished when the PR that carries it also carries every document it 
 | edits a generated-code source | the regenerated files |
 | is a release | `pubspec.yaml` `version:` (name and code), per `OPERATIONS.md` §3 |
 
-Then: the gate is green, the PR is open, the CI result is read (the failing step, if red), and the report says what was verified and how, with any unmade decision at the **top**. Commit subjects are imperative (`Fix the hue map toggle on restore`). Push the branch and open a PR. Do not merge.
+Then: the gate is green, the PR is open, the CI result is read (the failing step, if red), and the report says what was verified and how, with any unmade decision at the **top**. Commit subjects are imperative (`Fix the hue map toggle on restore`). Push the branch and open a PR. Do not merge unless the owner tells you to (G-011).
 
 ## 6. Addresses that never change
 
@@ -81,7 +81,7 @@ Words, which may change: the app's display name, copy, the repository name.
 
 - **Cloud session by default**, from claude.ai/code or the Claude mobile app, on a `claude/…` branch. No local clone is required, and none is privileged.
 - **Chat (the Claude Project)** thinks, plans and writes briefs. It reads the repository; it never writes to it.
-- **The owner** merges, installs test builds from Play's internal testing track on a phone, starts release builds, uploads them in Play Console, holds every secret, and decides what reaches production.
+- **The owner** decides merges (G-011), installs test builds from Play's internal testing track on a phone, starts release builds, uploads them in Play Console, holds every secret, and decides what reaches production.
 - **Releases:** `OPERATIONS.md` §3.
 
 ## 8. Session gotchas
