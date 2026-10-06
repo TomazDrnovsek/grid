@@ -25,7 +25,7 @@ Why is `DECISIONS.md`. How is `SPEC.md`, `ARCHITECTURE.md` and `OPERATIONS.md`. 
 - [ ] Owner: the bootstrap PR reviewed and merged; Pages check passed (OPERATIONS §4)
 - [ ] Owner: `docs/claude-project-instructions.md` pasted into the Grid Project; the workflow guide removed from Project knowledge
 - [ ] A smoke-test cloud session started from claude.ai/code on this repository alone: the hook installs Flutter, and the gate runs green
-- [ ] Release PR: `version: 1.0.3+7`, so the first CI build carries a new code (OPERATIONS §3 step 1)
+- [x] `version: 1.0.3+7`, so the first CI build carries a new code — carried as the last commit of the bootstrap PR (OPERATIONS §3 step 1)
 - [ ] First `android-release` run green; the certificate check passed (validates `DECISIONS.md` §10 A-1)
 - [ ] Bundle 7 uploaded to internal testing and installed on the phone; photos, order and profile intact (validates A-2)
 - [ ] Decide whether 1.0.3 (7) goes to production. It is the same app as 6, rebuilt; promoting it is optional
