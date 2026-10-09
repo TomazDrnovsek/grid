@@ -48,3 +48,8 @@ Entry shape: **N — date — what happened.** *Effect.* *Cause.* *Fix.* *Rule i
 *Fix.* The counter style and the note set `decoration: TextDecoration.none`. The widget test now mounts both widgets in a `Stack` with no `Material`, as the app does, and asserts the decoration. It fails without the fix (reads `TextDecoration.underline`) and passes with it.
 *Rule.* GUARDRAILS 5 (verify in the real runtime) and 7 (a test proves only what it asserts). First instance.
 
+**8 — 2026-10-09 — A brief asked to define a phase the repository had already closed.** A Grid HQ brief said Phase 1 (1.0.4 (9)) was the last complete phase and asked for Phase 2 to be defined from the Backlog. `main` already recorded Phase 2 — Carousels as complete, with 1.0.5 (12) in production.
+*Effect.* None. The session read `WORKPLAN.md` on `main` before acting; the owner then dropped the next phase altogether (G-018).
+*Cause.* The board's status was written from a state older than the repository's and not re-read against it.
+*Fix.* The brief's status was checked against `origin/main` before any work. The board is outside this repository; the owner closes the task there.
+*Rule.* GUARDRAILS 3 (ground every claim): a brief's status line is a claim. First instance.
