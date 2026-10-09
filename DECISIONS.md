@@ -147,6 +147,12 @@ Entry shape: *What changed* · *Why* · *What is settled* · *What is not settle
 *What is settled.* The build code stays where it is needed, in `pubspec.yaml` and Play Console (G-005), and is not shown in the app.
 *Not verified.* The line on a device.
 
+**G-018 — Grid is finished: no next phase is planned (2026-10-09).** The owner, on a Grid HQ brief to define and brief "Phase 2": "we are dropping phase 2. the app is finished until and if we decide differently." The brief was written before Carousels shipped; in this repository Phase 2 is Carousels, complete in 1.0.5 (12). What the owner dropped is the next phase.
+
+*What changed.* `WORKPLAN.md` has no current phase and no next one. No item is briefed or worked until the owner opens a new phase.
+*What is settled.* The production app as it stands is the finished product. The Backlog line and D-1 stay as written; each still needs an owner brief, and none is one.
+*Not settled.* Whether and when a later phase opens. That is the owner's call, made in a new dated entry that supersedes this one.
+
 ## §9 Superseded index
 
 | ID | Subject | Superseded by |

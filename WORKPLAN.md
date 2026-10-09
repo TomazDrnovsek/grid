@@ -9,7 +9,7 @@ Why is `DECISIONS.md`. How is `SPEC.md`, `ARCHITECTURE.md` and `OPERATIONS.md`. 
 
 ## Current phase
 
-None. Phase 2 — Carousels is complete: 1.0.5 (12) is in production (owner, 2026-10-06). Phases 0 and 1 are complete too.
+None, and none is planned: Grid is finished until the owner decides otherwise (G-018, 2026-10-09). Phase 2 — Carousels is complete: 1.0.5 (12) is in production (owner, 2026-10-06). Phases 0 and 1 are complete too.
 
 ## Phase map
 
@@ -83,3 +83,4 @@ Nothing.
 - 2026-10-06 — Owner: the live privacy page shows the G-015 text, and the Play Data safety form matches it.
 - 2026-10-06 — Carousels (G-016), PR #10 from `claude/trusting-lamport-nmx81h`; the version line shows the name only (G-017), PR #11; internal-testing fixes and the release-notes rule, PR #12.
 - 2026-10-06 — 1.0.5 (12) in production; Phase 2 closed, PR from `claude/trusting-lamport-nmx81h`.
+- 2026-10-09 — No next phase: Grid is finished until the owner decides otherwise (G-018), PR from `claude/laughing-galileo-h3txmk`.
