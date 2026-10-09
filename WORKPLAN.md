@@ -70,7 +70,7 @@ Nothing.
 
 ## Backlog — each needs an owner brief before it is worked
 
-- Automatic upload to Play internal testing (`DECISIONS.md` §12 D-1).
+Nothing. Automatic upload to Play was dropped (G-022).
 
 ## Done log
 
@@ -87,3 +87,4 @@ Nothing.
 - 2026-10-09 — `README.md` is a short public landing page instead of Flutter's template (G-019, decides O-1), PR from `claude/blissful-johnson-th5mye`.
 - 2026-10-09 — The regenerated macOS plugin registrant is committed (G-020), PR from `claude/blissful-johnson-th5mye`.
 - 2026-10-09 — The unshipped `ios/`, `macos/`, `linux/`, `windows/` and `web/` folders are deleted (G-021, decides O-2), PR from `claude/blissful-johnson-th5mye`.
+- 2026-10-09 — Automatic upload to Play dropped: D-1 and its Backlog line removed (G-022), PR from `claude/blissful-johnson-th5mye`.

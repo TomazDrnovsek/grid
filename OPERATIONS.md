@@ -45,7 +45,7 @@ Branch → `flutter analyze` and `flutter test` → PR → CI (`quality.yml`) gr
 7. **Promote.** On the internal-testing release → Promote release → Production → review → roll out. Or create a production release from the same bundle in the App bundle explorer.
 8. **Record.** Promoting needs no repository change. If something went wrong, `docs/incidents.md` gets an entry.
 
-Upload is manual by decision (G-007; automatic upload is deferred in `DECISIONS.md` §12).
+Upload is manual by decision (G-007). Nothing uploads to Play automatically (G-022).
 
 ## §4 GitHub Pages
 
