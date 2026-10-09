@@ -53,3 +53,9 @@ Entry shape: **N — date — what happened.** *Effect.* *Cause.* *Fix.* *Rule i
 *Cause.* The board's status was written from a state older than the repository's and not re-read against it.
 *Fix.* The brief's status was checked against `origin/main` before any work. The board is outside this repository; the owner closes the task there.
 *Rule.* GUARDRAILS 3 (ground every claim): a brief's status line is a claim. First instance.
+
+**9 — 2026-10-09 — A session proposed committing the regenerated macOS file without reading the incident log, again.** After the README work (G-019), the report offered to commit `macos/Flutter/GeneratedPluginRegistrant.swift` in its own PR as one of two ways to stop it reappearing. Incident 5's fix said the file stays out of commits until O-2 is decided; the proposal did not mention that. The owner chose to commit it.
+*Effect.* None harmful: the owner made the call with the option in front of them, and it is recorded as G-020. They were not told that it reversed incident 5's standing fix.
+*Cause.* The same as incident 5: a proposal written from the symptom, without checking `docs/incidents.md` for the same file.
+*Fix.* G-020 records the owner's decision; the file no longer drifts, so the trigger is gone. The incident log was read before the commit.
+*Rule.* GUARDRAILS 1 and 11. Second instance of this pattern (after 5), third of this file (after 3 and 5).
