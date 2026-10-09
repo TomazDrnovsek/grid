@@ -169,11 +169,20 @@ Entry shape: *What changed* · *Why* · *What is settled* · *What is not settle
 *Not verified.* That `flutter create --platforms=<platform> .` restores a folder cleanly in this repository; it was not run.
 *Paths not taken.* Keeping all five: the template would be stale by the time a port needed it, and the churn and public files stay. Keeping `ios/` only: the same, for a port that is not planned.
 
+**G-022 — Release bundles are never uploaded to Play automatically (2026-10-09; drops D-1).** The owner, on the D-1 options: "no, no more updates on google play store for now. the app is good. need no more updates currently", then "no, delete that entirely, no auto upload release bundles anywhere".
+
+*What changed.* D-1 is removed from §12, and its Backlog line from `WORKPLAN.md`. `OPERATIONS.md` §3 no longer calls the upload step deferred.
+*What is settled.* The owner uploads every bundle in Play Console by hand (G-007, `OPERATIONS.md` §3 step 5). No workflow, service account or Play Developer API credential uploads to Play, by key or by federated identity. The repository keeps its three Actions secrets. The identifier D-1 is retired, not reused.
+*Not settled.* Nothing here changes G-018: whether a later release happens at all is the owner's call.
+*Paths not taken.* Keeping D-1 parked: the owner wants it gone, not deferred.
+
 ## §9 Superseded index
 
 | ID | Subject | Superseded by |
 | --- | --- | --- |
 | G-020 | The regenerated macOS plugin registrant is committed | G-021 |
+| G-018 (Backlog and D-1 clause only) | What stays in the Backlog and §12 | G-022 |
+| G-007 (automatic-upload path only) | Uploading to Play automatically | G-022 |
 | G-012 (version line format only) | What the version line shows | G-017 |
 | G-010 (merge clause only) | Who merges | G-011 |
 | G-006 (gate clause only) | The gate | G-013 |
@@ -195,7 +204,7 @@ Entry shape: *What changed* · *Why* · *What is settled* · *What is not settle
 
 ## §12 Deliberately deferred
 
-- **D-1 Automatic upload to Play.** The release workflow could push the bundle to the internal testing track through a Google Cloud service account, so a release needs no Play Console upload step. *Reopen when:* the owner wants releases done entirely from the phone. It needs a service account with Play Console access and its key as a fifth repository secret.
+Nothing. D-1 (automatic upload to Play) was dropped (G-022).
 
 ## §13 Carried unverified, deliberately
 
