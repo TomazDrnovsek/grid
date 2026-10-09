@@ -8,7 +8,7 @@ Grid is an Android app for planning a photo feed: the owner of a social profile 
 
 Stack: Flutter 3.32.8 (Dart 3.8.1), Riverpod 2, freezed, sqflite, a Kotlin `MethodChannel` for Storage Access Framework backups. What it does: `SPEC.md`. How it is built: `ARCHITECTURE.md`. How it is released and run: `OPERATIONS.md`.
 
-`README.md` is not documentation. It is the index page GitHub Pages serves for this repository, and it stays as it is until an entry in `DECISIONS.md` changes it (open register, `DECISIONS.md` §11).
+`README.md` is not documentation. It is the public landing page: the index GitHub Pages serves for this repository and the repository's front page. Its content and its absolute links are set by G-019; a change to the definition or the promise in `SPEC.md` §0 updates it in the same PR.
 
 ## 2. Hard constraints
 

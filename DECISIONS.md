@@ -153,6 +153,14 @@ Entry shape: *What changed* · *Why* · *What is settled* · *What is not settle
 *What is settled.* The production app as it stands is the finished product. The Backlog line and D-1 stay as written; each still needs an owner brief, and none is one.
 *Not settled.* Whether and when a later phase opens. That is the owner's call, made in a new dated entry that supersedes this one.
 
+**G-019 — `README.md` is a short public landing page (2026-10-09; decides O-1).** The owner, on the O-1 brief, after reading the options: "go with your recommendation, open the PR". Done on the owner's instruction without opening a phase; G-018 stands.
+
+*What changed.* `README.md` replaces Flutter's template text ("A new Flutter project.") with Grid's definition and promise from `SPEC.md` §0 and three links: the Play listing, the privacy policy and `SPEC.md`. It is the Pages index and the repository's front page, so both change when it reaches `main`.
+*Why.* The Pages root is public and is the only page on the site besides the privacy policy. It showed the template while the app was in production.
+*What is settled.* Links in `README.md` are absolute: `SPEC.md` is excluded from Pages (G-009), so a relative link to it returns 404 there (`/grid/SPEC.html` and `/grid/SPEC.md` both answered 404 on 2026-10-09). A change to the definition or the promise in `SPEC.md` §0 updates `README.md` in the same PR. `README.md` stays served (G-009) and contains no Liquid.
+*Not verified.* How Jekyll's theme renders the new page, including whether the page title changes; seen only after the merge.
+*Paths not taken.* Keeping the template. A single line: it gives a visitor no route to the app or the policy. A bare pointer to `SPEC.md` §0: a working document that opens with "None of it was seen on a device" is a poor first page for someone arriving from Play.
+
 ## §9 Superseded index
 
 | ID | Subject | Superseded by |
@@ -171,7 +179,7 @@ Entry shape: *What changed* · *Why* · *What is settled* · *What is not settle
 
 ## §11 Open decisions — nothing here is briefed as if decided
 
-- **O-1 README.** `README.md` is Flutter's template text, and it is also the Pages index page. Options: keep it; replace it with a one-line description; or make it a pointer to `SPEC.md` §0 (the guide's default for a public repository). Changing it changes the public site's root page.
+- **O-1 README.** Decided 2026-10-09: a short landing page with links (G-019).
 - **O-2 Scaffolding folders.** `ios/`, `macos/`, `linux/`, `windows/` and `web/` are unshipped Flutter scaffolding. Keep them, or delete them in one PR?
 - **O-4 Android 5.0 support versus Play automatic protection.** Decided 2026-10-06: minimum SDK 24, protection on (G-014).
 - **O-3 Privacy wording versus backup.** Decided 2026-10-06: the policy names all four permissions and the backup folder case (G-015).
