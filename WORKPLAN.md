@@ -84,3 +84,4 @@ Nothing.
 - 2026-10-06 — Carousels (G-016), PR #10 from `claude/trusting-lamport-nmx81h`; the version line shows the name only (G-017), PR #11; internal-testing fixes and the release-notes rule, PR #12.
 - 2026-10-06 — 1.0.5 (12) in production; Phase 2 closed, PR from `claude/trusting-lamport-nmx81h`.
 - 2026-10-09 — No next phase: Grid is finished until the owner decides otherwise (G-018), PR from `claude/laughing-galileo-h3txmk`.
+- 2026-10-09 — `README.md` is a short public landing page instead of Flutter's template (G-019, decides O-1), PR from `claude/blissful-johnson-th5mye`.

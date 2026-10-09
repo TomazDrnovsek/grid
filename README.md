@@ -1,16 +1,9 @@
-# grid
+# Grid
 
-A new Flutter project.
+Grid is an Android app that shows how a photo feed will look before anything is posted. You import photos into a three-column grid, put them in order and judge the whole.
 
-## Getting Started
+Your photos never leave your phone. No account, no sign-up, works offline.
 
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- [Get it on Google Play](https://play.google.com/store/apps/details?id=si.tomazdrnovsek.grid)
+- [Privacy policy](https://tomazdrnovsek.github.io/grid/privacy.html)
+- [What the app does, in full](https://github.com/TomazDrnovsek/grid/blob/main/SPEC.md)
