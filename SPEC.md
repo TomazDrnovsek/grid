@@ -103,4 +103,4 @@ These are permanently excluded unless a new decision reopens them:
 - Posting to, or connecting to, any social network.
 - Accounts, sync between devices through a server, or any server.
 - Analytics, advertising, tracking.
-- An iOS release. The `ios/`, `macos/`, `linux/`, `windows/` and `web/` folders are Flutter's scaffolding and are not shipped (`DECISIONS.md` §11 asks whether to keep them).
+- An iOS release. The repository holds only the Android platform folder; Flutter's `ios/`, `macos/`, `linux/`, `windows/` and `web/` scaffolding was deleted (G-021).

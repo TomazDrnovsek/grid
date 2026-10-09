@@ -86,3 +86,4 @@ Nothing.
 - 2026-10-09 — No next phase: Grid is finished until the owner decides otherwise (G-018), PR from `claude/laughing-galileo-h3txmk`.
 - 2026-10-09 — `README.md` is a short public landing page instead of Flutter's template (G-019, decides O-1), PR from `claude/blissful-johnson-th5mye`.
 - 2026-10-09 — The regenerated macOS plugin registrant is committed (G-020), PR from `claude/blissful-johnson-th5mye`.
+- 2026-10-09 — The unshipped `ios/`, `macos/`, `linux/`, `windows/` and `web/` folders are deleted (G-021, decides O-2), PR from `claude/blissful-johnson-th5mye`.
