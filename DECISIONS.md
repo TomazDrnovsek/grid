@@ -161,13 +161,6 @@ Entry shape: *What changed* · *Why* · *What is settled* · *What is not settle
 *Verified (2026-10-09).* After the merge of #15, "pages build and deployment" succeeded; the Pages root served the new heading, both paragraphs and all three links, and `privacy.html` answered 200. The page title changed from "grid | Instagram grid planner" to "Grid | grid": the README's heading now names the page, followed by the repository name. The meta description is still "Instagram grid planner", from the repository description. The theme's header still shows the repository name "grid" above the README's "Grid". Read from the served HTML; not seen in a browser or on a phone.
 *Paths not taken.* Keeping the template. A single line: it gives a visitor no route to the app or the policy. A bare pointer to `SPEC.md` §0: a working document that opens with "None of it was seen on a device" is a poor first page for someone arriving from Play.
 
-**G-020 — The regenerated macOS plugin registrant is committed (2026-10-09; settles the file question incidents 3 and 5 left to the owner under O-2; superseded by G-021).** The owner, after being told the file is regenerated in every session: "commit the regenerated macOS file in its own PR".
-
-*What changed.* `macos/Flutter/GeneratedPluginRegistrant.swift` gains the two `package_info_plus` lines that `flutter pub get` has written into it since G-012. Sessions no longer need to restore the file before staging (incident 3's fix).
-*Why.* The committed file lagged the dependencies, so every session's SessionStart hook and every gate run left it modified, and each session had to restore it by hand.
-*What is settled.* The file is Flutter's output, committed as `flutter pub get` writes it. When a dependency change regenerates it, the PR that changes the dependency carries it.
-*Not settled.* O-2: whether the scaffolding folders stay at all. Deleting `macos/` would remove this file with them.
-
 **G-021 — The unshipped platform folders are deleted (2026-10-09; decides O-2; supersedes G-020).** The owner, after reading the options: "go with your recommendation, open the PR". Done on the owner's instruction without opening a phase; G-018 stands.
 
 *What changed.* `ios/`, `macos/`, `linux/`, `windows/` and `web/` are gone. `android/` is the only platform folder. `macos/Flutter/GeneratedPluginRegistrant.swift` goes with `macos/`, so G-020 no longer applies.
